@@ -4,6 +4,16 @@ import type { TableColumn } from '@nuxt/ui'
 import { storeToRefs } from 'pinia'
 import type { EmployeeActivityRecord, EmployeeActivityStatus } from '~/stores/employeeActivity'
 
+interface CustomerFilterItem {
+  id: number
+  username: string
+}
+
+interface EmployeeSelectItem {
+  label: string
+  value: number
+}
+
 definePageMeta({
   title: 'Активность сотрудников'
 })
@@ -14,10 +24,24 @@ const UButton = resolveComponent('UButton')
 const toast = useToast()
 const employeeActivityStore = useEmployeeActivityStore()
 const { list, loading } = storeToRefs(employeeActivityStore)
+const activeBuilding = useState<{ id: number, name: string } | null>('active-building')
+const editOpen = ref(false)
+const editLoading = ref(false)
+const employeesLoading = ref(false)
+const editingRecord = ref<EmployeeActivityRecord | null>(null)
+const employeeOptions = ref<EmployeeSelectItem[]>([])
 
 const filters = reactive({
   from: '',
-  to: ''
+  to: '',
+  employeeIds: [] as number[]
+})
+
+const editState = reactive({
+  date: '',
+  status: 'on_time' as EmployeeActivityStatus,
+  workMinutes: '',
+  lateMinutes: ''
 })
 
 function statusColor(status: EmployeeActivityStatus) {
@@ -53,20 +77,89 @@ function getErrorMessage(error: unknown) {
   return undefined
 }
 
+function normalizeEmployeeFilters() {
+  if (!filters.employeeIds.length) {
+    return
+  }
+
+  const availableIds = new Set(employeeOptions.value.map(item => item.value))
+  filters.employeeIds = filters.employeeIds.filter(employeeId => availableIds.has(employeeId))
+}
+
+async function loadEmployeeOptions() {
+  employeesLoading.value = true
+
+  try {
+    const customers = await $fetch<CustomerFilterItem[]>('/api/customers', {
+      query: {
+        buildingId: activeBuilding.value?.id || undefined
+      }
+    })
+
+    employeeOptions.value = customers
+      .map(customer => ({
+        label: customer.username,
+        value: customer.id
+      }))
+      .sort((left, right) => left.label.localeCompare(right.label, 'ru'))
+
+    normalizeEmployeeFilters()
+  } catch (error) {
+    employeeOptions.value = []
+    filters.employeeIds = []
+
+    toast.add({
+      title: 'Не удалось загрузить список сотрудников',
+      description: getErrorMessage(error) || 'Повторите попытку позже.',
+      color: 'error'
+    })
+  } finally {
+    employeesLoading.value = false
+  }
+}
+
 async function loadActivities() {
   try {
     await employeeActivityStore.fetchActivities({
       from: filters.from,
-      to: filters.to
+      to: filters.to,
+      buildingId: activeBuilding.value?.id,
+      employeeIds: filters.employeeIds
     })
   } catch (error) {
     toast.add({
       title: 'Не удалось загрузить активность сотрудников',
-      description: getErrorMessage(error) || 'Проверьте API-заглушку активности сотрудников.',
+      description: getErrorMessage(error) || 'Проверьте API активности сотрудников.',
       color: 'error'
     })
   }
 }
+
+async function loadPageData() {
+  await loadEmployeeOptions()
+  await loadActivities()
+}
+
+watch(() => activeBuilding.value?.id, async (newBuildingId, oldBuildingId) => {
+  if (newBuildingId === oldBuildingId) {
+    return
+  }
+
+  filters.employeeIds = []
+  employeeActivityStore.$patch({ list: [] })
+  await loadPageData()
+})
+
+watch(() => editState.status, (status) => {
+  if (status === 'on_time') {
+    editState.lateMinutes = '0'
+  }
+
+  if (status === 'absent') {
+    editState.workMinutes = '0'
+    editState.lateMinutes = '0'
+  }
+})
 
 async function applyFilters() {
   await loadActivities()
@@ -75,22 +168,94 @@ async function applyFilters() {
 async function resetFilters() {
   filters.from = ''
   filters.to = ''
+  filters.employeeIds = []
   await loadActivities()
 }
 
-function editRecord(record: EmployeeActivityRecord) {
-  toast.add({
-    title: 'Редактирование пока недоступно',
-    description: `${record.employeeName} за ${formatDate(record.date)}`,
-    color: 'neutral'
-  })
+function openEditModal(record: EmployeeActivityRecord) {
+  editingRecord.value = record
+  editState.date = record.date.slice(0, 10)
+  editState.status = record.status
+  editState.workMinutes = String(record.workMinutes)
+  editState.lateMinutes = String(record.lateMinutes)
+  editOpen.value = true
+}
+
+function parseNonNegativeInteger(value: string, fieldLabel: string) {
+  const parsed = Number(value)
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`Поле "${fieldLabel}" должно быть целым числом не меньше 0.`)
+  }
+
+  return parsed
+}
+
+function normalizeEditValues() {
+  let workMinutes = parseNonNegativeInteger(editState.workMinutes || '0', 'Рабочие минуты')
+  let lateMinutes = parseNonNegativeInteger(editState.lateMinutes || '0', 'Минуты опоздания')
+
+  if (editState.status === 'on_time') {
+    lateMinutes = 0
+  }
+
+  if (editState.status === 'absent') {
+    workMinutes = 0
+    lateMinutes = 0
+  }
+
+  return {
+    workMinutes,
+    lateMinutes
+  }
+}
+
+async function saveEditRecord() {
+  if (!editingRecord.value || editLoading.value) {
+    return
+  }
+
+  editLoading.value = true
+
+  try {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(editState.date)) {
+      throw new Error('Поле "Дата" должно быть в формате YYYY-MM-DD.')
+    }
+
+    const { workMinutes, lateMinutes } = normalizeEditValues()
+
+    await employeeActivityStore.updateActivity(editingRecord.value.id, {
+      date: editState.date,
+      status: editState.status,
+      workMinutes,
+      lateMinutes
+    })
+
+    await loadActivities()
+    editOpen.value = false
+
+    toast.add({
+      title: 'Активность обновлена',
+      description: `${editingRecord.value.employeeName} за ${formatDate(editState.date)}`,
+      color: 'success'
+    })
+  } catch (error) {
+    toast.add({
+      title: 'Не удалось сохранить изменения',
+      description: getErrorMessage(error) || 'Повторите попытку.',
+      color: 'error'
+    })
+  } finally {
+    editLoading.value = false
+  }
 }
 
 if (import.meta.server) {
-  await loadActivities()
+  await loadPageData()
 } else {
   employeeActivityStore.$patch({ list: [] })
-  void loadActivities()
+  employeeOptions.value = []
+  void loadPageData()
 }
 
 const totalWorkMinutes = computed(() =>
@@ -118,12 +283,10 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
   {
     accessorKey: 'status',
     header: 'Статус',
-    cell: ({ row }) => {
-      return h(UBadge, {
-        color: statusColor(row.original.status),
-        variant: 'subtle'
-      }, () => statusLabel(row.original.status))
-    }
+    cell: ({ row }) => h(UBadge, {
+      color: statusColor(row.original.status),
+      variant: 'subtle'
+    }, () => statusLabel(row.original.status))
   },
   {
     accessorKey: 'workMinutes',
@@ -138,18 +301,16 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
   {
     id: 'actions',
     header: () => h('div', { class: 'text-right' }, 'Действия'),
-    cell: ({ row }) => {
-      return h('div', { class: 'flex justify-end' }, [
-        h(UButton, {
-          label: 'Редактировать',
-          icon: 'i-lucide-pencil',
-          size: 'xs',
-          color: 'primary',
-          variant: 'subtle',
-          onClick: () => editRecord(row.original)
-        })
-      ])
-    }
+    cell: ({ row }) => h('div', { class: 'flex justify-end' }, [
+      h(UButton, {
+        label: 'Редактировать',
+        icon: 'i-lucide-pencil',
+        size: 'xs',
+        color: 'primary',
+        variant: 'subtle',
+        onClick: () => openEditModal(row.original)
+      })
+    ])
   }
 ]
 </script>
@@ -186,7 +347,7 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
               <div
                 v-for="n in 4"
                 :key="`activity-stat-${n}`"
-                class="min-w-36 rounded-xl border border-default bg-elevated/40 px-4 py-3 animate-pulse space-y-2"
+                class="min-w-36 animate-pulse space-y-2 rounded-xl border border-default bg-elevated/40 px-4 py-3"
               >
                 <div class="h-3 w-20 rounded bg-default/50" />
                 <div class="h-8 w-24 rounded bg-default/70" />
@@ -233,8 +394,8 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
           </div>
 
           <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div class="flex flex-col gap-4 sm:flex-row">
-              <UFormField label="С" class="min-w-44">
+            <div class="grid flex-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <UFormField label="С">
                 <UInput
                   v-model="filters.from"
                   type="date"
@@ -242,11 +403,25 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
                 />
               </UFormField>
 
-              <UFormField label="По" class="min-w-44">
+              <UFormField label="По">
                 <UInput
                   v-model="filters.to"
                   type="date"
                   :min="filters.from || undefined"
+                />
+              </UFormField>
+
+              <UFormField label="Сотрудники">
+                <USelectMenu
+                  v-model="filters.employeeIds"
+                  :items="employeeOptions"
+                  value-key="value"
+                  label-key="label"
+                  multiple
+                  searchable
+                  class="w-full"
+                  placeholder="Выберите сотрудников"
+                  :disabled="employeesLoading"
                 />
               </UFormField>
             </div>
@@ -265,11 +440,15 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
                 icon="i-lucide-rotate-cw"
                 color="neutral"
                 variant="subtle"
-                :disabled="!filters.from && !filters.to"
+                :disabled="!filters.from && !filters.to && !filters.employeeIds.length"
                 @click="resetFilters"
               />
             </div>
           </div>
+
+          <p v-if="!employeeOptions.length && !employeesLoading" class="text-xs text-muted">
+            Для текущего здания сотрудники не найдены.
+          </p>
         </UCard>
 
         <UCard :ui="{ body: '!p-0' }">
@@ -279,7 +458,7 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
                 Таблица активности сотрудников
               </h2>
               <p class="text-sm text-muted">
-                Временные записи загружаются из <code>/api/employee/activity</code>.
+                Записи загружаются из <code>/api/employee/activity</code>.
               </p>
             </div>
 
@@ -288,8 +467,8 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
               icon="i-lucide-refresh-cw"
               color="neutral"
               variant="ghost"
-              :loading="loading"
-              @click="loadActivities"
+              :loading="loading || employeesLoading"
+              @click="loadPageData"
             />
           </div>
 
@@ -313,6 +492,78 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
           </div>
         </UCard>
       </div>
+
+      <UModal
+        v-model:open="editOpen"
+        :title="editingRecord ? `Редактировать активность: ${editingRecord.employeeName}` : 'Редактировать активность'"
+        description="Измените дату, статус и рабочие метрики сотрудника."
+      >
+        <template #body>
+          <div class="space-y-4">
+            <UFormField label="Дата">
+              <UInput
+                v-model="editState.date"
+                type="date"
+                class="w-full"
+              />
+            </UFormField>
+
+            <UFormField label="Статус">
+              <USelect
+                v-model="editState.status"
+                :items="[
+                  { label: 'Вовремя', value: 'on_time' },
+                  { label: 'Опоздание', value: 'late' },
+                  { label: 'Отсутствие', value: 'absent' }
+                ]"
+                class="w-full"
+              />
+            </UFormField>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <UFormField label="Рабочие минуты">
+                <UInput
+                  v-model="editState.workMinutes"
+                  type="number"
+                  min="0"
+                  step="1"
+                  :disabled="editState.status === 'absent'"
+                  class="w-full"
+                />
+              </UFormField>
+
+              <UFormField label="Минуты опоздания">
+                <UInput
+                  v-model="editState.lateMinutes"
+                  type="number"
+                  min="0"
+                  step="1"
+                  :disabled="editState.status !== 'late'"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+          </div>
+        </template>
+
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UButton
+              label="Отмена"
+              color="neutral"
+              variant="subtle"
+              :disabled="editLoading"
+              @click="editOpen = false"
+            />
+            <UButton
+              label="Сохранить"
+              color="primary"
+              :loading="editLoading"
+              @click="saveEditRecord"
+            />
+          </div>
+        </template>
+      </UModal>
     </template>
   </UDashboardPanel>
 </template>

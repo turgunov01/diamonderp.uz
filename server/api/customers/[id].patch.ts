@@ -1,4 +1,5 @@
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+import { deleteEmployeeActivitiesByEmployeeId } from '../../utils/employee-activity'
 import {
   mapCustomerDbRowToRecord,
   mapUpdateBodyToDbUpdate,
@@ -183,6 +184,10 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
   return update
 }
 
+function isCustomerInactive(row: CustomerDbRow) {
+  return !row.object_pinned?.trim()
+}
+
 export default eventHandler(async (event) => {
   const customerId = parseCustomerId(event)
   const updateBody = parseUpdateBody(await readBody(event))
@@ -207,6 +212,14 @@ export default eventHandler(async (event) => {
         statusCode: 404,
         statusMessage: 'Пользователь не найден.'
       })
+    }
+
+    if (isCustomerInactive(updatedRow)) {
+      try {
+        await deleteEmployeeActivitiesByEmployeeId(customerId)
+      } catch (cleanupError) {
+        console.error('Failed to cleanup employee activities after customer deactivation.', cleanupError)
+      }
     }
 
     return mapCustomerDbRowToRecord(updatedRow)

@@ -1,99 +1,36 @@
-type EmployeeActivityStatus = 'on_time' | 'late' | 'absent'
+import { listEmployeeActivities } from '../../utils/employee-activity'
 
-type EmployeeActivityRecord = {
-  id: number
-  employeeName: string
-  date: string
-  status: EmployeeActivityStatus
-  workMinutes: number
-  lateMinutes: number
-}
-
-function buildDate(daysAgo: number, hours: number, minutes: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - daysAgo)
-  date.setHours(hours, minutes, 0, 0)
-  return date.toISOString()
-}
-
-function parseDateBoundary(value: string | undefined, endOfDay = false) {
-  if (!value) {
-    return null
+function parseDateFilter(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
   }
 
-  const date = new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}`)
-  return Number.isNaN(date.getTime()) ? null : date
+  const normalized = value.trim()
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : undefined
 }
 
-const activities: EmployeeActivityRecord[] = [
-  {
-    id: 1,
-    employeeName: 'Aziza Karimova',
-    date: buildDate(0, 8, 58),
-    status: 'on_time',
-    workMinutes: 540,
-    lateMinutes: 0
-  },
-  {
-    id: 2,
-    employeeName: 'Bekzod Tursunov',
-    date: buildDate(0, 9, 17),
-    status: 'late',
-    workMinutes: 505,
-    lateMinutes: 17
-  },
-  {
-    id: 3,
-    employeeName: 'Dilshod Rakhimov',
-    date: buildDate(1, 9, 0),
-    status: 'absent',
-    workMinutes: 0,
-    lateMinutes: 0
-  },
-  {
-    id: 4,
-    employeeName: 'Malika Yuldasheva',
-    date: buildDate(1, 8, 51),
-    status: 'on_time',
-    workMinutes: 555,
-    lateMinutes: 0
-  },
-  {
-    id: 5,
-    employeeName: 'Sardor Ismailov',
-    date: buildDate(2, 9, 9),
-    status: 'late',
-    workMinutes: 498,
-    lateMinutes: 9
-  },
-  {
-    id: 6,
-    employeeName: 'Nodira Rasulova',
-    date: buildDate(3, 8, 44),
-    status: 'on_time',
-    workMinutes: 562,
-    lateMinutes: 0
-  }
-]
+function parseBuildingId(value: unknown) {
+  const buildingId = typeof value === 'string' ? Number(value) : NaN
+  return Number.isInteger(buildingId) && buildingId > 0 ? buildingId : undefined
+}
 
-export default eventHandler((event) => {
+function parseEmployeeIds(value: unknown) {
+  const rawValues = Array.isArray(value) ? value : [value]
+  const employeeIds = rawValues
+    .flatMap(rawValue => typeof rawValue === 'string' ? rawValue.split(',') : [])
+    .map(rawValue => Number(rawValue.trim()))
+    .filter((employeeId): employeeId is number => Number.isInteger(employeeId) && employeeId > 0)
+
+  return employeeIds.length ? [...new Set(employeeIds)] : undefined
+}
+
+export default eventHandler(async (event) => {
   const query = getQuery(event)
-  const from = typeof query.from === 'string' ? parseDateBoundary(query.from) : null
-  const to = typeof query.to === 'string' ? parseDateBoundary(query.to, true) : null
 
-  return activities
-    .filter((item) => {
-      const timestamp = new Date(item.date).getTime()
-
-      if (from && timestamp < from.getTime()) {
-        return false
-      }
-
-      if (to && timestamp > to.getTime()) {
-        return false
-      }
-
-      return true
-    })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  return await listEmployeeActivities({
+    from: parseDateFilter(query.from),
+    to: parseDateFilter(query.to),
+    buildingId: parseBuildingId(query.buildingId),
+    employeeIds: parseEmployeeIds(query.employeeIds)
+  })
 })

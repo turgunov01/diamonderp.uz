@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
+import type { AuthSession } from '~/shared/types/auth'
 
 defineProps<{
   collapsed?: boolean
@@ -7,6 +8,7 @@ defineProps<{
 
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
+const { session, logout } = useAuth()
 
 const colors = ['red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose']
 const neutrals = ['slate', 'gray', 'zinc', 'neutral', 'stone']
@@ -61,12 +63,48 @@ const { data: userMenu } = await useFetch<UserMenuPayload>('/api/routes/user-men
   default: () => defaultUserMenu
 })
 
-const user = computed(() => userMenu.value?.user ?? defaultUserMenu.user)
+function getUserAvatar(sessionUser: AuthSession | null) {
+  if (!sessionUser?.avatar) {
+    return defaultUserMenu.user.avatar
+  }
+
+  return {
+    src: sessionUser.avatar,
+    alt: sessionUser.name
+  }
+}
+
+function attachMenuActions(groups: DropdownMenuItem[][]) {
+  return groups.map(group => group.map(item => {
+    if (item.label !== 'Выйти') {
+      return item
+    }
+
+    return {
+      ...item,
+      async onSelect(event: Event) {
+        event.preventDefault()
+        await logout()
+      }
+    } satisfies DropdownMenuItem
+  }))
+}
+
+const user = computed(() => {
+  if (session.value) {
+    return {
+      name: session.value.name,
+      avatar: getUserAvatar(session.value)
+    }
+  }
+
+  return userMenu.value?.user ?? defaultUserMenu.user
+})
 
 const items = computed<DropdownMenuItem[][]>(() => {
   const fetchedGroups = userMenu.value?.groups ?? []
   const firstGroup = fetchedGroups[0] ?? []
-  const trailingGroups = fetchedGroups.slice(1)
+  const trailingGroups = attachMenuActions(fetchedGroups.slice(1))
 
   return [
     [{

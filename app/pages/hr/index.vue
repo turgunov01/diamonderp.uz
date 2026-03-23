@@ -3,6 +3,7 @@ import type { TableColumn } from '@nuxt/ui'
 import { upperFirst } from 'scule'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
+import type { EmployeeActivityRecord } from '~/stores/employeeActivity'
 
 interface Customer {
   id: number
@@ -30,9 +31,25 @@ interface ShiftDraft {
 }
 
 interface SalaryDraft {
-  baseSalary: number
-  positionBonus: number
+  baseSalary: string
+  positionBonus: string
   saving: boolean
+}
+
+interface SalaryFormulaConfig {
+  daysInMonth: string
+  workHoursPerDay: string
+  minutesPerHour: string
+  penaltyMultiplier: string
+}
+
+function createDefaultSalaryFormulaConfig(): SalaryFormulaConfig {
+  return {
+    daysInMonth: '',
+    workHoursPerDay: String(WORK_HOURS_PER_DAY),
+    minutesPerHour: String(MINUTES_PER_HOUR),
+    penaltyMultiplier: String(LATE_PENALTY_MULTIPLIER)
+  }
 }
 
 const UAvatar = resolveComponent('UAvatar')
@@ -49,6 +66,12 @@ const selectedCustomer = ref<Customer | null>(null)
 const deletingSelected = ref(false)
 const editCustomerOpen = ref(false)
 const editingCustomer = ref<Customer | null>(null)
+const salaryMonthSeed = useState<string>('hr-salary-month-seed', () => new Date().toISOString())
+const salaryFormulaOpen = ref(false)
+
+const WORK_HOURS_PER_DAY = 12
+const MINUTES_PER_HOUR = 60
+const LATE_PENALTY_MULTIPLIER = 4
 
 const hrTabs = [{
   label: 'Пользователи',
@@ -71,6 +94,21 @@ const rowSelection = ref({})
 
 const shiftDrafts = ref<Record<number, ShiftDraft>>({})
 const salaryDrafts = ref<Record<number, SalaryDraft>>({})
+const salaryFormulaCookie = useCookie<SalaryFormulaConfig>('hr-salary-formula-config', {
+  default: () => createDefaultSalaryFormulaConfig(),
+  sameSite: 'lax',
+  maxAge: 60 * 60 * 24 * 365
+})
+const salaryFormulaConfig = useState<SalaryFormulaConfig>('hr-salary-formula-config', () => ({
+  ...createDefaultSalaryFormulaConfig(),
+  ...salaryFormulaCookie.value
+}))
+const salaryFormulaDraft = reactive<SalaryFormulaConfig>({
+  daysInMonth: salaryFormulaConfig.value.daysInMonth,
+  workHoursPerDay: salaryFormulaConfig.value.workHoursPerDay,
+  minutesPerHour: salaryFormulaConfig.value.minutesPerHour,
+  penaltyMultiplier: salaryFormulaConfig.value.penaltyMultiplier
+})
 
 const { data, status, error, refresh } = await useAutoRefreshFetch<Customer[]>('/api/customers', {
   lazy: true,
@@ -79,8 +117,56 @@ const { data, status, error, refresh } = await useAutoRefreshFetch<Customer[]>('
     buildingId: computed(() => activeBuilding.value?.id)
   }
 })
+const salaryMonthDate = computed(() => new Date(salaryMonthSeed.value))
+const salaryMonthStart = computed(() => {
+  const date = salaryMonthDate.value
+  return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10)
+})
+const salaryMonthEnd = computed(() => {
+  const date = salaryMonthDate.value
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().slice(0, 10)
+})
+const salaryMonthDays = computed(() => {
+  const date = salaryMonthDate.value
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+})
+const salaryMonthLabel = computed(() =>
+  salaryMonthDate.value.toLocaleDateString('ru-RU', {
+    month: 'long',
+    year: 'numeric'
+  })
+)
+const effectiveSalaryMonthDays = computed(() =>
+  normalizeFormulaValue(salaryFormulaConfig.value.daysInMonth, salaryMonthDays.value)
+)
+const effectiveWorkHoursPerDay = computed(() =>
+  normalizeFormulaValue(salaryFormulaConfig.value.workHoursPerDay, WORK_HOURS_PER_DAY)
+)
+const effectiveMinutesPerHour = computed(() =>
+  normalizeFormulaValue(salaryFormulaConfig.value.minutesPerHour, MINUTES_PER_HOUR)
+)
+const effectivePenaltyMultiplier = computed(() =>
+  normalizeFormulaValue(salaryFormulaConfig.value.penaltyMultiplier, LATE_PENALTY_MULTIPLIER)
+)
+const {
+  data: monthlyActivityData,
+  status: monthlyActivityStatus,
+  error: monthlyActivityError
+} = await useAutoRefreshFetch<EmployeeActivityRecord[]>('/api/employee/activity', {
+  lazy: true,
+  default: () => [],
+  query: {
+    from: salaryMonthStart,
+    to: salaryMonthEnd,
+    buildingId: computed(() => activeBuilding.value?.id)
+  }
+})
 const safeCustomers = computed(() => data.value || [])
+const safeMonthlyActivities = computed(() => monthlyActivityData.value || [])
 const isLoading = computed(() => status.value === 'pending' || status.value === 'idle')
+const isSalaryActivityLoading = computed(() =>
+  monthlyActivityStatus.value === 'pending' || monthlyActivityStatus.value === 'idle'
+)
 
 watch(error, (newError) => {
   if (!newError) {
@@ -90,6 +176,18 @@ watch(error, (newError) => {
   toast.add({
     title: 'Не удалось загрузить клиентов',
     description: newError.statusMessage || 'Проверьте API и переменные окружения Supabase.',
+    color: 'error'
+  })
+}, { immediate: true })
+
+watch(monthlyActivityError, (newError) => {
+  if (!newError) {
+    return
+  }
+
+  toast.add({
+    title: 'Не удалось загрузить активность сотрудников для расчета зарплаты',
+    description: newError.statusMessage || 'Проверьте API активности сотрудников.',
     color: 'error'
   })
 }, { immediate: true })
@@ -111,8 +209,8 @@ watch(data, (customers) => {
     }
 
     nextSalaryDrafts[customer.id] = {
-      baseSalary: customer.baseSalary,
-      positionBonus: customer.positionBonus,
+      baseSalary: String(customer.baseSalary),
+      positionBonus: String(customer.positionBonus),
       saving: false
     }
   }
@@ -120,6 +218,50 @@ watch(data, (customers) => {
   shiftDrafts.value = nextShiftDrafts
   salaryDrafts.value = nextSalaryDrafts
 }, { immediate: true })
+
+function normalizeFormulaValue(value: string, fallback: number) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function resetSalaryFormulaDraft() {
+  salaryFormulaDraft.daysInMonth = salaryFormulaConfig.value.daysInMonth
+  salaryFormulaDraft.workHoursPerDay = salaryFormulaConfig.value.workHoursPerDay
+  salaryFormulaDraft.minutesPerHour = salaryFormulaConfig.value.minutesPerHour
+  salaryFormulaDraft.penaltyMultiplier = salaryFormulaConfig.value.penaltyMultiplier
+}
+
+function updateSalaryFormulaDraft(
+  field: keyof SalaryFormulaConfig,
+  value: string | number
+) {
+  salaryFormulaDraft[field] = String(value ?? '').replace(/[^\d]/g, '')
+}
+
+function saveSalaryFormulaConfig() {
+  const nextConfig: SalaryFormulaConfig = {
+    daysInMonth: salaryFormulaDraft.daysInMonth,
+    workHoursPerDay: salaryFormulaDraft.workHoursPerDay,
+    minutesPerHour: salaryFormulaDraft.minutesPerHour,
+    penaltyMultiplier: salaryFormulaDraft.penaltyMultiplier
+  }
+
+  salaryFormulaConfig.value = nextConfig
+  salaryFormulaCookie.value = nextConfig
+  salaryFormulaOpen.value = false
+
+  toast.add({
+    title: 'Формула сохранена',
+    description: 'Новые параметры сразу применены к расчету зарплаты.',
+    color: 'success'
+  })
+}
+
+watch(salaryFormulaOpen, (value) => {
+  if (value) {
+    resetSalaryFormulaDraft()
+  }
+})
 
 function openCustomerInfo(customer: Customer) {
   selectedCustomer.value = customer
@@ -346,13 +488,73 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
-function getSalaryTotal(customerId: number) {
+const lateMinutesByEmployee = computed(() => {
+  const totals: Record<number, number> = {}
+
+  for (const activity of safeMonthlyActivities.value) {
+    if (!activity.employeeId) {
+      continue
+    }
+
+    totals[activity.employeeId] = (totals[activity.employeeId] || 0) + (activity.lateMinutes || 0)
+  }
+
+  return totals
+})
+
+function getBaseSalary(customerId: number) {
   const draft = salaryDrafts.value[customerId]
   if (!draft) {
     return 0
   }
 
-  return (Number(draft.baseSalary) || 0) + (Number(draft.positionBonus) || 0)
+  return Number(draft.baseSalary) || 0
+}
+
+function getPositionBonus(customerId: number) {
+  const draft = salaryDrafts.value[customerId]
+  if (!draft) {
+    return 0
+  }
+
+  return Number(draft.positionBonus) || 0
+}
+
+function getEmployeeLateMinutes(customerId: number) {
+  return lateMinutesByEmployee.value[customerId] || 0
+}
+
+function getLatePenalty(customerId: number) {
+  const baseSalary = getBaseSalary(customerId)
+  const lateMinutes = getEmployeeLateMinutes(customerId)
+
+  if (!baseSalary || !lateMinutes || !effectiveSalaryMonthDays.value) {
+    return 0
+  }
+
+  const perMinuteRate = baseSalary
+    / effectiveSalaryMonthDays.value
+    / effectiveWorkHoursPerDay.value
+    / effectiveMinutesPerHour.value
+
+  return Math.round(perMinuteRate * effectivePenaltyMultiplier.value * lateMinutes)
+}
+
+function getGrossSalary(customerId: number) {
+  return getBaseSalary(customerId) + getPositionBonus(customerId)
+}
+
+function getSalaryTotal(customerId: number) {
+  return Math.max(getGrossSalary(customerId) - getLatePenalty(customerId), 0)
+}
+
+function updateSalaryDraft(customerId: number, field: 'baseSalary' | 'positionBonus', value: string | number) {
+  const draft = salaryDrafts.value[customerId]
+  if (!draft) {
+    return
+  }
+
+  draft[field] = String(value ?? '').replace(/[^\d]/g, '')
 }
 
 function parseNonNegativeInteger(value: unknown, fieldName: string) {
@@ -716,6 +918,28 @@ async function saveCustomerSalary(customer: Customer) {
         </div>
 
         <div v-else class="space-y-4">
+          <div class="rounded-lg border border-default bg-elevated/30 p-4 text-sm text-muted">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p class="font-medium text-highlighted">
+                  Расчет за {{ salaryMonthLabel }}
+                </p>
+                <p class="mt-1">
+                  Формула штрафа: (индивидуальная базовая зарплата / {{ effectiveSalaryMonthDays }} / {{ effectiveWorkHoursPerDay }} / {{ effectiveMinutesPerHour }}) * {{ effectivePenaltyMultiplier }} * минуты опоздания за месяц.
+                </p>
+              </div>
+
+              <UButton
+                icon="i-lucide-settings-2"
+                color="neutral"
+                variant="subtle"
+                square
+                aria-label="Настроить формулу зарплаты"
+                @click="salaryFormulaOpen = true"
+              />
+            </div>
+          </div>
+
           <div class="rounded-lg border border-default overflow-x-auto">
             <table class="min-w-full text-sm">
               <thead>
@@ -754,22 +978,33 @@ async function saveCustomerSalary(customer: Customer) {
                   </td>
                   <td class="px-3 py-2 min-w-48">
                     <UInput
-                      v-model="salaryDrafts[customer.id]!.baseSalary"
+                      :model-value="salaryDrafts[customer.id]?.baseSalary ?? ''"
                       type="number"
                       min="0"
                       step="1"
+                      inputmode="numeric"
+                      @update:model-value="updateSalaryDraft(customer.id, 'baseSalary', $event)"
                     />
                   </td>
                   <td class="px-3 py-2 min-w-40">
                     <UInput
-                      v-model="salaryDrafts[customer.id]!.positionBonus"
+                      :model-value="salaryDrafts[customer.id]?.positionBonus ?? ''"
                       type="number"
                       min="0"
                       step="1"
+                      inputmode="numeric"
+                      @update:model-value="updateSalaryDraft(customer.id, 'positionBonus', $event)"
                     />
                   </td>
                   <td class="px-3 py-2 font-medium whitespace-nowrap">
-                    {{ formatCurrency(getSalaryTotal(customer.id)) }}
+                    <div class="space-y-1">
+                      <p>{{ formatCurrency(getSalaryTotal(customer.id)) }}</p>
+                      <p class="text-xs font-normal text-muted">
+                        {{ isSalaryActivityLoading
+                          ? 'Загрузка активности...'
+                          : `Опоздание: ${getEmployeeLateMinutes(customer.id)} мин, штраф: ${formatCurrency(getLatePenalty(customer.id))}` }}
+                      </p>
+                    </div>
                   </td>
                   <td class="px-3 py-2 text-right">
                     <UButton
@@ -790,6 +1025,77 @@ async function saveCustomerSalary(customer: Customer) {
           </p>
         </div>
       </div>
+
+      <UModal
+        v-model:open="salaryFormulaOpen"
+        title="Настройки формулы зарплаты"
+        description="Измените параметры расчета штрафа за опоздание."
+      >
+        <template #body>
+          <div class="space-y-4">
+            <UFormField label="Дней в расчете">
+              <UInput
+                :model-value="salaryFormulaDraft.daysInMonth"
+                type="number"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                placeholder="Авто по текущему месяцу"
+                @update:model-value="updateSalaryFormulaDraft('daysInMonth', $event)"
+              />
+            </UFormField>
+
+            <UFormField label="Рабочих часов в день">
+              <UInput
+                :model-value="salaryFormulaDraft.workHoursPerDay"
+                type="number"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                @update:model-value="updateSalaryFormulaDraft('workHoursPerDay', $event)"
+              />
+            </UFormField>
+
+            <UFormField label="Минут в часе">
+              <UInput
+                :model-value="salaryFormulaDraft.minutesPerHour"
+                type="number"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                @update:model-value="updateSalaryFormulaDraft('minutesPerHour', $event)"
+              />
+            </UFormField>
+
+            <UFormField label="Множитель штрафа">
+              <UInput
+                :model-value="salaryFormulaDraft.penaltyMultiplier"
+                type="number"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                @update:model-value="updateSalaryFormulaDraft('penaltyMultiplier', $event)"
+              />
+            </UFormField>
+          </div>
+        </template>
+
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UButton
+              label="Отмена"
+              color="neutral"
+              variant="subtle"
+              @click="salaryFormulaOpen = false"
+            />
+            <UButton
+              label="Сохранить"
+              color="primary"
+              @click="saveSalaryFormulaConfig"
+            />
+          </div>
+        </template>
+      </UModal>
 
       <UModal
         v-model:open="customerInfoOpen"

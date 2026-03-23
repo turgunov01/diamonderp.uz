@@ -29,7 +29,7 @@ const links: SidebarLinks = [
         },
         {
           label: 'Активность сотрудников',
-          icon: 'i-heroicons-clock',
+          // icon: 'i-heroicons-clock',
           to: '/hr/employee-activity',
           exact: true
         },

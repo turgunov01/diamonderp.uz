@@ -159,7 +159,7 @@ const {
   error,
   status,
   refresh
-} = await useAsyncData<DocumentsResponse>(
+} = await useAutoRefreshAsyncData<DocumentsResponse>(
   'documents-data',
   () => {
     if (!objectId.value) {
@@ -182,7 +182,7 @@ const {
 const {
   data: customers,
   refresh: refreshCustomers
-} = await useAsyncData<Customer[]>(
+} = await useAutoRefreshAsyncData<Customer[]>(
   'documents-customers',
   () => {
     const query: Record<string, number> = {}

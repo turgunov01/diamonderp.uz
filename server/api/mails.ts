@@ -3,65 +3,65 @@ import { sub } from 'date-fns'
 const mails = [{
   id: 1,
   from: {
-    name: 'Alex Smith',
+    name: 'Алексей Смирнов',
     email: 'alex.smith@example.com',
     avatar: {
       src: 'https://i.pravatar.cc/128?u=1'
     }
   },
-  subject: 'Meeting Schedule: Q1 Marketing Strategy Review',
-  body: `Dear Team,
+  subject: 'График встречи: обзор маркетинговой стратегии за 1 квартал',
+  body: `Коллеги,
 
-I hope this email finds you well. Just a quick reminder about our Q1 Marketing Strategy meeting scheduled for tomorrow at 10 AM EST in Conference Room A.
+Напоминаю о встрече по маркетинговой стратегии за 1 квартал, которая состоится завтра в 10:00 в конференц-зале A.
 
-Agenda:
-- Q4 Performance Review
-- New Campaign Proposals
-- Budget Allocation for Q2
-- Team Resource Planning
+Повестка:
+- Разбор результатов за 4 квартал
+- Новые предложения по кампаниям
+- Распределение бюджета на 2 квартал
+- Планирование ресурсов команды
 
-Please come prepared with your department updates. I've attached the preliminary deck for your review.
+Пожалуйста, подготовьте обновления по своим направлениям. Предварительная презентация приложена для ознакомления.
 
-Best regards,
-Alex Smith
-Senior Marketing Director
-Tel: (555) 123-4567`,
+С уважением,
+Алексей Смирнов
+Директор по маркетингу
+Тел.: (555) 123-4567`,
   date: new Date().toISOString()
 }, {
   id: 2,
   unread: true,
   from: {
-    name: 'Jordan Brown',
+    name: 'Жасур Браун',
     email: 'jordan.brown@example.com',
     avatar: {
       src: 'https://i.pravatar.cc/128?u=2'
     }
   },
-  subject: 'RE: Project Phoenix - Sprint 3 Update',
-  body: `Hi team,
+  subject: 'RE: Проект Phoenix - обновление по спринту 3',
+  body: `Коллеги,
 
-Quick update on Sprint 3 deliverables:
+Короткое обновление по задачам спринта 3:
 
-✅ User authentication module completed
-🏗️ Payment integration at 80%
-⏳ API documentation pending review
+Модуль аутентификации пользователей завершен.
+Интеграция платежей выполнена на 80%.
+Документация API ожидает ревью.
 
-Key metrics:
-- Code coverage: 94%
-- Sprint velocity: 45 points
-- Bug resolution rate: 98%
+Ключевые метрики:
+- Покрытие кода: 94%
+- Скорость спринта: 45 поинтов
+- Уровень закрытия багов: 98%
 
-Please review the attached report for detailed analysis. Let's discuss any blockers in tomorrow's stand-up.
+Посмотрите приложенный отчет для детального анализа. Обсудим блокеры на завтрашнем стендапе.
 
-Regards,
-Jordan
+С уважением,
+Жасур Браун
 
 --
-Jordan Brown
-Lead Developer | Tech Solutions
-Mobile: +1 (555) 234-5678`,
+Жасур Браун
+Ведущий разработчик | Tech Solutions
+Моб.: +1 (555) 234-5678`,
   date: sub(new Date(), { minutes: 7 }).toISOString()
-},]
+}]
 
 export default eventHandler(async () => {
   return mails

@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { Member } from '~/types'
 
-const { data: members } = await useFetch<Member[]>('/api/members', { default: () => [] })
+const { data: members, status } = await useAutoRefreshFetch<Member[]>('/api/members', { default: () => [] })
 
 const q = ref('')
+const safeMembers = computed(() => members.value || [])
+const isLoading = computed(() => status.value === 'pending' || status.value === 'idle')
 
 const filteredMembers = computed(() => {
-  return members.value.filter((member) => {
+  return safeMembers.value.filter((member) => {
     return member.name.search(new RegExp(q.value, 'i')) !== -1 || member.username.search(new RegExp(q.value, 'i')) !== -1
   })
 })
@@ -15,14 +17,14 @@ const filteredMembers = computed(() => {
 <template>
   <div>
     <UPageCard
-      title="Members"
-      description="Invite new members by email address."
+      title="Пользователи"
+      description="Приглашайте новых пользователей по адресу электронной почты."
       variant="naked"
       orientation="horizontal"
       class="mb-4"
     >
       <UButton
-        label="Invite people"
+        label="Пригласить"
         color="neutral"
         class="w-fit lg:ms-auto"
       />
@@ -33,13 +35,27 @@ const filteredMembers = computed(() => {
         <UInput
           v-model="q"
           icon="i-lucide-search"
-          placeholder="Search members"
+          placeholder="Поиск пользователей"
           autofocus
           class="w-full"
         />
       </template>
 
-      <SettingsMembersList :members="filteredMembers" />
+      <div v-if="isLoading" class="divide-y divide-default">
+        <div
+          v-for="n in 6"
+          :key="`member-skeleton-${n}`"
+          class="flex items-center gap-3 px-4 py-4 animate-pulse"
+        >
+          <div class="h-10 w-10 rounded-full bg-default/60" />
+          <div class="min-w-0 flex-1 space-y-2">
+            <div class="h-4 w-40 rounded bg-default/70" />
+            <div class="h-3 w-28 rounded bg-default/50" />
+          </div>
+        </div>
+      </div>
+
+      <SettingsMembersList v-else :members="filteredMembers" />
     </UPageCard>
   </div>
 </template>

@@ -20,10 +20,10 @@ interface ObjectRow {
 export default eventHandler(async (event) => {
   const body = await readBody<Body>(event)
   if (!body?.name?.trim()) {
-    throw createError({ statusCode: 400, statusMessage: 'name is required' })
+    throw createError({ statusCode: 400, statusMessage: 'Название обязательно.' })
   }
   if (!body?.buildingId || body.buildingId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'buildingId is required' })
+    throw createError({ statusCode: 400, statusMessage: 'buildingId обязателен.' })
   }
 
   const { url, serviceRoleKey } = getSupabaseServerConfig()
@@ -45,7 +45,7 @@ export default eventHandler(async (event) => {
   })
 
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Failed to create object' })
+    throw createError({ statusCode: 500, statusMessage: 'Не удалось создать объект.' })
   }
 
   setResponseStatus(event, 201)

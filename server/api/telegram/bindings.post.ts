@@ -23,11 +23,11 @@ export default eventHandler(async (event) => {
   const objectId = Number(body?.objectId)
 
   if (!Number.isInteger(tgChatId) || tgChatId === 0) {
-    throw createError({ statusCode: 400, statusMessage: 'tgChatId is required' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле tgChatId обязательно.' })
   }
 
   if (!Number.isInteger(objectId) || objectId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'objectId is required' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле objectId обязательно.' })
   }
 
   const { url, serviceRoleKey } = getSupabaseServerConfig()
@@ -52,7 +52,7 @@ export default eventHandler(async (event) => {
   })
 
   if (!saved?.id) {
-    throw createError({ statusCode: 500, statusMessage: 'Failed to save Telegram binding' })
+    throw createError({ statusCode: 500, statusMessage: 'Не удалось сохранить привязку Telegram.' })
   }
 
   return {

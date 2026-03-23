@@ -63,7 +63,7 @@ async function createBuilding() {
 
   if (!form.name.trim()) {
     toast.add({
-      title: 'Building name is required',
+      title: 'Название здания обязательно',
       color: 'warning'
     })
     return
@@ -88,14 +88,14 @@ async function createBuilding() {
     resetForm()
 
     toast.add({
-      title: 'Building created',
+      title: 'Здание создано',
       description: created.name,
       color: 'success'
     })
   } catch (error: unknown) {
     toast.add({
-      title: 'Failed to create building',
-      description: getErrorMessage(error) || 'Check the building data and try again.',
+      title: 'Не удалось создать здание',
+      description: getErrorMessage(error) || 'Проверьте данные здания и повторите попытку.',
       color: 'error'
     })
   } finally {
@@ -118,19 +118,19 @@ const items = computed<DropdownMenuItem[][]>(() => {
   }))
 
   return [buildingItems, [{
-    label: 'Create building',
+    label: 'Создать здание',
     icon: 'i-lucide-building-2',
     onSelect() {
       createBuildingOpen.value = true
     }
   }, {
-    label: 'Create object',
+    label: 'Создать объект',
     icon: 'i-lucide-circle-plus',
     onSelect() {
       router.push('/objects/create')
     }
   }, {
-    label: 'My objects',
+    label: 'Мои объекты',
     icon: 'i-lucide-list',
     onSelect() {
       router.push('/objects')
@@ -147,7 +147,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
       :ui="{ content: collapsed ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width)' }"
     >
       <UButton
-        :label="collapsed ? undefined : limitBuildingName(selectedBuilding?.name || 'Select building')"
+        :label="collapsed ? undefined : limitBuildingName(selectedBuilding?.name || 'Выбрать здание')"
         :avatar="selectedBuilding?.logo ? { src: selectedBuilding.logo, alt: selectedBuilding.name } : undefined"
         :trailing-icon="collapsed ? undefined : 'i-lucide-chevrons-up-down'"
         color="neutral"
@@ -162,21 +162,21 @@ const items = computed<DropdownMenuItem[][]>(() => {
 
     <UModal
       v-model:open="createBuildingOpen"
-      title="Create building"
-      description="Add a building and use it as the top-level workspace scope."
+      title="Создать здание"
+      description="Добавьте здание и используйте его как верхний уровень рабочего пространства."
     >
       <template #body>
         <div class="space-y-4">
-          <UFormField label="Name" required>
+          <UFormField label="Название" required>
             <UInput
               v-model="form.name"
               class="w-full"
               :maxlength="BUILDING_NAME_MAX_LENGTH"
-              placeholder="Tashkent City Mall"
+              placeholder="Ташкент Сити Молл"
             />
           </UFormField>
 
-          <UFormField label="Logo URL">
+          <UFormField label="URL логотипа">
             <UInput
               v-model="form.logo"
               class="w-full"
@@ -184,25 +184,25 @@ const items = computed<DropdownMenuItem[][]>(() => {
             />
           </UFormField>
 
-          <UFormField label="Description">
+          <UFormField label="Описание">
             <UTextarea
               v-model="form.description"
               class="w-full"
               :rows="3"
-              placeholder="Short building description"
+              placeholder="Краткое описание здания"
             />
           </UFormField>
 
           <div class="flex justify-end gap-2">
             <UButton
-              label="Cancel"
+              label="Отмена"
               color="neutral"
               variant="subtle"
               :disabled="creating"
               @click="createBuildingOpen = false"
             />
             <UButton
-              label="Create"
+              label="Создать"
               :loading="creating"
               @click="createBuilding"
             />

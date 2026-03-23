@@ -47,12 +47,14 @@ type CurrencyCode = (typeof allowedCurrencies)[number]
 
 const currency = useState<CurrencyCode>('dashboard-currency', () => 'UZS')
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
+const activeObjectIdCookie = useCookie<number | null>('active-object-id', { default: () => null })
+const activeObjectId = computed(() => activeObject.value?.id ?? activeObjectIdCookie.value ?? undefined)
 
 function safeCurrency(code?: string): CurrencyCode {
   return allowedCurrencies.includes(code as CurrencyCode) ? code as CurrencyCode : 'USD'
 }
 
-const { data: fxData } = await useAsyncData<RatesResponse>('fx-latest', () => $fetch('/api/rates/latest'), {
+const { data: fxData } = await useAutoRefreshAsyncData<RatesResponse>('fx-latest', () => $fetch('/api/rates/latest'), {
   default: () => ({
     base: 'USD',
     updatedAt: Date.now(),
@@ -92,19 +94,23 @@ function formatCurrency(amount: number, code: string) {
   }).format(Number.isFinite(amount) ? amount : 0)
 }
 
-const { data: expensesData, execute: executeExpenses } = await useFetch<ExpensesResponse>('/api/expenses', {
+const { data: expensesData, execute: executeExpenses, status: expensesStatus } = await useAutoRefreshFetch<ExpensesResponse>('/api/expenses', {
   default: () => ({
     items: []
   }),
   query: {
-    objectId: computed(() => activeObject.value?.id)
+    objectId: activeObjectId
   },
   immediate: true
 })
 
-watch(activeObject, (value) => {
+watch(activeObjectId, () => {
   executeExpenses()
-}, { immediate: true })
+})
+
+const isLoading = computed(() =>
+  expensesStatus.value === 'pending' || expensesStatus.value === 'idle'
+)
 
 function paidSumForItems(items: ExpenseItem[]) {
   let total = 0
@@ -205,13 +211,26 @@ const template = (item: DataRecord) => {
         <p class="text-xs text-muted uppercase mb-1.5">
           Расходы
         </p>
-        <p class="text-3xl text-highlighted font-semibold">
+        <p v-if="!isLoading" class="text-3xl text-highlighted font-semibold">
           {{ formatCurrency(total, currency) }}
         </p>
+        <div v-else class="h-10 w-40 rounded bg-default/60 animate-pulse" />
       </div>
     </template>
 
+    <div v-if="isLoading" class="h-96 px-6 pb-3">
+      <div class="flex h-full items-end gap-4 animate-pulse">
+        <div class="h-32 flex-1 rounded-t-3xl bg-primary/10" />
+        <div class="h-48 flex-1 rounded-t-3xl bg-primary/15" />
+        <div class="h-24 flex-1 rounded-t-3xl bg-primary/10" />
+        <div class="h-72 flex-1 rounded-t-3xl bg-primary/20" />
+        <div class="h-44 flex-1 rounded-t-3xl bg-primary/15" />
+        <div class="h-20 flex-1 rounded-t-3xl bg-primary/10" />
+      </div>
+    </div>
+
     <VisXYContainer
+      v-else
       :data="data"
       :padding="{ top: 40 }"
       class="h-96"

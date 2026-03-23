@@ -41,7 +41,7 @@ const {
   refresh,
   status,
   pending
-} = await useAsyncData<WasteResponse>(
+} = await useAutoRefreshAsyncData<WasteResponse>(
   'waste-data',
   () => $fetch('/api/waste', {
     query: {

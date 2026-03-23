@@ -71,7 +71,7 @@ function parseOptionalBuildingId(value: unknown) {
   if (!Number.isInteger(buildingId) || buildingId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'buildingId must be a positive integer.'
+      statusMessage: 'Поле buildingId должно быть положительным целым числом.'
     })
   }
 
@@ -123,7 +123,7 @@ function parseObjectPositions(value: unknown) {
   if (!objectPositions.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'objectPositions должен быть непустым массивом строк.'
+      statusMessage: 'Поле objectPositions должно быть непустым массивом строк.'
     })
   }
 
@@ -161,7 +161,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   const positionBonus = parseOptionalMoney(input.positionBonus, 'positionBonus')
 
   if (!Array.isArray(input.objectPositions) || !input.objectPositions.length || input.objectPositions.some(position => !isNonEmptyString(position))) {
-    throw createError({ statusCode: 400, statusMessage: 'objectPositions должен быть непустым массивом строк.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле objectPositions должно быть непустым массивом строк.' })
   }
 
   return {

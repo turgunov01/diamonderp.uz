@@ -16,7 +16,7 @@ export default eventHandler(async (event) => {
   }>(event)
 
   if (!body.name || !body.name.trim()) {
-    throw createError({ statusCode: 400, statusMessage: 'name is required' })
+    throw createError({ statusCode: 400, statusMessage: 'Название обязательно.' })
   }
 
   const rows = await $fetch<any[]>(`${url}/rest/v1/aroma_devices`, {

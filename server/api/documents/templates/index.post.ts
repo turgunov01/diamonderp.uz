@@ -23,7 +23,7 @@ function parseCreateTemplateBody(body: unknown): Required<Pick<CreateTemplateBod
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Body must be a valid object.'
+      statusMessage: 'Тело запроса должно быть корректным объектом.'
     })
   }
 
@@ -33,7 +33,7 @@ function parseCreateTemplateBody(body: unknown): Required<Pick<CreateTemplateBod
   if (!name) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Template name is required.'
+      statusMessage: 'Название шаблона обязательно.'
     })
   }
 
@@ -110,7 +110,7 @@ export default eventHandler(async (event) => {
     if (!createdRow) {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Supabase did not return created template row.'
+        statusMessage: 'Supabase не вернул созданную запись шаблона.'
       })
     }
 
@@ -125,7 +125,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Table "document_templates" is missing. Run db/supabase/documents.sql first.'
+        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/supabase/documents.sql.'
       })
     }
 

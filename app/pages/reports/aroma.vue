@@ -30,7 +30,7 @@ const {
   data,
   pending,
   refresh
-} = await useAsyncData<{ devices: AromaDevice[]; refills?: AromaRefill[] }>('aroma-devices', () => $fetch('/api/reports/aroma', {
+} = await useAutoRefreshAsyncData<{ devices: AromaDevice[]; refills?: AromaRefill[] }>('aroma-devices', () => $fetch('/api/reports/aroma', {
   query: { objectId: activeObject.value?.id }
 }), {
   default: () => ({ devices: [], refills: [] }),
@@ -64,7 +64,7 @@ const activeDevices = computed(() => devices.value.filter(d => d.active))
 // Подтягиваем варианты локаций из объектов API + уже сохранённых устройств
 const activeBuilding = useState<{ id: number, name: string } | null>('active-building')
 
-const { data: objectsData, refresh: refreshObjects } = await useAsyncData<{ id: number; name: string }[]>(
+const { data: objectsData, refresh: refreshObjects } = await useAutoRefreshAsyncData<{ id: number; name: string }[]>(
   'aroma-objects',
   () => $fetch('/api/objects', {
     query: {

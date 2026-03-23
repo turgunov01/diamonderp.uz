@@ -72,12 +72,15 @@ const rowSelection = ref({})
 const shiftDrafts = ref<Record<number, ShiftDraft>>({})
 const salaryDrafts = ref<Record<number, SalaryDraft>>({})
 
-const { data, status, error, refresh } = await useFetch<Customer[]>('/api/customers', {
+const { data, status, error, refresh } = await useAutoRefreshFetch<Customer[]>('/api/customers', {
   lazy: true,
+  default: () => [],
   query: {
     buildingId: computed(() => activeBuilding.value?.id)
   }
 })
+const safeCustomers = computed(() => data.value || [])
+const isLoading = computed(() => status.value === 'pending' || status.value === 'idle')
 
 watch(error, (newError) => {
   if (!newError) {
@@ -238,9 +241,9 @@ const userColumns: TableColumn<Customer>[] = [
       )
     }
   },
-  {
+  /**{
     id: 'status',
-    header: 'Status',
+    header: 'Статус',
     cell: ({ row }) => {
       return h('div', { class: 'space-y-1' }, [
         h(UBadge, {
@@ -251,7 +254,7 @@ const userColumns: TableColumn<Customer>[] = [
         h('p', { class: 'text-xs text-muted' }, getCustomerStatusHint(row.original))
       ])
     }
-  },
+  },**/
   {
     accessorKey: 'objectPinned',
     header: 'Закрепленный объект'
@@ -318,7 +321,7 @@ function getColumnLabel(columnId: string) {
 }
 
 const shiftStats = computed(() => {
-  const customers = data.value || []
+  const customers = safeCustomers.value
   const dayUsers = customers.filter(customer => customer.workShift === 'day')
   const nightUsers = customers.filter(customer => customer.workShift === 'night')
 
@@ -393,7 +396,7 @@ function getCustomerStatus(customer: Customer): CustomerStatus {
 }
 
 function getCustomerStatusLabel(customer: Customer) {
-  return getCustomerStatus(customer) === 'active' ? 'Active' : 'Inactive'
+  return getCustomerStatus(customer) === 'active' ? 'Активен' : 'Неактивен'
 }
 
 function getCustomerStatusColor(customer: Customer) {
@@ -402,8 +405,8 @@ function getCustomerStatusColor(customer: Customer) {
 
 function getCustomerStatusHint(customer: Customer) {
   return getCustomerStatus(customer) === 'active'
-    ? 'Pinned to object'
-    : 'On review - waiting for changes'
+    ? 'Закреплен за объектом'
+    : 'На проверке - ожидаются изменения'
 }
 
 async function deleteCustomer(customer: Customer) {
@@ -539,7 +542,7 @@ async function saveCustomerSalary(customer: Customer) {
 <template>
   <UDashboardPanel id="hr">
     <template #header>
-      <UDashboardNavbar title="HR">
+      <UDashboardNavbar title="Кадры">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -558,7 +561,7 @@ async function saveCustomerSalary(customer: Customer) {
 
         <div v-if="selectedHrTab === 'users'" class="space-y-4">
           <div class="text-sm text-muted">
-            {{ activeBuilding?.name ? `Building: ${activeBuilding.name}` : 'No building selected' }}
+            {{ activeBuilding?.name ? `Здание: ${activeBuilding.name}` : 'Здание не выбрано' }}
           </div>
 
           <div class="flex flex-wrap items-center justify-between gap-1.5">
@@ -632,9 +635,9 @@ async function saveCustomerSalary(customer: Customer) {
               getPaginationRowModel: getPaginationRowModel()
             }"
             class="shrink-0"
-            :data="data"
+            :data="safeCustomers"
             :columns="userColumns"
-            :loading="status === 'pending'"
+            :loading="isLoading"
             :ui="{
               base: 'table-fixed border-separate border-spacing-0',
               thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
@@ -739,7 +742,7 @@ async function saveCustomerSalary(customer: Customer) {
               </thead>
               <tbody>
                 <tr
-                  v-for="customer in data || []"
+                  v-for="customer in safeCustomers"
                   :key="customer.id"
                   class="border-t border-default"
                 >
@@ -829,7 +832,7 @@ async function saveCustomerSalary(customer: Customer) {
                   Закрепленный объект
                 </p>
                 <p class="font-medium">
-                  {{ selectedCustomer.objectPinned || 'On review - waiting for changes' }}
+                  {{ selectedCustomer.objectPinned || 'На проверке - ожидаются изменения' }}
                 </p>
               </div>
               <div class="rounded-md border border-default p-3">

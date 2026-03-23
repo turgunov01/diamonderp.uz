@@ -33,7 +33,7 @@ async function createObject() {
 
   if (!form.name.trim()) {
     toast.add({
-      title: 'Name is required',
+      title: 'Название обязательно',
       color: 'warning'
     })
     return
@@ -41,7 +41,7 @@ async function createObject() {
 
   if (!activeBuilding.value?.id) {
     toast.add({
-      title: 'Select a building first',
+      title: 'Сначала выберите здание',
       color: 'warning'
     })
     return
@@ -67,7 +67,7 @@ async function createObject() {
     }
 
     toast.add({
-      title: 'Object created',
+      title: 'Объект создан',
       description: created.name,
       color: 'success'
     })
@@ -75,8 +75,8 @@ async function createObject() {
     router.push('/objects')
   } catch (error: unknown) {
     toast.add({
-      title: 'Failed to create object',
-      description: getErrorMessage(error) || 'Check the form values and try again.',
+      title: 'Не удалось создать объект',
+      description: getErrorMessage(error) || 'Проверьте значения формы и повторите попытку.',
       color: 'error'
     })
   } finally {
@@ -88,7 +88,7 @@ async function createObject() {
 <template>
   <UDashboardPanel id="object-create">
     <template #header>
-      <UDashboardNavbar title="Create Object">
+      <UDashboardNavbar title="Создать объект">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -106,41 +106,41 @@ async function createObject() {
     <template #body>
       <div class="max-w-2xl">
         <UCard :ui="{ body: 'space-y-4' }">
-          <UFormField label="Building">
+          <UFormField label="Здание">
             <UInput
-              :model-value="activeBuilding?.name || 'No building selected'"
+              :model-value="activeBuilding?.name || 'Здание не выбрано'"
               class="w-full"
               disabled
             />
           </UFormField>
 
-          <UFormField label="Name" required>
+          <UFormField label="Название" required>
             <UInput
               v-model="form.name"
               class="w-full"
-              placeholder="Main Entrance"
+              placeholder="Главный вход"
               autofocus
             />
           </UFormField>
 
-          <UFormField label="Address">
+          <UFormField label="Адрес">
             <UInput
               v-model="form.address"
               class="w-full"
-              placeholder="City, district, street"
+              placeholder="Город, район, улица"
             />
           </UFormField>
 
-          <UFormField label="Description">
+          <UFormField label="Описание">
             <UTextarea
               v-model="form.description"
               class="w-full"
               :rows="4"
-              placeholder="Short object description"
+              placeholder="Краткое описание объекта"
             />
           </UFormField>
 
-          <UFormField label="Code">
+          <UFormField label="Код">
             <UInput
               v-model="form.code"
               class="w-full"
@@ -150,14 +150,14 @@ async function createObject() {
 
           <div class="flex justify-end gap-2">
             <UButton
-              label="Cancel"
+              label="Отмена"
               color="neutral"
               variant="subtle"
               :disabled="creating"
               @click="router.push('/objects')"
             />
             <UButton
-              label="Create"
+              label="Создать"
               :loading="creating"
               @click="createObject"
             />

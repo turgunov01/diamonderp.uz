@@ -61,7 +61,7 @@ const categories = [
 
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
 
-const { data, error, refresh, execute, status, pending } = await useFetch<ExpensesResponse>('/api/expenses', {
+const { data, error, refresh, execute, status, pending } = await useAutoRefreshFetch<ExpensesResponse>('/api/expenses', {
   default: () => ({
     items: [],
     summary: {

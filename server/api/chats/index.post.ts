@@ -10,7 +10,7 @@ interface Body {
 export default eventHandler(async (event) => {
   const body = await readBody<Body>(event)
   if (!body?.title) {
-    throw createError({ statusCode: 400, statusMessage: 'title is required' })
+    throw createError({ statusCode: 400, statusMessage: 'Название обязательно.' })
   }
 
   const { url, serviceRoleKey } = getSupabaseServerConfig()
@@ -31,7 +31,7 @@ export default eventHandler(async (event) => {
 
   const chat = insertedChats[0]
   if (!chat?.id) {
-    throw createError({ statusCode: 500, statusMessage: 'Supabase did not return created chat id' })
+    throw createError({ statusCode: 500, statusMessage: 'Supabase не вернул id созданного чата.' })
   }
 
   if (body.memberIds?.length) {

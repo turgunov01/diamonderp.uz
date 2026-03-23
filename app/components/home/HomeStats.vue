@@ -10,6 +10,7 @@ type ExpenseItem = {
   id: number
   plannedAmount: number
   actualAmount?: number
+  dueDate?: string
   currency: string
   createdAt: string
 }
@@ -29,12 +30,14 @@ type CurrencyCode = (typeof allowedCurrencies)[number]
 
 const currency = useState<CurrencyCode>('dashboard-currency', () => 'UZS')
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
+const activeObjectIdCookie = useCookie<number | null>('active-object-id', { default: () => null })
+const activeObjectId = computed(() => activeObject.value?.id ?? activeObjectIdCookie.value ?? undefined)
 
 function safeCurrency(code?: string): CurrencyCode {
   return allowedCurrencies.includes(code as CurrencyCode) ? code as CurrencyCode : 'USD'
 }
 
-const { data: fxData } = await useAsyncData<RatesResponse>('fx-latest', () => $fetch('/api/rates/latest'), {
+const { data: fxData } = await useAutoRefreshAsyncData<RatesResponse>('fx-latest', () => $fetch('/api/rates/latest'), {
   default: () => ({
     base: 'USD',
     updatedAt: Date.now(),
@@ -74,7 +77,8 @@ function formatCurrency(amount: number) {
   }).format(Number.isFinite(amount) ? amount : 0)
 }
 
-const { data: customersData } = await useFetch<Customer[]>('/api/customers', {
+const { data: customersData, status: customersStatus } = await useAutoRefreshFetch<Customer[]>('/api/customers', {
+  default: () => [],
   query: {
     period: props.period,
     from: props.range?.start,
@@ -83,19 +87,26 @@ const { data: customersData } = await useFetch<Customer[]>('/api/customers', {
   watch: [() => props.period, () => props.range]
 })
 
-const { data: expensesData, execute: executeExpenses } = await useFetch<ExpensesResponse>('/api/expenses', {
+const { data: expensesData, execute: executeExpenses, status: expensesStatus } = await useAutoRefreshFetch<ExpensesResponse>('/api/expenses', {
   default: () => ({
     items: []
   }),
   query: {
-    objectId: computed(() => activeObject.value?.id)
+    objectId: activeObjectId
   },
   immediate: true
 })
 
-watch(activeObject, (value) => {
+watch(activeObjectId, () => {
   executeExpenses()
-}, { immediate: true })
+})
+
+const isLoading = computed(() =>
+  customersStatus.value === 'pending'
+  || customersStatus.value === 'idle'
+  || expensesStatus.value === 'pending'
+  || expensesStatus.value === 'idle'
+)
 
 const customersCount = computed(() => {
   return customersData.value?.length || 0
@@ -156,7 +167,20 @@ const stats = computed<Stat[]>(() => [
 
 <template>
   <UPageGrid class="lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-px">
+    <template v-if="isLoading">
+      <div
+        v-for="n in 4"
+        :key="`home-stat-skeleton-${n}`"
+        class="rounded-lg border border-default bg-elevated/30 p-5 space-y-3 animate-pulse"
+      >
+        <div class="h-10 w-10 rounded-full bg-primary/15" />
+        <div class="h-3 w-24 rounded bg-default/50" />
+        <div class="h-8 w-32 rounded bg-default/70" />
+      </div>
+    </template>
+
     <UPageCard
+      v-else
       v-for="(stat, index) in stats"
       :key="index"
       :icon="stat.icon"

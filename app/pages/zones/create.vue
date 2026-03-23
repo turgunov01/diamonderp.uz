@@ -12,8 +12,8 @@ const newZoneForm = reactive({
 async function createZone() {
   if (!newZoneForm.name.trim()) {
     toast.add({
-      title: "Error",
-      description: "Zone name is required",
+      title: "Ошибка",
+      description: "Название зоны обязательно",
       color: "error",
     });
     return;
@@ -31,16 +31,16 @@ async function createZone() {
     });
 
     toast.add({
-      title: "Success",
-      description: `Zone "${newZoneForm.name}" created`,
+      title: "Успешно",
+      description: `Зона "${newZoneForm.name}" создана`,
       color: "success",
     });
 
     router.push("/zones");
   } catch {
     toast.add({
-      title: "Error",
-      description: "Failed to create zone",
+      title: "Ошибка",
+      description: "Не удалось создать зону",
       color: "error",
     });
   } finally {
@@ -53,7 +53,7 @@ async function createZone() {
 <template>
   <UDashboardPanel id="zone-create">
     <template #header>
-      <UDashboardNavbar title="Create Zone">
+      <UDashboardNavbar title="Создать зону">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -72,7 +72,7 @@ async function createZone() {
       <div class="max-w-xl">
         <UCard :ui="{ divide: 'divide-y divide-default' }">
           <template #header>
-            <h3 class="text-lg font-semibold">New Zone</h3>
+            <h3 class="text-lg font-semibold">Новая зона</h3>
           </template>
 
           <div class="space-y-6 flex flex-col">
@@ -94,8 +94,8 @@ async function createZone() {
 
           <template #footer>
             <div class="flex justify-end gap-2">
-              <UButton label="Cancel" variant="outline" @click="router.push('/zones')" />
-              <UButton label="Create" :loading="isCreating" @click="createZone" />
+              <UButton label="Отмена" variant="outline" @click="router.push('/zones')" />
+              <UButton label="Создать" :loading="isCreating" @click="createZone" />
             </div>
           </template>
         </UCard>

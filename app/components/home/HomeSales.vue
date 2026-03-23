@@ -9,6 +9,11 @@ const props = defineProps<{
 }>()
 
 const UBadge = resolveComponent('UBadge')
+const saleStatusLabels: Record<string, string> = {
+  paid: 'Оплачено',
+  failed: 'Ошибка',
+  refunded: 'Возврат'
+}
 
 const sampleEmails = [
   'james.anderson@example.com',
@@ -49,9 +54,9 @@ const columns: TableColumn<Sale>[] = [
   },
   {
     accessorKey: 'date',
-    header: 'Date',
+    header: 'Дата',
     cell: ({ row }) => {
-      return new Date(row.getValue('date')).toLocaleString('en-US', {
+      return new Date(row.getValue('date')).toLocaleString('ru-RU', {
         day: 'numeric',
         month: 'short',
         hour: '2-digit',
@@ -62,7 +67,7 @@ const columns: TableColumn<Sale>[] = [
   },
   {
     accessorKey: 'status',
-    header: 'Status',
+    header: 'Статус',
     cell: ({ row }) => {
       const color = {
         paid: 'success' as const,
@@ -70,22 +75,22 @@ const columns: TableColumn<Sale>[] = [
         refunded: 'neutral' as const
       }[row.getValue('status') as string]
 
-      return h(UBadge, { class: 'capitalize', variant: 'subtle', color }, () =>
-        row.getValue('status')
+      return h(UBadge, { variant: 'subtle', color }, () =>
+        saleStatusLabels[row.getValue('status') as string] || String(row.getValue('status'))
       )
     }
   },
   {
     accessorKey: 'email',
-    header: 'Email'
+    header: 'Электронная почта'
   },
   {
     accessorKey: 'amount',
-    header: () => h('div', { class: 'text-right' }, 'Amount'),
+    header: () => h('div', { class: 'text-right' }, 'Сумма'),
     cell: ({ row }) => {
       const amount = Number.parseFloat(row.getValue('amount'))
 
-      const formatted = new Intl.NumberFormat('en-US', {
+      const formatted = new Intl.NumberFormat('ru-RU', {
         style: 'currency',
         currency: 'EUR'
       }).format(amount)

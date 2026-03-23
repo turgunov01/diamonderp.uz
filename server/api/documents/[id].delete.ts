@@ -11,7 +11,7 @@ export default eventHandler(async (event) => {
   const objectId = parseObjectIdInput(getQuery(event).objectId, 'objectId query param is required.')
 
   if (!rawId || !Number.isInteger(templateId) || templateId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid template id.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id шаблона.' })
   }
 
   const { url, serviceRoleKey } = getSupabaseServerConfig()
@@ -32,7 +32,7 @@ export default eventHandler(async (event) => {
 
     const deleted = rows?.[0]
     if (!deleted) {
-      throw createError({ statusCode: 404, statusMessage: 'Template not found.' })
+      throw createError({ statusCode: 404, statusMessage: 'Шаблон не найден.' })
     }
 
     return { success: true, id: templateId }
@@ -41,7 +41,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Table "document_templates" is missing. Run db/supabase/documents.sql first.'
+        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/supabase/documents.sql.'
       })
     }
     throw error

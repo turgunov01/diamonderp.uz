@@ -80,7 +80,7 @@ const buildingId = computed(() => activeBuilding.value?.id ?? null)
 const {
   data: objects,
   status: objectsStatus
-} = await useAsyncData<ObjectItem[]>(
+} = await useAutoRefreshAsyncData<ObjectItem[]>(
   'chat-objects-flat',
   () => {
     if (!buildingId.value) {
@@ -107,7 +107,7 @@ const {
   error: chatListError,
   status: chatListStatus,
   refresh: refreshChats
-} = await useAsyncData<ChatItem[]>(
+} = await useAutoRefreshAsyncData<ChatItem[]>(
   'chats-list',
   () => {
     if (!buildingId.value) {
@@ -121,7 +121,8 @@ const {
   { default: () => [], watch: [buildingId] }
 )
 
-const isChatListLoading = computed(() => chatListStatus.value === 'pending')
+const safeChatList = computed(() => chatList.value || [])
+const isChatListLoading = computed(() => chatListStatus.value === 'pending' || chatListStatus.value === 'idle')
 
 watch(chatListError, (value) => {
   if (!value) {
@@ -138,7 +139,7 @@ watch(chatListError, (value) => {
 const filteredChats = computed(() => {
   const normalizedSearch = search.value.toLowerCase().trim()
 
-  return chatList.value
+  return safeChatList.value
     .filter(chat => {
       if (!normalizedSearch) return true
       const titleMatch = chat.title.toLowerCase().includes(normalizedSearch)
@@ -158,7 +159,7 @@ watch(filteredChats, (list) => {
   }
 }, { immediate: true })
 
-const selectedChatMeta = computed(() => chatList.value.find(chat => chat.id === selectedChatId.value) || null)
+const selectedChatMeta = computed(() => safeChatList.value.find(chat => chat.id === selectedChatId.value) || null)
 
 watch(buildingId, () => {
   selectedChatId.value = null
@@ -173,7 +174,7 @@ const {
   data: selectedConversation,
   status: chatDetailStatus,
   refresh: refreshConversation
-} = await useAsyncData<ChatDetail | null>(
+} = await useAutoRefreshAsyncData<ChatDetail | null>(
   'chat-detail',
   () => {
     if (!selectedChatId.value) {
@@ -188,7 +189,9 @@ const {
   }
 )
 
-const isChatDetailLoading = computed(() => chatDetailStatus.value === 'pending')
+const isChatDetailLoading = computed(() =>
+  Boolean(selectedChatId.value) && (chatDetailStatus.value === 'pending' || chatDetailStatus.value === 'idle')
+)
 
 function closeStream() {
   if (streamReconnect.value) {
@@ -201,7 +204,7 @@ function closeStream() {
 }
 
 function updateChatListMeta(chatId: number, message: ChatMessage) {
-  const entry = chatList.value.find(chat => chat.id === chatId)
+  const entry = safeChatList.value.find(chat => chat.id === chatId)
   if (!entry) return
 
   entry.lastMessage = message.imageUrl ? '📷 Фото' : message.text
@@ -278,7 +281,7 @@ function handleRealtimeRow(row: any) {
     status: (row.status as ChatMessage['status']) || 'sent'
   }
 
-  const knownChat = chatList.value.some(c => c.id === chatId)
+  const knownChat = safeChatList.value.some(c => c.id === chatId)
   if (!knownChat) return
 
   upsertMessage(chatId, message)
@@ -345,7 +348,7 @@ async function fetchAndMergeChatList() {
   if (!buildingId.value) return
   try {
     const rows = await $fetch<ChatItem[]>('/api/chats', { query: { buildingId: buildingId.value } })
-    const current = new Map(chatList.value.map(item => [item.id, item]))
+    const current = new Map(safeChatList.value.map(item => [item.id, item]))
     const merged: ChatItem[] = []
 
     for (const row of rows) {
@@ -384,7 +387,7 @@ async function startRealtime() {
     realtimeChannel.value = null
   }
 
-  const chatIds = chatList.value.map(c => c.id).filter(Boolean)
+  const chatIds = safeChatList.value.map(c => c.id).filter(Boolean)
   const filter = chatIds.length ? `chat_id=in.(${chatIds.join(',')})` : undefined
 
   const channel = client.channel('chat-messages-realtime')
@@ -515,7 +518,7 @@ function normalizeMessage(message: ChatMessage): ChatMessage {
 
 function getDisplayName(message: ChatMessage) {
   if (message.authorId === 'dashboard-user') return 'Вы'
-  if (/^\d+$/.test(message.authorId)) return `User ${message.authorId}`
+  if (/^\d+$/.test(message.authorId)) return `Пользователь ${message.authorId}`
   return message.authorId || 'Неизвестно'
 }
 
@@ -708,7 +711,7 @@ async function deleteChat(chatId?: number | null) {
       selectedChatId.value = null
     }
     closeContextMenu()
-    chatList.value = chatList.value.filter(chat => chat.id !== numericId)
+    chatList.value = safeChatList.value.filter(chat => chat.id !== numericId)
   } catch (err) {
     toast.add({
       title: 'Не удалось удалить чат',
@@ -749,7 +752,7 @@ async function deleteChat(chatId?: number | null) {
               <UInput v-model="search" icon="i-lucide-search" placeholder="Поиск" size="sm" />
 
               <p class="text-xs text-muted">
-                Всего чатов: {{ isChatListLoading ? '—' : chatList.length }}
+                Всего чатов: {{ isChatListLoading ? '—' : safeChatList.length }}
               </p>
             </div>
 
@@ -790,7 +793,7 @@ async function deleteChat(chatId?: number | null) {
                 <UBadge v-if="chat.unread" :label="chat.unread" color="primary" variant="solid" class="self-center" />
               </button>
 
-              <div v-if="!filteredChats.length && chatListStatus !== 'pending'" class="px-4 py-6 text-sm text-muted">
+              <div v-if="!filteredChats.length && !isChatListLoading" class="px-4 py-6 text-sm text-muted">
                 Чатов пока нет.
               </div>
             </div>

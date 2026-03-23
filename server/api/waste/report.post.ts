@@ -7,7 +7,7 @@ export default eventHandler(async (event) => {
 
   const binId = Number(body.binId)
   if (!Number.isInteger(binId) || binId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'binId обязателен' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле binId обязательно.' })
   }
 
   const amountM3 = Number(body.amountM3 ?? 0)

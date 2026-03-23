@@ -24,7 +24,7 @@ const {
   data,
   pending,
   refresh
-} = await useAsyncData<{ events: MarbleEvent[] }>(
+} = await useAutoRefreshAsyncData<{ events: MarbleEvent[] }>(
   'marble-events',
   () => $fetch('/api/reports/marble', { query: { objectId: activeObject.value?.id } }),
   { default: () => ({ events: [] }), watch: [activeObject] }
@@ -58,7 +58,7 @@ const createForm = reactive({
   notes: ''
 })
 
-const { data: customers } = await useAsyncData<{ id: number, username: string, objectPinned: string, objectPositions: string[] }[]>(
+const { data: customers } = await useAutoRefreshAsyncData<{ id: number, username: string, objectPinned: string, objectPositions: string[] }[]>(
   'marble-customers',
   () => $fetch('/api/customers'),
   { default: () => [] }

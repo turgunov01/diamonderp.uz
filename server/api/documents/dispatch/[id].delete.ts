@@ -8,7 +8,7 @@ export default eventHandler(async (event) => {
   const idRaw = getRouterParam(event, 'id')
   const dispatchId = Number(idRaw)
   if (!idRaw || !Number.isInteger(dispatchId) || dispatchId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid dispatch id.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id отправки.' })
   }
 
   const objectId = parseObjectIdInput(getQuery(event).objectId, 'objectId query param is required.')
@@ -37,7 +37,7 @@ export default eventHandler(async (event) => {
 
   const count = Number(res.headers.get('content-range')?.split('/')?.[1] ?? '0')
   if (!count) {
-    throw createError({ statusCode: 404, statusMessage: 'Dispatch not found.' })
+    throw createError({ statusCode: 404, statusMessage: 'Отправка не найдена.' })
   }
 
   return { deleted: true }

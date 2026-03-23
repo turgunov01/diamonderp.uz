@@ -16,7 +16,7 @@ const links: SidebarLinks = [
       badge: '4'
     },
     {
-      label: 'HR',
+      label: 'Кадры',
       icon: 'i-lucide-users',
       to: '/hr',
       defaultOpen: false,
@@ -25,6 +25,12 @@ const links: SidebarLinks = [
         {
           label: 'Сотрудники',
           to: '/hr',
+          exact: true
+        },
+        {
+          label: 'Активность сотрудников',
+          icon: 'i-heroicons-clock',
+          to: '/hr/employee-activity',
           exact: true
         },
         {

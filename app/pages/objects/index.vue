@@ -15,7 +15,7 @@ const activeBuilding = useState<{ id: number, name: string } | null>('active-bui
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
 const activeObjectIdCookie = useCookie<number | null>('active-object-id', { default: () => null })
 
-const { data: objects, error, status, refresh } = await useFetch<ObjectItem[]>('/api/objects', {
+const { data: objects, error, status, refresh } = await useAutoRefreshFetch<ObjectItem[]>('/api/objects', {
   default: () => [],
   query: {
     buildingId: computed(() => activeBuilding.value?.id)
@@ -30,7 +30,7 @@ watch(error, (value) => {
   const fetchError = value as { data?: { statusMessage?: string }, message?: string }
 
   toast.add({
-    title: 'Failed to load objects',
+    title: 'Не удалось загрузить объекты',
     description: fetchError.data?.statusMessage || fetchError.message,
     color: 'error'
   })
@@ -39,7 +39,7 @@ watch(error, (value) => {
 function openCreatePage() {
   if (!activeBuilding.value?.id) {
     toast.add({
-      title: 'Select a building first',
+      title: 'Сначала выберите здание',
       color: 'warning'
     })
     return
@@ -64,16 +64,16 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
 
     if (enabled) {
       setActiveObject(item)
-      toast.add({ title: 'Object activated', description: item.name, color: 'success' })
+      toast.add({ title: 'Объект активирован', description: item.name, color: 'success' })
     } else {
       if (activeObject.value?.id === item.id) {
         setActiveObject(null)
       }
-      toast.add({ title: 'Object deactivated', description: item.name, color: 'info' })
+      toast.add({ title: 'Объект деактивирован', description: item.name, color: 'info' })
     }
   } catch (err: unknown) {
-    const msg = (err as any)?.data?.statusMessage || (err as Error)?.message || 'Failed to update object'
-    toast.add({ title: 'Error', description: msg, color: 'error' })
+    const msg = (err as any)?.data?.statusMessage || (err as Error)?.message || 'Не удалось обновить объект'
+    toast.add({ title: 'Ошибка', description: msg, color: 'error' })
   }
 }
 </script>
@@ -81,7 +81,7 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
 <template>
   <UDashboardPanel id="objects">
     <template #header>
-      <UDashboardNavbar title="Objects">
+      <UDashboardNavbar title="Объекты">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -89,7 +89,7 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
         <template #right>
           <UButton
             icon="i-lucide-plus"
-            label="Create Object"
+            label="Создать объект"
             @click="openCreatePage"
           />
         </template>
@@ -99,7 +99,7 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
     <template #body>
       <div class="rounded-lg border border-default overflow-x-auto">
         <div class="border-b border-default px-3 py-2 text-sm text-muted">
-          {{ activeBuilding?.name ? `Building: ${activeBuilding.name}` : 'No building selected' }}
+          {{ activeBuilding?.name ? `Здание: ${activeBuilding.name}` : 'Здание не выбрано' }}
         </div>
 
         <table class="min-w-full text-sm">
@@ -109,22 +109,22 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
                 ID
               </th>
               <th class="px-3 py-2 text-left">
-                Name
+                Название
               </th>
               <th class="px-3 py-2 text-left">
-                Address
+                Адрес
               </th>
               <th class="px-3 py-2 text-left">
-                Description
+                Описание
               </th>
               <th class="px-3 py-2 text-left">
-                Code
+                Код
               </th>
               <th class="px-3 py-2 text-left">
-                Status
+                Статус
               </th>
               <th class="px-3 py-2 text-right">
-                Action
+                Действие
               </th>
             </tr>
           </thead>
@@ -152,7 +152,7 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
               </td>
               <td class="px-3 py-2">
                 <UBadge
-                  :label="item.is_active ? 'Active' : 'Inactive'"
+                  :label="item.is_active ? 'Активен' : 'Неактивен'"
                   :color="item.is_active ? 'primary' : 'neutral'"
                   variant="subtle"
                 />
@@ -169,13 +169,13 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
 
             <tr v-if="status === 'pending'">
               <td class="px-3 py-4 text-muted" colspan="7">
-                Loading objects...
+                Загрузка объектов...
               </td>
             </tr>
 
             <tr v-else-if="!objects.length">
               <td class="px-3 py-4 text-muted" colspan="7">
-                {{ activeBuilding?.name ? 'No objects found for this building.' : 'Select a building to see objects.' }}
+                {{ activeBuilding?.name ? 'Для этого здания объекты не найдены.' : 'Выберите здание, чтобы увидеть объекты.' }}
               </td>
             </tr>
           </tbody>

@@ -34,7 +34,7 @@ async function downloadTemplate(format: 'xlsx' | 'csv' = 'xlsx') {
   try {
     const response = await fetch(`/api/customers/import-template?format=${format}`)
     if (!response.ok) {
-      throw new Error('Failed to download template')
+      throw new Error('Не удалось скачать шаблон')
     }
 
     const blob = await response.blob()
@@ -69,7 +69,7 @@ async function onFileSelected(event: Event) {
 
   try {
     if (!activeBuilding.value?.id) {
-      throw new Error('Select a building before import.')
+      throw new Error('Выберите здание перед импортом.')
     }
 
     const formData = new FormData()

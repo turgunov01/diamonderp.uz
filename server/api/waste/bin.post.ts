@@ -7,14 +7,14 @@ export default eventHandler(async (event) => {
 
   const category = body.category
   if (!category || !['Макулатура', 'Пластик', 'Общее'].includes(category)) {
-    throw createError({ statusCode: 400, statusMessage: 'category обязателен' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле category обязательно.' })
   }
 
   const volumeM3 = Number(body.volumeM3 ?? 0)
   const weightKg = Number(body.weightKg ?? 0)
   const status = body.status || 'available'
   if (!['available', 'loaded'].includes(status)) {
-    throw createError({ statusCode: 400, statusMessage: 'status некорректен' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле status некорректно.' })
   }
 
   const rows = await $fetch<WasteBinRow[]>(`${url}/rest/v1/waste_bins`, {

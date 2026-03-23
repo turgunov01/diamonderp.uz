@@ -15,9 +15,26 @@ const items = [[{
   to: '/hr'
 }]] satisfies DropdownMenuItem[][]
 
-const range = shallowRef<Range>({
-  start: sub(new Date(), { days: 14 }),
-  end: new Date()
+const rangeState = useState<{ start: number, end: number }>('home-range', () => {
+  const end = new Date()
+
+  return {
+    start: sub(end, { days: 14 }).getTime(),
+    end: end.getTime()
+  }
+})
+
+const range = computed<Range>({
+  get: () => ({
+    start: new Date(rangeState.value.start),
+    end: new Date(rangeState.value.end)
+  }),
+  set: (value) => {
+    rangeState.value = {
+      start: value.start.getTime(),
+      end: value.end.getTime()
+    }
+  }
 })
 
 const period = ref<Period>('daily')

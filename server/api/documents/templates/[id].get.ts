@@ -14,7 +14,7 @@ function parseTemplateId(event: H3Event) {
   const rawId = getRouterParam(event, 'id')
   const templateId = Number(rawId)
   if (!rawId || !Number.isInteger(templateId) || templateId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid template id.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id шаблона.' })
   }
 
   return templateId
@@ -42,7 +42,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Table "document_templates" is missing. Run db/supabase/documents.sql first.'
+        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/supabase/documents.sql.'
       })
     }
 
@@ -51,7 +51,7 @@ export default eventHandler(async (event) => {
 
   const row = rows[0]
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'Template not found.' })
+    throw createError({ statusCode: 404, statusMessage: 'Шаблон не найден.' })
   }
 
   let projectRaw: string | null = null

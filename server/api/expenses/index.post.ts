@@ -32,7 +32,7 @@ function requiredTrimmedString(value: unknown, fieldName: string) {
 
 function parseCreateBody(body: unknown): CreateExpenseBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Body must be a valid object.' })
+    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
   }
 
   const input = body as Partial<CreateExpenseBody>
@@ -45,7 +45,7 @@ function parseCreateBody(body: unknown): CreateExpenseBody {
   let status: ExpenseStatus = 'draft'
   if (input.status !== undefined) {
     if (!isExpenseStatus(input.status)) {
-      throw createError({ statusCode: 400, statusMessage: 'Invalid status.' })
+      throw createError({ statusCode: 400, statusMessage: 'Некорректный статус.' })
     }
     status = input.status
   }
@@ -93,7 +93,7 @@ export default eventHandler(async (event) => {
 
   const created = rows[0]
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Supabase did not return created expense.' })
+    throw createError({ statusCode: 500, statusMessage: 'Supabase не вернул созданный расход.' })
   }
 
   setResponseStatus(event, 201)

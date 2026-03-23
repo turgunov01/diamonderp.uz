@@ -23,7 +23,7 @@ const {
   data,
   pending,
   refresh
-} = await useAsyncData<{ events: SanitationEvent[] }>(
+} = await useAutoRefreshAsyncData<{ events: SanitationEvent[] }>(
   'sanitation-events',
   () => $fetch('/api/reports/sanitation', {
     query: { objectId: activeObject.value?.id }

@@ -32,18 +32,18 @@ interface ObjectLiteRow {
 
 function parseSendBody(body: unknown): SendDocumentBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Body must be a valid object.' })
+    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
   }
 
   const input = body as Partial<SendDocumentBody>
   const templateId = Number(input.templateId)
 
   if (!Number.isInteger(templateId) || templateId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'templateId must be a positive integer.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле templateId должно быть положительным целым числом.' })
   }
 
   if (!Array.isArray(input.recipientIds) || !input.recipientIds.length) {
-    throw createError({ statusCode: 400, statusMessage: 'recipientIds must contain at least one user id.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле recipientIds должно содержать хотя бы один id пользователя.' })
   }
 
   const recipientIds = input.recipientIds
@@ -51,7 +51,7 @@ function parseSendBody(body: unknown): SendDocumentBody {
     .filter(id => Number.isInteger(id) && id > 0)
 
   if (!recipientIds.length) {
-    throw createError({ statusCode: 400, statusMessage: 'recipientIds must contain valid positive integers.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле recipientIds должно содержать корректные положительные целые числа.' })
   }
 
   return {
@@ -88,7 +88,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Table "document_templates" is missing. Run db/supabase/documents.sql first.'
+        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/supabase/documents.sql.'
       })
     }
 
@@ -97,7 +97,7 @@ export default eventHandler(async (event) => {
 
   const template = templateRows[0]
   if (!template) {
-    throw createError({ statusCode: 404, statusMessage: 'Template not found.' })
+    throw createError({ statusCode: 404, statusMessage: 'Шаблон не найден.' })
   }
 
   const objectRows = await $fetch<ObjectLiteRow[]>(`${url}/rest/v1/objects`, {
@@ -111,7 +111,7 @@ export default eventHandler(async (event) => {
 
   const currentObject = objectRows[0]
   if (!currentObject) {
-    throw createError({ statusCode: 404, statusMessage: 'Object not found.' })
+    throw createError({ statusCode: 404, statusMessage: 'Объект не найден.' })
   }
 
   const customers = await $fetch<CustomerLiteRow[]>(`${url}/rest/v1/customers`, {
@@ -135,7 +135,7 @@ export default eventHandler(async (event) => {
   const selectedCustomers = eligibleCustomers.length ? eligibleCustomers : customers
 
   if (!selectedCustomers.length) {
-    throw createError({ statusCode: 404, statusMessage: 'Recipients were not found for this object.' })
+    throw createError({ statusCode: 404, statusMessage: 'Получатели для этого объекта не найдены.' })
   }
 
   const recipientIds = selectedCustomers.map(customer => customer.id)
@@ -163,7 +163,7 @@ export default eventHandler(async (event) => {
 
   const dispatch = insertedDispatchRows[0]
   if (!dispatch) {
-    throw createError({ statusCode: 500, statusMessage: 'Supabase did not return dispatch row.' })
+    throw createError({ statusCode: 500, statusMessage: 'Supabase не вернул запись отправки.' })
   }
 
   return {

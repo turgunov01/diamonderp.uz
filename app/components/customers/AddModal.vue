@@ -119,7 +119,7 @@ const objectOptions = computed(() =>
 )
 
 const pinnedObjectOptions = computed(() => [
-  { label: 'Not pinned', value: NOT_PINNED_VALUE },
+  { label: 'Не закреплен', value: NOT_PINNED_VALUE },
   ...objectOptions.value
 ])
 
@@ -216,7 +216,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
 
   try {
     if (!activeBuilding.value?.id) {
-      throw new Error('Select a building before saving a customer.')
+      throw new Error('Выберите здание перед сохранением сотрудника.')
     }
 
     const objectPinned = event.data.objectPinned?.trim() || ''

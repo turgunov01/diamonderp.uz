@@ -17,9 +17,9 @@ const currencyOptions = [
 ]
 
 const profileSchema = z.object({
-  name: z.string().min(2, 'Too short'),
-  email: z.string().email('Invalid email'),
-  username: z.string().min(2, 'Too short'),
+  name: z.string().min(2, 'Слишком короткое значение'),
+  email: z.string().email('Некорректный email'),
+  username: z.string().min(2, 'Слишком короткое значение'),
   avatar: z.string().optional(),
   bio: z.string().optional()
 })
@@ -27,9 +27,9 @@ const profileSchema = z.object({
 type ProfileSchema = z.output<typeof profileSchema>
 
 const profile = reactive<Partial<ProfileSchema>>({
-  name: 'Benjamin Canac',
-  email: 'ben@nuxtlabs.com',
-  username: 'benjamincanac',
+  name: 'Нодир Усманов',
+  email: 'nodir@example.com',
+  username: 'nodir.usmanov',
   avatar: undefined,
   bio: undefined
 })
@@ -38,8 +38,8 @@ const toast = useToast()
 
 async function onSubmit(event: FormSubmitEvent<ProfileSchema>) {
   toast.add({
-    title: 'Success',
-    description: 'Your settings have been updated.',
+    title: 'Успешно',
+    description: 'Настройки обновлены.',
     icon: 'i-lucide-check',
     color: 'success'
   })
@@ -70,15 +70,15 @@ function onFileClick() {
     @submit="onSubmit"
   >
     <UPageCard
-      title="Profile"
-      description="These informations will be displayed publicly."
+      title="Профиль"
+      description="Эта информация будет отображаться публично."
       variant="naked"
       orientation="horizontal"
       class="mb-4"
     >
       <UButton
         form="settings"
-        label="Save changes"
+        label="Сохранить изменения"
         color="neutral"
         type="submit"
         class="w-fit lg:ms-auto"
@@ -88,8 +88,8 @@ function onFileClick() {
     <UPageCard variant="subtle">
       <UFormField
         name="name"
-        label="Name"
-        description="Will appear on receipts, invoices, and other communication."
+        label="Имя"
+        description="Будет отображаться в чеках, счетах и другой коммуникации."
         required
         class="flex max-sm:flex-col justify-between items-start gap-4"
       >
@@ -104,7 +104,7 @@ function onFileClick() {
       <UFormField
         name="currency"
         label="Валюта по умолчанию"
-        description="Используется в статистике и revenue."
+        description="Используется в статистике и выручке."
         class="flex max-sm:flex-col justify-between items-start gap-4"
         :ui="{ container: 'w-full' }"
       >
@@ -121,8 +121,8 @@ function onFileClick() {
 
       <UFormField
         name="email"
-        label="Email"
-        description="Used to sign in, for email receipts and product updates."
+        label="Электронная почта"
+        description="Используется для входа, email-чеков и обновлений продукта."
         required
         class="flex max-sm:flex-col justify-between items-start gap-4"
       >
@@ -137,8 +137,8 @@ function onFileClick() {
 
       <UFormField
         name="username"
-        label="Username"
-        description="Your unique username for logging in and your profile URL."
+        label="Логин"
+        description="Ваш уникальный логин для входа и адреса профиля."
         required
         class="flex max-sm:flex-col justify-between items-start gap-4"
       >
@@ -153,8 +153,8 @@ function onFileClick() {
 
       <UFormField
         name="avatar"
-        label="Avatar"
-        description="JPG, GIF or PNG. 1MB Max."
+        label="Аватар"
+        description="JPG, GIF или PNG. Максимум 1 МБ."
         class="flex max-sm:flex-col justify-between sm:items-center gap-4"
       >
         <div class="flex flex-wrap items-center gap-3">
@@ -164,7 +164,7 @@ function onFileClick() {
             size="lg"
           />
           <UButton
-            label="Choose"
+            label="Выбрать"
             color="neutral"
             @click="onFileClick"
           />
@@ -182,8 +182,8 @@ function onFileClick() {
 
       <UFormField
         name="bio"
-        label="Bio"
-        description="Brief description for your profile. URLs are hyperlinked."
+        label="О себе"
+        description="Краткое описание профиля. Ссылки будут отображаться как кликабельные."
         class="flex max-sm:flex-col justify-between items-start gap-4"
         :ui="{ container: 'w-full' }"
       >

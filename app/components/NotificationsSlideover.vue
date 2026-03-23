@@ -4,15 +4,54 @@ import type { Notification } from '~/types'
 
 const { isNotificationsSlideoverOpen } = useDashboard()
 
-const { data: notifications } = await useFetch<Notification[]>('/api/notifications')
+const { data: notifications, status } = await useFetch<Notification[]>('/api/notifications', {
+  default: () => []
+})
+const isMounted = ref(false)
+
+onMounted(() => {
+  isMounted.value = true
+})
+
+function formatNotificationDate(value: string) {
+  const date = new Date(value)
+
+  if (!isMounted.value) {
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  return formatTimeAgo(date)
+}
 </script>
 
 <template>
   <USlideover
     v-model:open="isNotificationsSlideoverOpen"
-    title="Notifications"
+    title="Уведомления"
   >
     <template #body>
+      <div v-if="status === 'pending' || status === 'idle'" class="space-y-3">
+        <div
+          v-for="n in 5"
+          :key="`notification-skeleton-${n}`"
+          class="flex items-center gap-3 rounded-md px-3 py-2.5 animate-pulse"
+        >
+          <div class="h-10 w-10 rounded-full bg-default/60" />
+          <div class="min-w-0 flex-1 space-y-2">
+            <div class="flex items-center justify-between gap-3">
+              <div class="h-4 w-28 rounded bg-default/70" />
+              <div class="h-3 w-16 rounded bg-default/50" />
+            </div>
+            <div class="h-3 w-3/4 rounded bg-default/50" />
+          </div>
+        </div>
+      </div>
+
       <NuxtLink
         v-for="notification in notifications"
         :key="notification.id"
@@ -38,7 +77,7 @@ const { data: notifications } = await useFetch<Notification[]>('/api/notificatio
             <time
               :datetime="notification.date"
               class="text-muted text-xs"
-              v-text="formatTimeAgo(new Date(notification.date))"
+              v-text="formatNotificationDate(notification.date)"
             />
           </p>
 

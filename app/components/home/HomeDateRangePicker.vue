@@ -2,7 +2,7 @@
 import { DateFormatter, getLocalTimeZone, CalendarDate, today } from '@internationalized/date'
 import type { Range } from '~/types'
 
-const df = new DateFormatter('en-US', {
+const df = new DateFormatter('ru-RU', {
   dateStyle: 'medium'
 })
 

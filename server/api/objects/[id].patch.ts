@@ -8,12 +8,12 @@ export default eventHandler(async (event) => {
   const idRaw = getRouterParam(event, 'id')
   const id = Number(idRaw)
   if (!idRaw || !Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid object id.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id объекта.' })
   }
 
   const body = await readBody<{ isActive?: boolean }>(event)
   if (typeof body.isActive !== 'boolean') {
-    throw createError({ statusCode: 400, statusMessage: 'isActive is required.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле isActive обязательно.' })
   }
 
   const rows = await $fetch<any[]>(`${url}/rest/v1/objects`, {
@@ -30,7 +30,7 @@ export default eventHandler(async (event) => {
 
   const row = rows[0]
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'Object not found.' })
+    throw createError({ statusCode: 404, statusMessage: 'Объект не найден.' })
   }
 
   return row

@@ -19,17 +19,18 @@ const newZoneForm = reactive({
   description: "",
 });
 
-const { data: zones, status, error, refresh } = await useFetch<Zone[]>("/api/zones", {
+const { data: zones, status, error, refresh } = await useAutoRefreshFetch<Zone[]>("/api/zones", {
   lazy: true,
   default: () => [],
 });
 
-const { data: customers, refresh: refreshCustomers } = await useFetch<Customer[]>(
+const { data: customers, refresh: refreshCustomers } = await useAutoRefreshFetch<Customer[]>(
   "/api/customers",
   {
     default: () => [],
   }
 );
+const safeCustomers = computed(() => customers.value || []);
 
 watch(
   error,
@@ -47,15 +48,15 @@ watch(
 );
 
 function getZoneMembers(zoneName: string): Customer[] {
-  return customers.value?.filter((c) => c.objectPinned === zoneName) || [];
+  return safeCustomers.value.filter((c) => c.objectPinned === zoneName);
 }
 
 const zoneMembers = computed<Customer[]>(() => {
-  if (!selectedZoneForMembers.value?.name || !customers.value) {
+  if (!selectedZoneForMembers.value?.name) {
     return [];
   }
 
-  return customers.value.filter(
+  return safeCustomers.value.filter(
     (c) => c.objectPinned === selectedZoneForMembers.value!.name
   );
 });
@@ -69,7 +70,7 @@ function closeMembersView() {
 }
 
 async function deleteZone(zone: Zone) {
-  const confirmed = confirm(`Delete zone "${zone.name}"?`);
+  const confirmed = confirm(`Удалить зону "${zone.name}"?`);
   if (!confirmed) return;
 
   try {
@@ -78,16 +79,16 @@ async function deleteZone(zone: Zone) {
     });
 
     toast.add({
-      title: "Deleted",
-      description: `Zone "${zone.name}" removed`,
+      title: "Удалено",
+      description: `Зона "${zone.name}" удалена`,
       color: "success",
     });
 
     await refresh();
   } catch {
     toast.add({
-      title: "Error",
-      description: "Failed to delete zone",
+      title: "Ошибка",
+      description: "Не удалось удалить зону",
       color: "error",
     });
   }
@@ -140,7 +141,7 @@ const name = computed({
 <template>
   <UDashboardPanel id="zones">
     <template #header>
-      <UDashboardNavbar title="Zones Management">
+      <UDashboardNavbar title="Управление зонами">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -163,12 +164,12 @@ const name = computed({
             v-model="name"
             class="max-w-sm"
             icon="i-lucide-search"
-            placeholder="Filter by zone name..."
+            placeholder="Фильтр по названию зоны..."
           />
 
           <div class="flex flex-wrap items-center gap-1.5">
             <UButton
-              label="Create Zone"
+              label="Создать зону"
               icon="i-lucide-plus"
               color="primary"
               @click="useRouter().push('/zones/create')"
@@ -201,14 +202,14 @@ const name = computed({
 
         <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
           <div class="text-sm text-white">
-            Showing {{ pagination.pageIndex * pagination.pageSize + 1 }} to
+            Показано с {{ pagination.pageIndex * pagination.pageSize + 1 }} по
             {{
               Math.min(
                 (pagination.pageIndex + 1) * pagination.pageSize,
                 zones?.length || 0
               )
             }}
-            of {{ zones?.length || 0 }} zones
+            из {{ zones?.length || 0 }} зон
           </div>
 
           <UPagination
@@ -222,8 +223,8 @@ const name = computed({
 
       <div v-else class="space-y-4">
         <UPageCard
-          :title="`Members in ${selectedZoneForMembers.name}`"
-          :description="`Assigned users: ${zoneMembers.length}`"
+          :title="`Сотрудники в зоне ${selectedZoneForMembers.name}`"
+          :description="`Назначено пользователей: ${zoneMembers.length}`"
           variant="subtle"
           orientation="horizontal"
         >
@@ -238,15 +239,15 @@ const name = computed({
             >
               <UAvatar
                 :src="user.avatar?.src || undefined"
-                :alt="user.username || 'User'"
+                :alt="user.username || 'Пользователь'"
                 size="md"
               />
               <div>
                 <div class="font-semibold text-sm">
-                  {{ user.username || "Unnamed user" }}
+                  {{ user.username || "Без имени" }}
                 </div>
                 <div class="text-xs text-white">
-                  Age: {{ user.age ?? "-" }}, Shift: {{ user.workShift ?? "-" }}
+                  Возраст: {{ user.age ?? "-" }}, Смена: {{ user.workShift ?? "-" }}
                 </div>
               </div>
             </div>

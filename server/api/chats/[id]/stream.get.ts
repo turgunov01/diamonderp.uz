@@ -15,7 +15,7 @@ type MessageRow = {
 export default eventHandler(async (event) => {
   const chatId = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(chatId) || chatId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid chat id' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id чата.' })
   }
 
   // SSE headers

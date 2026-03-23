@@ -17,6 +17,7 @@ type SanitationEvent = {
 }
 
 const toast = useToast()
+const { canManageSanitation } = useRoleAccess()
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
 
 const {
@@ -90,6 +91,7 @@ function statusForDate(target: Date | null) {
 }
 
 async function submitEvent() {
+  if (!canManageSanitation.value) return
   if (creating.value) return
   creating.value = true
   try {
@@ -136,7 +138,14 @@ async function submitEvent() {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
+          <UBadge
+            v-if="!canManageSanitation"
+            label="Только чтение"
+            color="neutral"
+            variant="subtle"
+          />
           <UButton
+            v-if="canManageSanitation"
             icon="i-lucide-plus"
             label="Новая запись"
             color="primary"
@@ -258,6 +267,7 @@ async function submitEvent() {
       </div>
 
       <UModal
+        v-if="canManageSanitation"
         v-model:open="createModalOpen"
         title="Новая обработка"
         description="Запишите факт дезинфекции или дератизации, добавьте исполнителей и фотоотчёт."

@@ -18,6 +18,7 @@ type MarbleEvent = {
 }
 
 const toast = useToast()
+const { canManageMarble } = useRoleAccess()
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
 
 const {
@@ -96,6 +97,7 @@ function formatNumber(n: number) {
 }
 
 async function submitEvent() {
+  if (!canManageMarble.value) return
   if (creating.value) return
   creating.value = true
   try {
@@ -133,6 +135,7 @@ async function submitEvent() {
 }
 
 async function uploadPhotos(event: Event) {
+  if (!canManageMarble.value) return
   const target = event.target as HTMLInputElement | null
   if (!target?.files || !target.files.length) return
   if (uploadingPhotos.value) return
@@ -167,7 +170,14 @@ async function uploadPhotos(event: Event) {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
+          <UBadge
+            v-if="!canManageMarble"
+            label="Только чтение"
+            color="neutral"
+            variant="subtle"
+          />
           <UButton
+            v-if="canManageMarble"
             icon="i-lucide-plus"
             label="Новая запись"
             color="primary"
@@ -284,6 +294,7 @@ async function uploadPhotos(event: Event) {
       </div>
 
       <UModal
+        v-if="canManageMarble"
         v-model:open="createModalOpen"
         title="Новая обработка"
         description="Зафиксируйте кристаллизацию или полировку: команда и площадь."

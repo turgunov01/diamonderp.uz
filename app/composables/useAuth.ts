@@ -1,4 +1,4 @@
-import type { AuthSession, LoginRequestBody, LoginResponse } from '~/shared/types/auth'
+import type { AuthSession, LoginRequestBody, LoginResponse } from '~~/shared/types/auth'
 
 export function useAuth() {
   const session = useCookie<AuthSession | null>('diamond-erp-session', {

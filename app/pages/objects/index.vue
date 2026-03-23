@@ -11,6 +11,7 @@ type ObjectItem = {
 
 const router = useRouter()
 const toast = useToast()
+const { canManageObjects } = useRoleAccess()
 const activeBuilding = useState<{ id: number, name: string } | null>('active-building')
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
 const activeObjectIdCookie = useCookie<number | null>('active-object-id', { default: () => null })
@@ -37,6 +38,15 @@ watch(error, (value) => {
 }, { immediate: true })
 
 function openCreatePage() {
+  if (!canManageObjects.value) {
+    toast.add({
+      title: 'Страница доступна только для просмотра',
+      description: 'Создание объектов доступно только администратору.',
+      color: 'warning'
+    })
+    return
+  }
+
   if (!activeBuilding.value?.id) {
     toast.add({
       title: 'Сначала выберите здание',
@@ -54,6 +64,10 @@ function setActiveObject(item: ObjectItem | null) {
 }
 
 async function toggleObject(item: ObjectItem, enabled: boolean) {
+  if (!canManageObjects.value) {
+    return
+  }
+
   try {
     await $fetch(`/api/objects/${item.id}`, {
       method: 'PATCH',
@@ -87,11 +101,20 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
         </template>
 
         <template #right>
-          <UButton
-            icon="i-lucide-plus"
-            label="Создать объект"
-            @click="openCreatePage"
-          />
+          <div class="flex items-center gap-2">
+            <UBadge
+              v-if="!canManageObjects"
+              label="Только чтение"
+              color="neutral"
+              variant="subtle"
+            />
+            <UButton
+              v-if="canManageObjects"
+              icon="i-lucide-plus"
+              label="Создать объект"
+              @click="openCreatePage"
+            />
+          </div>
         </template>
       </UDashboardNavbar>
     </template>
@@ -160,9 +183,11 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
               <td class="px-3 py-2 text-right">
                 <div class="flex justify-end">
                   <USwitch
+                    v-if="canManageObjects"
                     :model-value="!!item.is_active"
                     @update:model-value="toggleObject(item, $event)"
                   />
+                  <span v-else class="text-xs text-muted">Только просмотр</span>
                 </div>
               </td>
             </tr>

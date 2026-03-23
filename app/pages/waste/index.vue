@@ -34,6 +34,7 @@ interface WasteResponse {
 }
 
 const toast = useToast()
+const { canManageWaste } = useRoleAccess()
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
 
 const {
@@ -136,6 +137,7 @@ function statusColor(status: BinStatus) {
 }
 
 async function submitReport() {
+  if (!canManageWaste.value) return
   if (!reportForm.binId) {
     toast.add({ title: 'Выберите бак', color: 'warning' })
     return
@@ -165,6 +167,7 @@ async function submitReport() {
 }
 
 async function createBin() {
+  if (!canManageWaste.value) return
   if (creating.value) return
   creating.value = true
 
@@ -205,7 +208,14 @@ async function createBin() {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
+          <UBadge
+            v-if="!canManageWaste"
+            label="Только чтение"
+            color="neutral"
+            variant="subtle"
+          />
           <UButton
+            v-if="canManageWaste"
             icon="i-lucide-plus"
             label="Создать бак"
             color="primary"
@@ -374,11 +384,13 @@ async function createBin() {
             </div>
             <div class="flex items-center justify-end gap-2">
               <UButton
+                v-if="canManageWaste"
                 label="Отправить отчёт"
                 icon="i-lucide-send"
                 :loading="isLoading"
                 @click="submitReport"
               />
+              <span v-else class="text-xs text-muted">Редактирование доступно только администратору</span>
             </div>
           </div>
 
@@ -434,6 +446,7 @@ async function createBin() {
       </div>
 
       <UModal
+        v-if="canManageWaste"
         v-model:open="createModalOpen"
         title="Создать бак"
         description="Добавьте новый контейнер для учёта отходов."

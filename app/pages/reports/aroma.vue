@@ -24,6 +24,7 @@ type AromaRefill = {
 }
 
 const toast = useToast()
+const { canManageAroma } = useRoleAccess()
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
 
 const {
@@ -144,6 +145,7 @@ async function generateReport() {
 }
 
 async function createDevice() {
+  if (!canManageAroma.value) return
   if (creating.value) return
   creating.value = true
   try {
@@ -183,7 +185,14 @@ async function createDevice() {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
+          <UBadge
+            v-if="!canManageAroma"
+            label="Только чтение"
+            color="neutral"
+            variant="subtle"
+          />
           <UButton
+            v-if="canManageAroma"
             icon="i-lucide-plus"
             label="Добавить"
             color="primary"
@@ -326,6 +335,7 @@ async function createDevice() {
       </div>
 
       <UModal
+        v-if="canManageAroma"
         v-model:open="createModalOpen"
         title="Добавить диффузор"
         description="Создайте устройство, чтобы отслеживать график заправок."

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import { canAccessPath, getDefaultRouteForRole } from '~~/shared/utils/access'
 
 definePageMeta({
   layout: false
@@ -47,11 +48,15 @@ async function onSubmit(event: FormSubmitEvent<LoginSchema>) {
   errorMessage.value = ''
 
   try {
-    await login(event.data)
+    const user = await login(event.data)
 
-    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+    const requestedRedirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
       ? route.query.redirect
-      : '/'
+      : getDefaultRouteForRole(user.role)
+
+    const redirect = canAccessPath(user.role, requestedRedirect)
+      ? requestedRedirect
+      : getDefaultRouteForRole(user.role)
 
     await navigateTo(redirect, { replace: true })
   } catch (error) {

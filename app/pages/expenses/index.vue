@@ -35,6 +35,7 @@ interface CreateExpenseState {
 }
 
 const toast = useToast()
+const { canManageExpenses, canDeleteExpenses } = useRoleAccess()
 const createModalOpen = ref(false)
 const creating = ref(false)
 const updatingId = ref<number | null>(null)
@@ -150,6 +151,10 @@ function resetCreateState() {
 }
 
 async function createExpense() {
+  if (!canManageExpenses.value) {
+    return
+  }
+
   if (creating.value) {
     return
   }
@@ -196,6 +201,10 @@ async function createExpense() {
 }
 
 async function setStatus(item: ExpenseRecord, status: ExpenseStatus) {
+  if (!canManageExpenses.value) {
+    return
+  }
+
   if (updatingId.value === item.id) {
     return
   }
@@ -224,11 +233,16 @@ async function setStatus(item: ExpenseRecord, status: ExpenseStatus) {
 }
 
 function confirmDelete(item: ExpenseRecord) {
+  if (!canDeleteExpenses.value) {
+    return
+  }
+
   expenseToDelete.value = item
   deleteModalOpen.value = true
 }
 
 async function deleteExpense() {
+  if (!canDeleteExpenses.value) return
   if (!expenseToDelete.value) return
   if (deletingId.value) return
 
@@ -249,6 +263,41 @@ async function deleteExpense() {
     deletingId.value = null
   }
 }
+
+function getExpenseActions(item: ExpenseRecord) {
+  const actions = []
+
+  if (canManageExpenses.value) {
+    actions.push(
+      {
+        label: 'Согласовать',
+        icon: 'i-lucide-check',
+        onSelect: () => setStatus(item, 'approved')
+      },
+      {
+        label: 'Отклонить',
+        icon: 'i-lucide-x',
+        onSelect: () => setStatus(item, 'rejected')
+      },
+      {
+        label: 'Отметить как оплачено',
+        icon: 'i-lucide-wallet',
+        onSelect: () => setStatus(item, 'paid')
+      }
+    )
+  }
+
+  if (canDeleteExpenses.value) {
+    actions.push({
+      label: 'Удалить',
+      icon: 'i-lucide-trash',
+      color: 'error',
+      onSelect: () => confirmDelete(item)
+    })
+  }
+
+  return actions
+}
 </script>
 
 <template>
@@ -260,11 +309,20 @@ async function deleteExpense() {
         </template>
 
         <template #right>
-          <UButton
-            label="Новый расход"
-            icon="i-lucide-plus"
-            @click="createModalOpen = true"
-          />
+          <div class="flex items-center gap-2">
+            <UBadge
+              v-if="!canManageExpenses"
+              label="Только чтение"
+              color="neutral"
+              variant="subtle"
+            />
+            <UButton
+              v-if="canManageExpenses"
+              label="Новый расход"
+              icon="i-lucide-plus"
+              @click="createModalOpen = true"
+            />
+          </div>
         </template>
       </UDashboardNavbar>
     </template>
@@ -351,29 +409,8 @@ async function deleteExpense() {
                   </td>
                   <td class="px-3 py-2 text-right">
                     <UDropdownMenu
-                      :items="[
-                        {
-                          label: 'Согласовать',
-                          icon: 'i-lucide-check',
-                          onSelect: () => setStatus(item, 'approved')
-                        },
-                        {
-                          label: 'Отклонить',
-                          icon: 'i-lucide-x',
-                          onSelect: () => setStatus(item, 'rejected')
-                        },
-                        {
-                          label: 'Отметить как оплачено',
-                          icon: 'i-lucide-wallet',
-                          onSelect: () => setStatus(item, 'paid')
-                        },
-                        {
-                          label: 'Удалить',
-                          icon: 'i-lucide-trash',
-                          color: 'error',
-                          onSelect: () => confirmDelete(item)
-                        }
-                      ]"
+                      v-if="getExpenseActions(item).length"
+                      :items="getExpenseActions(item)"
                       :content="{ align: 'end' }"
                     >
                       <UButton
@@ -383,6 +420,7 @@ async function deleteExpense() {
                         :loading="updatingId === item.id"
                       />
                     </UDropdownMenu>
+                    <span v-else class="text-xs text-muted">Только просмотр</span>
                   </td>
                 </tr>
                 <tr v-if="!data.items.length">
@@ -397,6 +435,7 @@ async function deleteExpense() {
       </div>
 
       <UModal
+        v-if="canManageExpenses"
         v-model:open="createModalOpen"
         title="Новый расход"
         description="Добавьте плановый расход и отслеживайте его статус"
@@ -450,6 +489,7 @@ async function deleteExpense() {
       </UModal>
 
       <UModal
+        v-if="canDeleteExpenses"
         v-model:open="deleteModalOpen"
         title="Удалить расход?"
         description="При удалении запись удаляется с сервера без возможности восстановления."

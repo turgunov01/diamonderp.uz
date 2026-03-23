@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import type { AuthSession } from '~/shared/types/auth'
+import type { AuthSession } from '~~/shared/types/auth'
+import { canAccessPath, getRoleLabel } from '~~/shared/utils/access'
 
 defineProps<{
   collapsed?: boolean
@@ -9,6 +10,7 @@ defineProps<{
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
 const { session, logout } = useAuth()
+const { role } = useRoleAccess()
 
 const colors = ['red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose']
 const neutrals = ['slate', 'gray', 'zinc', 'neutral', 'stone']
@@ -101,9 +103,20 @@ const user = computed(() => {
   return userMenu.value?.user ?? defaultUserMenu.user
 })
 
+const roleItem = computed<DropdownMenuItem>(() => ({
+  type: 'label',
+  label: `Роль: ${getRoleLabel(role.value)}`
+}))
+
 const items = computed<DropdownMenuItem[][]>(() => {
   const fetchedGroups = userMenu.value?.groups ?? []
-  const firstGroup = fetchedGroups[0] ?? []
+  const firstGroup = (fetchedGroups[0] ?? []).filter((item) => {
+    if (!item.to || typeof item.to !== 'string') {
+      return true
+    }
+
+    return canAccessPath(role.value, item.to)
+  })
   const trailingGroups = attachMenuActions(fetchedGroups.slice(1))
 
   return [
@@ -112,6 +125,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
       label: user.value.name,
       avatar: user.value.avatar
     }],
+    [roleItem.value],
     firstGroup,
     [{
       label: 'Тема',

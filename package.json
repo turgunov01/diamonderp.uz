@@ -25,6 +25,7 @@
     "@unovis/vue": "^1.6.4",
     "@vueuse/core": "^14.2.1",
     "@vueuse/nuxt": "^14.2.1",
+    "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
     "exceljs": "^4.4.0",
     "grapesjs": "^0.22.14",

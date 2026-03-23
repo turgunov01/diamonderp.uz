@@ -1,4 +1,6 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
+import type { AuthSession } from '~~/shared/types/auth'
+import { filterNavigationItemsByRole } from '~~/shared/utils/access'
 
 type SidebarLinks = NavigationMenuItem[][]
 
@@ -29,7 +31,7 @@ const links: SidebarLinks = [
         },
         {
           label: 'Активность сотрудников',
-          // icon: 'i-heroicons-clock',
+          icon: 'i-heroicons-clock',
           to: '/hr/employee-activity',
           exact: true
         },
@@ -108,4 +110,22 @@ const links: SidebarLinks = [
   []
 ]
 
-export default eventHandler<SidebarLinks>(() => links)
+function parseSession(event: Parameters<typeof eventHandler>[0]) {
+  const rawSession = getCookie(event, 'diamond-erp-session')
+
+  if (!rawSession) {
+    return null
+  }
+
+  try {
+    return JSON.parse(decodeURIComponent(rawSession)) as AuthSession
+  } catch {
+    return null
+  }
+}
+
+export default eventHandler<SidebarLinks>((event) => {
+  const session = parseSession(event)
+
+  return links.map(group => filterNavigationItemsByRole(group, session?.role ?? null))
+})

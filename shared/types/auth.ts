@@ -1,4 +1,4 @@
-export type AuthRole = 'admin' | 'hr'
+export type AuthRole = 'admin' | 'hr' | 'procurement'
 
 export interface AuthSession {
   email: string

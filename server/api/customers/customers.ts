@@ -10,9 +10,6 @@ export interface CustomerRecord {
   avatar: {
     src: string
   }
-  if (body.role) {
-    update.role = body.role
-  }
   password: string
   phoneNumber: string
   passportFile: string

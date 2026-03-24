@@ -75,6 +75,7 @@ type FormState = {
   username: string
   password: string
   phoneNumber: string
+  role: 'customer' | 'hr' | 'admin' | 'procurement'
   age: number
   workShift: 'day' | 'night'
   objectPinned: string
@@ -175,7 +176,7 @@ function fillStateFromCustomer(customer?: EditableCustomer | null) {
   state.username = customer?.username || ''
   state.password = customer ? '' : DEFAULT_PASSWORD
   state.phoneNumber = customer?.phoneNumber || ''
-  state.role = 'customer'
+  state.role = customer?.role || 'customer'
   state.age = customer?.age ?? 18
   state.workShift = customer?.workShift || 'day'
   state.objectPinned = customer?.objectPinned || ''

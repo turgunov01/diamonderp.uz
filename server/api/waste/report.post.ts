@@ -1,9 +1,20 @@
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
-import type { WasteReportRow, WasteBinRow } from './waste'
+import type { WasteReportRow, WasteBinRow, WasteDirection } from './waste'
 
 export default eventHandler(async (event) => {
   const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const body = await readBody<{ binId?: number, amountM3?: number, amountKg?: number, objectId?: number | null }>(event)
+  const body = await readBody<{
+    binId?: number
+    amountM3?: number
+    amountKg?: number
+    objectId?: number | null
+    fromObjectId?: number | null
+    toObjectId?: number | null
+    direction?: WasteDirection
+    vehicle?: string
+    photoUrl?: string
+    comment?: string
+  }>(event)
 
   const binId = Number(body.binId)
   if (!Number.isInteger(binId) || binId <= 0) {
@@ -12,6 +23,7 @@ export default eventHandler(async (event) => {
 
   const amountM3 = Number(body.amountM3 ?? 0)
   const amountKg = Number(body.amountKg ?? 0)
+  const direction: WasteDirection = body.direction === 'in' ? 'in' : 'out'
 
   const headers = getSupabaseServerHeaders(serviceRoleKey)
 
@@ -28,6 +40,9 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Бак не найден' })
   }
 
+  const fromObjectId = body.fromObjectId ?? bin.object_id ?? null
+  const toObjectId = body.toObjectId ?? body.objectId ?? null
+
   const reportRows = await $fetch<WasteReportRow[]>(`${url}/rest/v1/waste_reports`, {
     method: 'POST',
     headers: {
@@ -36,15 +51,25 @@ export default eventHandler(async (event) => {
     },
     body: {
       bin_id: binId,
-      object_id: body.objectId ?? bin.object_id ?? null,
+      object_id: toObjectId ?? fromObjectId ?? null,
       category: bin.category,
       amount_m3: amountM3,
-      amount_kg: amountKg
+      amount_kg: amountKg,
+      direction,
+      from_object_id: fromObjectId,
+      to_object_id: toObjectId,
+      vehicle: body.vehicle || null,
+      photo_url: body.photoUrl || null,
+      comment: body.comment || null
     }
   })
 
-  // After reporting, mark bin as available and reduce weight; volume left unchanged.
-  const newWeight = Math.max(0, (bin.weight_kg ?? 0) - (Number.isFinite(amountKg) ? amountKg : 0))
+  // Update bin state depending on direction
+  const newStatus = direction === 'out' ? 'loaded' : 'available'
+  const newObjectId = direction === 'in' ? (toObjectId ?? bin.object_id ?? null) : null
+  const newWeight = direction === 'in'
+    ? Math.max(0, amountKg || Number(bin.weight_kg || 0))
+    : Math.max(0, (bin.weight_kg ?? 0) - (Number.isFinite(amountKg) ? amountKg : 0))
 
   await $fetch(`${url}/rest/v1/waste_bins`, {
     method: 'PATCH',
@@ -54,7 +79,8 @@ export default eventHandler(async (event) => {
     },
     query: { id: `eq.${binId}` },
     body: {
-      status: 'available',
+      status: newStatus,
+      object_id: newObjectId,
       weight_kg: newWeight
     }
   })

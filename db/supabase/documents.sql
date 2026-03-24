@@ -35,8 +35,24 @@ create table if not exists public.signed_documents (
   phone_number text not null,
   signed_at timestamptz not null default now(),
   signed_via text not null default 'mobile',
-  file_url text
+  file_url text,
+  signature_path text,
+  signature_json jsonb,
+  consent_checked boolean not null default false,
+  user_agent text
 );
+
+-- Safe upserts for existing deployments
+alter table public.signed_documents
+  add column if not exists signature_path text,
+  add column if not exists signature_json jsonb,
+  add column if not exists consent_checked boolean not null default false,
+  add column if not exists user_agent text;
+
+alter table public.document_dispatches
+  alter column status drop default,
+  alter column status type text using status::text,
+  alter column status set default 'sent';
 
 create index if not exists document_templates_object_id_idx on public.document_templates(object_id);
 create index if not exists document_dispatches_template_id_idx on public.document_dispatches(template_id);
@@ -44,6 +60,7 @@ create index if not exists document_dispatches_object_id_idx on public.document_
 create index if not exists signed_documents_template_id_idx on public.signed_documents(template_id);
 create index if not exists signed_documents_object_id_idx on public.signed_documents(object_id);
 create index if not exists signed_documents_phone_number_idx on public.signed_documents(phone_number);
+create index if not exists signed_documents_signature_path_idx on public.signed_documents(signature_path);
 
 alter table public.document_templates enable row level security;
 alter table public.document_dispatches enable row level security;
@@ -117,6 +134,16 @@ with check (true);
 
 insert into storage.buckets (id, name, public)
 values ('document-templates', 'document-templates', false)
+on conflict (id) do update
+set public = excluded.public;
+
+insert into storage.buckets (id, name, public)
+values ('document-signatures', 'document-signatures', false)
+on conflict (id) do update
+set public = excluded.public;
+
+insert into storage.buckets (id, name, public)
+values ('document-template-uploads', 'document-template-uploads', false)
 on conflict (id) do update
 set public = excluded.public;
 

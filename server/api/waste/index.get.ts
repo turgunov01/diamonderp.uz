@@ -23,7 +23,7 @@ export default eventHandler(async (event): Promise<WasteResponse> => {
   }
 
   const reportQuery: Record<string, string> = {
-    select: 'id,bin_id,object_id,category,amount_m3,amount_kg,created_at',
+    select: 'id,bin_id,object_id,category,amount_m3,amount_kg,direction,from_object_id,to_object_id,vehicle,photo_url,comment,created_at',
     order: 'created_at.desc',
     limit: '50'
   }

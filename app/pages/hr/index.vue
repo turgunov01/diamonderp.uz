@@ -7,6 +7,7 @@ import type { EmployeeActivityRecord } from '~/stores/employeeActivity'
 
 interface Customer {
   id: number
+  fullName?: string
   username: string
   avatar: {
     src: string
@@ -21,6 +22,10 @@ interface Customer {
   baseSalary: number
   positionBonus: number
   salaryCurrency: 'UZS'
+  status?: string
+  mustChangePassword?: boolean
+  archivedAt?: string | null
+  deactivationComment?: string | null
 }
 
 type CustomerStatus = 'active' | 'inactive'

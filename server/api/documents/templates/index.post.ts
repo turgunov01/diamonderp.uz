@@ -17,9 +17,14 @@ interface CreateTemplateBody {
   html?: string
   css?: string
   projectData?: unknown
+  uploadFile?: {
+    filename: string
+    contentType?: string
+    data: Uint8Array
+  }
 }
 
-function parseCreateTemplateBody(body: unknown): Required<Pick<CreateTemplateBody, 'name' | 'objectId'>> & Omit<CreateTemplateBody, 'name' | 'objectId'> {
+function parseJsonCreateTemplateBody(body: unknown): Required<Pick<CreateTemplateBody, 'name' | 'objectId'>> & Omit<CreateTemplateBody, 'name' | 'objectId'> {
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
@@ -50,9 +55,44 @@ function parseCreateTemplateBody(body: unknown): Required<Pick<CreateTemplateBod
   }
 }
 
+async function parseMultipartCreateTemplateBody(event: H3Event): Promise<CreateTemplateBody> {
+  const form = await readMultipartFormData(event)
+  if (!form?.length) {
+    throw createError({ statusCode: 400, statusMessage: 'Пустая форма.' })
+  }
+
+  const fields = new Map<string, string>()
+  let uploadFile: { filename: string, contentType?: string, data: Uint8Array } | undefined
+  for (const part of form) {
+    if (!part.name) continue
+    if (part.filename) {
+      uploadFile = {
+        filename: part.filename,
+        contentType: part.type,
+        data: part.data
+      }
+      continue
+    }
+    fields.set(part.name, new TextDecoder().decode(part.data))
+  }
+
+  return {
+    ...parseJsonCreateTemplateBody(Object.fromEntries(fields)),
+    uploadFile
+  }
+}
+
+async function parseCreateTemplateBody(event: H3Event): Promise<CreateTemplateBody> {
+  const contentType = getHeader(event, 'content-type') || ''
+  if (contentType.includes('multipart/form-data')) {
+    return parseMultipartCreateTemplateBody(event)
+  }
+  return parseJsonCreateTemplateBody(await readBody(event))
+}
+
 export default eventHandler(async (event) => {
-  const payload = parseCreateTemplateBody(await readBody(event))
-  const { url, serviceRoleKey, documentTemplateBucket } = getSupabaseServerConfig()
+  const payload = await parseCreateTemplateBody(event)
+  const { url, serviceRoleKey, documentTemplateBucket, documentTemplateUploadBucket } = getSupabaseServerConfig()
 
   await ensureStorageBucket({
     url,
@@ -62,10 +102,39 @@ export default eventHandler(async (event) => {
     missingErrorMessage: `Unable to initialize storage bucket "${documentTemplateBucket}".`
   })
 
+  if (payload.uploadFile) {
+    await ensureStorageBucket({
+      url,
+      serviceRoleKey,
+      bucket: documentTemplateUploadBucket,
+      isPublic: false,
+      missingErrorMessage: `Unable to initialize storage bucket "${documentTemplateUploadBucket}".`
+    })
+  }
+
   const timestamp = Date.now()
   const safeName = sanitizePathSegment(payload.name)
   const uniqueId = crypto.randomUUID()
   const storagePath = `${safeName}/${timestamp}-${uniqueId}.json`
+
+  let originalFilePath: string | undefined
+  if (payload.uploadFile) {
+    const uploadPath = `${safeName}/${timestamp}-${sanitizePathSegment(payload.uploadFile.filename)}`
+    await uploadStorageObject({
+      url,
+      serviceRoleKey,
+      bucket: documentTemplateUploadBucket,
+      path: uploadPath,
+      data: payload.uploadFile.data,
+      contentType: payload.uploadFile.contentType || 'application/octet-stream',
+      uploadErrorMessage: 'Не удалось загрузить оригинальный файл шаблона.'
+    })
+    originalFilePath = `${documentTemplateUploadBucket}/${uploadPath}`
+
+    if (!payload.html?.trim()) {
+      payload.html = `<p>Загружен файл ${payload.uploadFile.filename}. Откройте его в редакторе и отредактируйте.</p>`
+    }
+  }
 
   const serializedProject = JSON.stringify({
     objectId: payload.objectId,
@@ -74,7 +143,10 @@ export default eventHandler(async (event) => {
     contractType: payload.contractType,
     html: payload.html,
     css: payload.css,
-    projectData: payload.projectData,
+    projectData: {
+      ...(payload.projectData || {}),
+      originalFilePath
+    },
     updatedAt: new Date().toISOString()
   })
 

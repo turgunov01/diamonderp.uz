@@ -4,6 +4,8 @@ interface SupabaseServerConfig {
   avatarBucket: string
   passportBucket: string
   documentTemplateBucket: string
+  documentTemplateUploadBucket: string
+  documentSignatureBucket: string
 }
 
 function normalizeUrl(value: string) {
@@ -17,6 +19,8 @@ export function getSupabaseServerConfig(): SupabaseServerConfig {
   const avatarBucket = config.supabase?.avatarBucket
   const passportBucket = config.supabase?.passportBucket
   const documentTemplateBucket = config.supabase?.documentTemplateBucket
+  const documentTemplateUploadBucket = config.supabase?.documentTemplateUploadBucket
+  const documentSignatureBucket = config.supabase?.documentSignatureBucket
 
   if (typeof url !== 'string' || !url.length) {
     throw createError({
@@ -39,7 +43,13 @@ export function getSupabaseServerConfig(): SupabaseServerConfig {
     passportBucket: typeof passportBucket === 'string' && passportBucket.length ? passportBucket : 'customer-passports',
     documentTemplateBucket: typeof documentTemplateBucket === 'string' && documentTemplateBucket.length
       ? documentTemplateBucket
-      : 'document-templates'
+      : 'document-templates',
+    documentTemplateUploadBucket: typeof documentTemplateUploadBucket === 'string' && documentTemplateUploadBucket.length
+      ? documentTemplateUploadBucket
+      : 'document-template-uploads',
+    documentSignatureBucket: typeof documentSignatureBucket === 'string' && documentSignatureBucket.length
+      ? documentSignatureBucket
+      : 'document-signatures'
   }
 }
 

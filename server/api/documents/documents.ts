@@ -47,6 +47,10 @@ export interface SignedDocumentDbRow {
   signed_at: string
   signed_via: string
   file_url: string | null
+  signature_path?: string | null
+  signature_json?: unknown
+  consent_checked?: boolean
+  user_agent?: string | null
 }
 
 export interface DocumentTemplateRecord {
@@ -88,6 +92,7 @@ export interface SignedDocumentRecord {
   signedAt: string
   signedVia: string
   fileUrl?: string
+  signaturePath?: string
 }
 
 export function mapTemplateDbRowToRecord(row: DocumentTemplateDbRow): DocumentTemplateRecord {
@@ -130,7 +135,8 @@ export function mapSignedDbRowToRecord(row: SignedDocumentDbRow): SignedDocument
     phoneNumber: row.phone_number,
     signedAt: row.signed_at,
     signedVia: row.signed_via,
-    fileUrl: row.file_url || undefined
+    fileUrl: row.file_url || undefined,
+    signaturePath: row.signature_path || undefined
   }
 }
 

@@ -1,4 +1,5 @@
--- Waste bins and reports
+-- Waste bins and transport history
+
 create table if not exists public.waste_bins (
   id bigint generated always as identity primary key,
   object_id bigint references public.objects(id) on delete set null,
@@ -13,15 +14,32 @@ create table if not exists public.waste_bins (
 create table if not exists public.waste_reports (
   id bigint generated always as identity primary key,
   bin_id bigint not null references public.waste_bins(id) on delete cascade,
-  object_id bigint references public.objects(id) on delete set null,
+  object_id bigint references public.objects(id) on delete set null, -- legacy field
   category text not null check (category in ('Макулатура','Пластик','Общее')),
   amount_m3 numeric not null default 0,
   amount_kg numeric not null default 0,
+  direction text not null default 'out' check (direction in ('in','out')),
+  from_object_id bigint references public.objects(id) on delete set null,
+  to_object_id bigint references public.objects(id) on delete set null,
+  vehicle text,
+  photo_url text,
+  comment text,
   created_at timestamptz not null default now()
 );
 
+-- Safe alters for existing deployments
+alter table public.waste_reports
+  add column if not exists direction text not null default 'out' check (direction in ('in','out')),
+  add column if not exists from_object_id bigint references public.objects(id) on delete set null,
+  add column if not exists to_object_id bigint references public.objects(id) on delete set null,
+  add column if not exists vehicle text,
+  add column if not exists photo_url text,
+  add column if not exists comment text;
+
 create index if not exists waste_reports_bin_id_idx on public.waste_reports(bin_id);
 create index if not exists waste_bins_object_idx on public.waste_bins(object_id);
+create index if not exists waste_reports_created_idx on public.waste_reports(created_at desc);
+create index if not exists waste_reports_direction_idx on public.waste_reports(direction);
 
 -- Update trigger for updated_at
 create or replace function public.set_updated_at()

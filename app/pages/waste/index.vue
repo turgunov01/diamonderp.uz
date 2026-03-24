@@ -6,6 +6,7 @@ definePageMeta({
 
 type BinCategory = 'Макулатура' | 'Пластик' | 'Общее'
 type BinStatus = 'available' | 'loaded'
+type WasteDirection = 'in' | 'out'
 
 interface WasteBin {
   id: number
@@ -25,6 +26,12 @@ interface WasteReport {
   category: BinCategory
   amountM3: number
   amountKg: number
+  direction: WasteDirection
+  fromObjectId?: number | null
+  toObjectId?: number | null
+  vehicle?: string | null
+  photoUrl?: string | null
+  comment?: string | null
   createdAt: string
 }
 
@@ -36,6 +43,11 @@ interface WasteResponse {
 const toast = useToast()
 const { canManageWaste } = useRoleAccess()
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
+
+const { data: objectsData } = await useFetch<{ id: number, name: string }[]>('/api/objects', {
+  default: () => [],
+  query: { order: 'name.asc' }
+})
 
 const {
   data,
@@ -56,11 +68,33 @@ const {
 )
 
 const isLoading = computed(() => pending.value || status.value === 'pending')
+const bins = computed(() => data.value?.bins || [])
+const reports = computed(() => data.value?.reports || [])
 
-const reportForm = reactive({
-  binId: null as number | null,
-  amountM3: 0,
-  amountKg: 0
+const objectOptions = computed(() => (objectsData.value || []).map(o => ({ label: o.name, value: o.id })))
+const objectNameById = computed(() => {
+  const map = new Map<number, string>()
+  for (const o of objectsData.value || []) map.set(o.id, o.name)
+  return map
+})
+
+const totals = computed(() => ({
+  total: bins.value.length,
+  available: bins.value.filter(b => b.status === 'available').length,
+  loaded: bins.value.filter(b => b.status === 'loaded').length
+}))
+
+const categoryStats = computed(() => {
+  const cats: BinCategory[] = ['Макулатура', 'Пластик', 'Общее']
+  return cats.map(cat => {
+    const catBins = bins.value.filter(b => b.category === cat)
+    return {
+      category: cat,
+      total: catBins.length,
+      available: catBins.filter(b => b.status === 'available').length,
+      loaded: catBins.filter(b => b.status === 'loaded').length
+    }
+  })
 })
 
 const createModalOpen = ref(false)
@@ -68,54 +102,26 @@ const creating = ref(false)
 const createForm = reactive({
   category: 'Общее' as BinCategory,
   volumeM3: 1,
-  widthM: 1,
-  heightM: 1,
   densityKgPerM3: 80,
   weightKg: 0,
-  status: 'available' as BinStatus
+  status: 'available' as BinStatus,
+  objectId: null as number | null
 })
 
-const bins = computed(() => data.value?.bins || [])
-const reports = computed(() => data.value?.reports || [])
-
-const availableBins = computed(() => bins.value.filter(b => b.status === 'available'))
-const loadedBins = computed(() => bins.value.filter(b => b.status === 'loaded'))
-
-const totals = computed(() => ({
-  count: bins.value.length,
-  m3: bins.value.reduce((s, b) => s + b.volumeM3, 0),
-  kg: bins.value.reduce((s, b) => s + b.weightKg, 0)
-}))
-
-const totalsAvailable = computed(() => ({
-  count: availableBins.value.length,
-  m3: availableBins.value.reduce((s, b) => s + b.volumeM3, 0),
-  kg: availableBins.value.reduce((s, b) => s + b.weightKg, 0)
-}))
-
-const totalsLoaded = computed(() => ({
-  count: loadedBins.value.length,
-  m3: loadedBins.value.reduce((s, b) => s + b.volumeM3, 0),
-  kg: loadedBins.value.reduce((s, b) => s + b.weightKg, 0)
-}))
-
-const categories: BinCategory[] = ['Макулатура', 'Пластик', 'Общее']
-const categoryStats = computed(() => categories.map(cat => {
-  const catBins = bins.value.filter(b => b.category === cat)
-  const avail = catBins.filter(b => b.status === 'available')
-  const load = catBins.filter(b => b.status === 'loaded')
-  return {
-    category: cat,
-    total: catBins.length,
-    available: avail.length,
-    loaded: load.length,
-    m3: catBins.reduce((s, b) => s + b.volumeM3, 0),
-    kg: catBins.reduce((s, b) => s + b.weightKg, 0)
-  }
-}))
+const operationForm = reactive({
+  direction: 'out' as WasteDirection,
+  binId: null as number | null,
+  fromObjectId: null as number | null,
+  toObjectId: null as number | null,
+  vehicle: '',
+  amountM3: 0,
+  amountKg: 0,
+  photoUrl: '',
+  comment: ''
+})
 
 function formatNumber(n: number) {
-  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(n)
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(n)
 }
 
 function formatDate(value: string) {
@@ -136,9 +142,13 @@ function statusColor(status: BinStatus) {
   return status === 'available' ? 'success' : 'warning'
 }
 
-async function submitReport() {
+function directionLabel(direction: WasteDirection) {
+  return direction === 'out' ? 'Вывоз' : 'Ввоз'
+}
+
+async function submitOperation() {
   if (!canManageWaste.value) return
-  if (!reportForm.binId) {
+  if (!operationForm.binId) {
     toast.add({ title: 'Выберите бак', color: 'warning' })
     return
   }
@@ -146,20 +156,27 @@ async function submitReport() {
     await $fetch('/api/waste/report', {
       method: 'POST',
       body: {
-        binId: reportForm.binId,
-        amountM3: reportForm.amountM3,
-        amountKg: reportForm.amountKg,
-        objectId: activeObject.value?.id ?? null
+        ...operationForm,
+        fromObjectId: operationForm.fromObjectId ?? activeObject.value?.id ?? null,
+        toObjectId: operationForm.toObjectId ?? activeObject.value?.id ?? null
       }
     })
-    toast.add({ title: 'Отчёт отправлен', description: 'Данные обновлены', color: 'success' })
-    reportForm.binId = null
-    reportForm.amountM3 = 0
-    reportForm.amountKg = 0
+    toast.add({ title: 'Операция сохранена', color: 'success' })
+    Object.assign(operationForm, {
+      direction: 'out' as WasteDirection,
+      binId: null,
+      fromObjectId: null,
+      toObjectId: null,
+      vehicle: '',
+      amountM3: 0,
+      amountKg: 0,
+      photoUrl: '',
+      comment: ''
+    })
     await refresh()
   } catch (err: unknown) {
     toast.add({
-      title: 'Не удалось отправить отчёт',
+      title: 'Не удалось сохранить',
       description: (err as any)?.data?.statusMessage || (err as Error)?.message,
       color: 'error'
     })
@@ -167,12 +184,10 @@ async function submitReport() {
 }
 
 async function createBin() {
-  if (!canManageWaste.value) return
-  if (creating.value) return
+  if (!canManageWaste.value || creating.value) return
   creating.value = true
 
-  const computedWeight = createForm.densityKgPerM3 * (Number(createForm.volumeM3) || 0)
-  createForm.weightKg = Math.round(computedWeight)
+  createForm.weightKg = Math.round((Number(createForm.volumeM3) || 0) * (Number(createForm.densityKgPerM3) || 0))
 
   try {
     await $fetch('/api/waste/bin', {
@@ -182,7 +197,7 @@ async function createBin() {
         volumeM3: createForm.volumeM3,
         weightKg: createForm.weightKg,
         status: createForm.status,
-        objectId: activeObject.value?.id ?? null
+        objectId: createForm.objectId ?? activeObject.value?.id ?? null
       }
     })
     toast.add({ title: 'Бак создан', color: 'success' })
@@ -198,118 +213,60 @@ async function createBin() {
     creating.value = false
   }
 }
+
+async function updateBin(binId: number, patch: Partial<WasteBin>) {
+  if (!canManageWaste.value) return
+  await $fetch(`/api/waste/${binId}`, {
+    method: 'PATCH',
+    body: {
+      status: patch.status,
+      object_id: patch.objectId
+    }
+  })
+  await refresh()
+}
 </script>
 
 <template>
-  <UDashboardPanel id="waste">
-    <template #header>
-      <UDashboardNavbar title="Отходы">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <UBadge
-            v-if="!canManageWaste"
-            label="Только чтение"
-            color="neutral"
-            variant="subtle"
-          />
-          <UButton
-            v-if="canManageWaste"
-            icon="i-lucide-plus"
-            label="Создать бак"
-            color="primary"
-            @click="createModalOpen = true"
-          />
-          <UButton
-            icon="i-lucide-refresh-ccw"
-            color="neutral"
-            variant="outline"
-            :loading="isLoading"
-            @click="refresh"
-            label="Обновить"
-          />
-        </template>
-      </UDashboardNavbar>
+  <UDashboardPanel>
+    <template #title>
+      Отходы
+    </template>
+
+    <template #links>
+      <UButton
+        v-if="canManageWaste"
+        size="sm"
+        icon="i-lucide-plus"
+        label="Создать бак"
+        @click="createModalOpen = true"
+      />
     </template>
 
     <template #body>
-      <div class="space-y-4">
-        <div class="grid gap-3 sm:grid-cols-3">
-          <UPageCard
-            icon="i-lucide-trash"
-            title="Все баки"
-            variant="subtle"
-            :ui="{ leading: 'p-2.5 rounded-full bg-primary/10 ring ring-inset ring-primary/25 flex-col' }"
-          >
-            <p class="text-2xl font-semibold text-highlighted">{{ totals.count }}</p>
-            <p class="text-xs text-muted">Всего · {{ formatNumber(totals.m3) }} м³ · {{ formatNumber(totals.kg) }} кг</p>
-          </UPageCard>
-          <UPageCard
-            icon="i-lucide-check-circle"
-            title="Доступные"
-            variant="subtle"
-            :ui="{ leading: 'p-2.5 rounded-full bg-success/10 ring ring-inset ring-success/25 flex-col' }"
-          >
-            <p class="text-2xl font-semibold text-highlighted">{{ totalsAvailable.count }}</p>
-            <p class="text-xs text-muted">{{ formatNumber(totalsAvailable.m3) }} м³ · {{ formatNumber(totalsAvailable.kg) }} кг</p>
-          </UPageCard>
-          <UPageCard
-            icon="i-lucide-loader"
-            title="Загруженные"
-            variant="subtle"
-            :ui="{ leading: 'p-2.5 rounded-full bg-warning/10 ring ring-inset ring-warning/25 flex-col' }"
-          >
-            <p class="text-2xl font-semibold text-highlighted">{{ totalsLoaded.count }}</p>
-            <p class="text-xs text-muted">{{ formatNumber(totalsLoaded.m3) }} м³ · {{ formatNumber(totalsLoaded.kg) }} кг</p>
-          </UPageCard>
+      <div class="grid gap-4 md:grid-cols-3">
+        <div class="rounded-lg border border-default bg-elevated/40 p-4">
+          <p class="text-xs text-muted">Всего баков</p>
+          <p class="text-2xl font-semibold text-highlighted">{{ totals.total }}</p>
+          <p class="text-xs text-muted mt-1">Свободно: {{ totals.available }} · Загружено: {{ totals.loaded }}</p>
         </div>
-
-        <div class="rounded-lg border border-default bg-elevated/30">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-default/60">
-            <h3 class="font-semibold text-highlighted">По категориям</h3>
-            <UBadge :label="categoryStats.length" variant="subtle" />
-          </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-              <thead>
-                <tr class="bg-elevated/40">
-                  <th class="px-3 py-2 text-left">Категория</th>
-                  <th class="px-3 py-2 text-left">Контейнеров</th>
-                  <th class="px-3 py-2 text-left">Доступно</th>
-                  <th class="px-3 py-2 text-left">Загружено</th>
-                  <th class="px-3 py-2 text-left">Объём, м³</th>
-                  <th class="px-3 py-2 text-left">Вес, кг</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="stat in categoryStats"
-                  :key="stat.category"
-                  class="border-t border-default"
-                >
-                  <td class="px-3 py-2 font-medium text-highlighted">{{ stat.category }}</td>
-                  <td class="px-3 py-2">{{ stat.total }}</td>
-                  <td class="px-3 py-2 text-success">{{ stat.available }}</td>
-                  <td class="px-3 py-2 text-warning">{{ stat.loaded }}</td>
-                  <td class="px-3 py-2">{{ formatNumber(stat.m3) }}</td>
-                  <td class="px-3 py-2">{{ formatNumber(stat.kg) }}</td>
-                </tr>
-                <tr v-if="!categoryStats.length">
-                  <td class="px-3 py-4 text-muted" colspan="6">
-                    Нет данных по категориям.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div
+          v-for="stat in categoryStats"
+          :key="stat.category"
+          class="rounded-lg border border-default bg-elevated/40 p-4"
+        >
+          <p class="text-xs text-muted">{{ stat.category }}</p>
+          <p class="text-xl font-semibold text-highlighted">{{ stat.total }}</p>
+          <p class="text-xs text-muted mt-1">Свободно: {{ stat.available }} · Загружено: {{ stat.loaded }}</p>
         </div>
+      </div>
 
+      <div class="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         <div class="rounded-lg border border-default bg-elevated/30">
           <div class="flex items-center justify-between px-4 py-3 border-b border-default/60">
             <div>
               <h3 class="font-semibold text-highlighted leading-tight">Контейнеры</h3>
-              <p class="text-xs text-muted">Все баки с привязкой к объекту и статусом</p>
+              <p class="text-xs text-muted">Создавайте, закрепляйте за объектом и меняйте статус</p>
             </div>
             <UBadge :label="bins.length" variant="subtle" />
           </div>
@@ -323,37 +280,55 @@ async function createBin() {
                   <th class="px-3 py-2 text-left">Объём, м³</th>
                   <th class="px-3 py-2 text-left">Вес, кг</th>
                   <th class="px-3 py-2 text-left">Статус</th>
-                  <th class="px-3 py-2 text-left">Создан</th>
-                  <th class="px-3 py-2 text-left">Обновлён</th>
+                  <th class="px-3 py-2 text-left" v-if="canManageWaste">Действия</th>
                 </tr>
               </thead>
               <tbody>
                 <template v-if="isLoading">
                   <tr v-for="n in 5" :key="`bin-loading-${n}`" class="border-t border-default">
-                    <td class="px-3 py-3" colspan="8">
+                    <td class="px-3 py-3" colspan="7">
                       <div class="h-4 w-full bg-default/50 rounded animate-pulse" />
                     </td>
                   </tr>
                 </template>
                 <template v-else>
-                  <tr
-                    v-for="bin in bins"
-                    :key="bin.id"
-                    class="border-t border-default"
-                  >
+                  <tr v-for="bin in bins" :key="bin.id" class="border-t border-default">
                     <td class="px-3 py-2">#{{ bin.id }}</td>
-                    <td class="px-3 py-2">{{ bin.objectId ?? '—' }}</td>
+                    <td class="px-3 py-2">
+                      {{ objectNameById.get(bin.objectId ?? -1) || '—' }}
+                      <div v-if="canManageWaste" class="mt-1">
+                        <USelect
+                          v-model="bin.objectId"
+                          :items="objectOptions"
+                          placeholder="Закрепить объект"
+                          size="xs"
+                          @update:model-value="value => updateBin(bin.id, { objectId: value as number | null })"
+                        />
+                      </div>
+                    </td>
                     <td class="px-3 py-2">{{ bin.category }}</td>
                     <td class="px-3 py-2">{{ formatNumber(bin.volumeM3) }}</td>
                     <td class="px-3 py-2">{{ formatNumber(bin.weightKg) }}</td>
                     <td class="px-3 py-2">
                       <UBadge :label="statusLabel(bin.status)" :color="statusColor(bin.status)" variant="subtle" />
+                      <div v-if="canManageWaste" class="mt-1">
+                        <USelect
+                          v-model="bin.status"
+                          :items="[
+                            { label: 'Свободен', value: 'available' },
+                            { label: 'Загружен', value: 'loaded' }
+                          ]"
+                          size="xs"
+                          @update:model-value="value => updateBin(bin.id, { status: value as BinStatus })"
+                        />
+                      </div>
                     </td>
-                    <td class="px-3 py-2">{{ formatDate(bin.createdAt) }}</td>
-                    <td class="px-3 py-2">{{ formatDate(bin.updatedAt) }}</td>
+                    <td v-if="canManageWaste" class="px-3 py-2 text-right text-xs text-muted">
+                      {{ formatDate(bin.updatedAt) }}
+                    </td>
                   </tr>
                   <tr v-if="!bins.length">
-                    <td class="px-3 py-4 text-muted" colspan="8">
+                    <td class="px-3 py-4 text-muted" colspan="7">
                       Контейнеры не найдены.
                     </td>
                   </tr>
@@ -363,148 +338,187 @@ async function createBin() {
           </div>
         </div>
 
-        <div class="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-          <div class="rounded-lg border border-default bg-elevated/30 p-4 space-y-3">
-            <h3 class="font-semibold text-highlighted">Отчёт о вывозе</h3>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <UFormField label="Бак">
-                <USelect
-                  v-model="reportForm.binId"
-                  :items="bins.map(b => ({ label: `#${b.id} · ${b.category} · ${b.status === 'available' ? 'свободен' : 'загружен'}`, value: b.id }))"
-                  placeholder="Выберите бак"
-                  class="w-full"
-                />
-              </UFormField>
-              <UFormField label="Объём, м³">
-                <UInput v-model="reportForm.amountM3" type="number" min="0" step="0.1" class="w-full" />
-              </UFormField>
-              <UFormField label="Вес, кг">
-                <UInput v-model="reportForm.amountKg" type="number" min="0" step="1" class="w-full" />
-              </UFormField>
-            </div>
-            <div class="flex items-center justify-end gap-2">
-              <UButton
-                v-if="canManageWaste"
-                label="Отправить отчёт"
-                icon="i-lucide-send"
-                :loading="isLoading"
-                @click="submitReport"
+        <div class="rounded-lg border border-default bg-elevated/30 p-4 space-y-3">
+          <h3 class="font-semibold text-highlighted">Операция (ввоз / вывоз)</h3>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <UFormField label="Направление">
+              <USelect
+                v-model="operationForm.direction"
+                :items="[{ label: 'Вывоз', value: 'out' }, { label: 'Ввоз', value: 'in' }]"
               />
-              <span v-else class="text-xs text-muted">Редактирование доступно только администратору</span>
-            </div>
+            </UFormField>
+            <UFormField label="Бак">
+              <USelect
+                v-model="operationForm.binId"
+                :items="bins.map(b => ({ label: `#${b.id} · ${b.category}`, value: b.id }))"
+                placeholder="Выберите бак"
+              />
+            </UFormField>
+            <UFormField label="Откуда (объект)">
+              <USelect
+                v-model="operationForm.fromObjectId"
+                :items="objectOptions"
+                placeholder="Источник"
+              />
+            </UFormField>
+            <UFormField label="Куда (объект)">
+              <USelect
+                v-model="operationForm.toObjectId"
+                :items="objectOptions"
+                placeholder="Получатель / полигон"
+              />
+            </UFormField>
+            <UFormField label="Машина / номер">
+              <UInput v-model="operationForm.vehicle" placeholder="01A777AA" />
+            </UFormField>
+            <UFormField label="Объём, м³">
+              <UInput v-model="operationForm.amountM3" type="number" min="0" step="0.1" />
+            </UFormField>
+            <UFormField label="Вес, кг">
+              <UInput v-model="operationForm.amountKg" type="number" min="0" step="1" />
+            </UFormField>
+            <UFormField label="Фото (URL)">
+              <UInput v-model="operationForm.photoUrl" placeholder="https://..." />
+            </UFormField>
+            <UFormField label="Комментарий" class="sm:col-span-2">
+              <UTextarea v-model="operationForm.comment" placeholder="Что увезли, состояние, примечание" />
+            </UFormField>
           </div>
-
-          <div class="rounded-lg border border-default bg-elevated/30">
-            <div class="flex items-center justify-between px-4 py-3 border-b border-default/60">
-              <h3 class="font-semibold text-highlighted">История отчётов</h3>
-              <UBadge :label="reports.length" variant="subtle" />
-            </div>
-            <div class="overflow-x-auto">
-              <table class="min-w-full text-sm">
-                <thead>
-                  <tr class="bg-elevated/40">
-                    <th class="px-3 py-2 text-left">ID</th>
-                    <th class="px-3 py-2 text-left">Бак</th>
-                    <th class="px-3 py-2 text-left">Категория</th>
-                    <th class="px-3 py-2 text-left">Объём, м³</th>
-                    <th class="px-3 py-2 text-left">Вес, кг</th>
-                    <th class="px-3 py-2 text-left">Дата</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template v-if="isLoading">
-                    <tr v-for="n in 5" :key="`report-loading-${n}`" class="border-t border-default">
-                      <td class="px-3 py-3" colspan="6">
-                        <div class="h-4 w-full bg-default/50 rounded animate-pulse" />
-                      </td>
-                    </tr>
-                  </template>
-                  <template v-else>
-                    <tr
-                      v-for="report in reports"
-                      :key="report.id"
-                      class="border-t border-default"
-                    >
-                      <td class="px-3 py-2">#{{ report.id }}</td>
-                      <td class="px-3 py-2">#{{ report.binId }}</td>
-                      <td class="px-3 py-2">{{ report.category }}</td>
-                      <td class="px-3 py-2">{{ formatNumber(report.amountM3) }}</td>
-                      <td class="px-3 py-2">{{ formatNumber(report.amountKg) }}</td>
-                      <td class="px-3 py-2">{{ formatDate(report.createdAt) }}</td>
-                    </tr>
-                    <tr v-if="!reports.length">
-                      <td class="px-3 py-4 text-muted" colspan="6">
-                        Отчётов пока нет.
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
+          <div class="flex items-center justify-end">
+            <UButton
+              v-if="canManageWaste"
+              icon="i-lucide-send"
+              label="Сохранить операцию"
+              :loading="isLoading"
+              @click="submitOperation"
+            />
+            <span v-else class="text-xs text-muted">Редактирование доступно только администратору</span>
           </div>
         </div>
       </div>
 
-      <UModal
-        v-if="canManageWaste"
-        v-model:open="createModalOpen"
-        title="Создать бак"
-        description="Добавьте новый контейнер для учёта отходов."
-      >
-        <template #body>
-          <div class="space-y-3">
-            <UFormField label="Категория">
-              <USelect
-                v-model="createForm.category"
-                :items="['Макулатура', 'Пластик', 'Общее'].map(v => ({ label: v, value: v }))"
-              />
-            </UFormField>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <UFormField label="Объём, м³">
-                <UInput v-model="createForm.volumeM3" type="number" min="0" step="0.1" class="w-full" />
-              </UFormField>
-              <UFormField label="Ширина, м">
-                <UInput v-model="createForm.widthM" type="number" min="0" step="0.1" class="w-full" />
-              </UFormField>
-              <UFormField label="Высота, м">
-                <UInput v-model="createForm.heightM" type="number" min="0" step="0.1" class="w-full" />
-              </UFormField>
-              <UFormField label="Вес, кг (авто)">
-                <UInput
-                  :model-value="Math.round(createForm.densityKgPerM3 * (Number(createForm.volumeM3) || 0))"
-                  type="number"
-                  disabled
-                  class="w-full"
-                />
-              </UFormField>
-            </div>
-            <UFormField label="Статус">
-              <USelect
-                v-model="createForm.status"
-                :items="[
-                  { label: 'Доступен', value: 'available' },
-                  { label: 'Загружен', value: 'loaded' }
-                ]"
-              />
-            </UFormField>
-            <div class="flex items-center justify-end gap-2">
-              <UButton
-                label="Отмена"
-                color="neutral"
-                variant="subtle"
-                :disabled="creating"
-                @click="createModalOpen = false"
-              />
-              <UButton
-                label="Создать"
-                icon="i-lucide-check"
-                :loading="creating"
-                @click="createBin"
-              />
-            </div>
-          </div>
-        </template>
-      </UModal>
+      <div class="rounded-lg border border-default bg-elevated/30 mt-4">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-default/60">
+          <h3 class="font-semibold text-highlighted">История перевозок</h3>
+          <UBadge :label="reports.length" variant="subtle" />
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="bg-elevated/40">
+                <th class="px-3 py-2 text-left">ID</th>
+                <th class="px-3 py-2 text-left">Направление</th>
+                <th class="px-3 py-2 text-left">Бак</th>
+                <th class="px-3 py-2 text-left">Категория</th>
+                <th class="px-3 py-2 text-left">Откуда</th>
+                <th class="px-3 py-2 text-left">Куда</th>
+                <th class="px-3 py-2 text-left">Машина</th>
+                <th class="px-3 py-2 text-left">Объём, м³</th>
+                <th class="px-3 py-2 text-left">Вес, кг</th>
+                <th class="px-3 py-2 text-left">Фото</th>
+                <th class="px-3 py-2 text-left">Дата</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-if="isLoading">
+                <tr v-for="n in 5" :key="`report-loading-${n}`" class="border-t border-default">
+                  <td class="px-3 py-3" colspan="11">
+                    <div class="h-4 w-full bg-default/50 rounded animate-pulse" />
+                  </td>
+                </tr>
+              </template>
+              <template v-else>
+                <tr v-for="report in reports" :key="report.id" class="border-t border-default">
+                  <td class="px-3 py-2">#{{ report.id }}</td>
+                  <td class="px-3 py-2">
+                    <UBadge :label="directionLabel(report.direction)" :color="report.direction === 'out' ? 'warning' : 'success'" variant="subtle" />
+                  </td>
+                  <td class="px-3 py-2">#{{ report.binId }}</td>
+                  <td class="px-3 py-2">{{ report.category }}</td>
+                  <td class="px-3 py-2">{{ objectNameById.get(report.fromObjectId ?? -1) || '—' }}</td>
+                  <td class="px-3 py-2">{{ objectNameById.get(report.toObjectId ?? -1) || '—' }}</td>
+                  <td class="px-3 py-2">{{ report.vehicle || '—' }}</td>
+                  <td class="px-3 py-2">{{ formatNumber(report.amountM3) }}</td>
+                  <td class="px-3 py-2">{{ formatNumber(report.amountKg) }}</td>
+                  <td class="px-3 py-2">
+                    <a
+                      v-if="report.photoUrl"
+                      :href="report.photoUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-primary underline"
+                    >
+                      Фото
+                    </a>
+                    <span v-else class="text-muted">—</span>
+                  </td>
+                  <td class="px-3 py-2">{{ formatDate(report.createdAt) }}</td>
+                </tr>
+                <tr v-if="!reports.length">
+                  <td class="px-3 py-4 text-muted" colspan="11">
+                    История пуста.
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </template>
+
+    <UModal
+      v-if="canManageWaste"
+      v-model:open="createModalOpen"
+      title="Создать бак"
+      description="Добавьте новый контейнер и привяжите к объекту."
+    >
+      <template #body>
+        <div class="space-y-3">
+          <UFormField label="Категория">
+            <USelect
+              v-model="createForm.category"
+              :items="['Макулатура', 'Пластик', 'Общее'].map(v => ({ label: v, value: v }))"
+            />
+          </UFormField>
+          <UFormField label="Объём, м³">
+            <UInput v-model="createForm.volumeM3" type="number" min="0" step="0.1" class="w-full" />
+          </UFormField>
+          <UFormField label="Плотность, кг/м³">
+            <UInput v-model="createForm.densityKgPerM3" type="number" min="0" step="1" class="w-full" />
+          </UFormField>
+          <UFormField label="Статус">
+            <USelect
+              v-model="createForm.status"
+              :items="[
+                { label: 'Свободен', value: 'available' },
+                { label: 'Загружен', value: 'loaded' }
+              ]"
+            />
+          </UFormField>
+          <UFormField label="Объект">
+            <USelect
+              v-model="createForm.objectId"
+              :items="objectOptions"
+              placeholder="Не выбран"
+            />
+          </UFormField>
+          <div class="flex items-center justify-end gap-2">
+            <UButton
+              label="Отмена"
+              color="neutral"
+              variant="subtle"
+              :disabled="creating"
+              @click="createModalOpen = false"
+            />
+            <UButton
+              label="Создать"
+              icon="i-lucide-check"
+              :loading="creating"
+              @click="createBin"
+            />
+          </div>
+        </div>
+      </template>
+    </UModal>
   </UDashboardPanel>
 </template>

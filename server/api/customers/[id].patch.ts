@@ -116,6 +116,16 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
   const input = body as Record<string, unknown>
   const update: UpdateCustomerBody = {}
 
+  if (input.fullName !== undefined) {
+    if (!isNonEmptyString(input.fullName)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Поле fullName обязательно.'
+      })
+    }
+    update.fullName = input.fullName.trim()
+  }
+
   if (input.username !== undefined) {
     if (!isNonEmptyString(input.username) || input.username.trim().length < 3) {
       throw createError({
@@ -172,6 +182,47 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
 
   if (input.positionBonus !== undefined) {
     update.positionBonus = parseNonNegativeMoney(input.positionBonus, 'positionBonus')
+  }
+
+  if (input.status !== undefined) {
+    const allowed = ['pending', 'active', 'inactive', 'archived']
+    if (typeof input.status !== 'string' || !allowed.includes(input.status)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Поле status должно быть pending, active, inactive или archived.'
+      })
+    }
+    update.status = input.status as UpdateCustomerBody['status']
+  }
+
+  if (input.mustChangePassword !== undefined) {
+    if (typeof input.mustChangePassword !== 'boolean') {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Поле mustChangePassword должно быть true/false.'
+      })
+    }
+    update.mustChangePassword = input.mustChangePassword
+  }
+
+  if (input.deactivationComment !== undefined) {
+    if (input.deactivationComment !== null && typeof input.deactivationComment !== 'string') {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Поле deactivationComment должно быть строкой.'
+      })
+    }
+    update.deactivationComment = input.deactivationComment as string | undefined
+  }
+
+  if (input.archivedAt !== undefined) {
+    if (input.archivedAt !== null && typeof input.archivedAt !== 'string') {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Поле archivedAt должно быть ISO-датой или null.'
+      })
+    }
+    update.archivedAt = input.archivedAt as string | null
   }
 
   if (Object.keys(update).length === 0) {

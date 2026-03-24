@@ -1,9 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
 type EditableCustomer = {
   id: number
+  fullName?: string
   username: string
   phoneNumber: string
   age: number
@@ -34,8 +35,10 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { default: false })
 const NOT_PINNED_VALUE = '__not_pinned__'
+const DEFAULT_PASSWORD = '12345678'
 
 const createSchema = z.object({
+  fullName: z.string().min(3, 'ФИО обязательно'),
   username: z.string().min(3, 'Имя пользователя слишком короткое'),
   password: z.string().min(6, 'Пароль должен быть не менее 6 символов'),
   phoneNumber: z.string().min(7, 'Номер телефона слишком короткий'),
@@ -49,6 +52,7 @@ const createSchema = z.object({
 })
 
 const editSchema = z.object({
+  fullName: z.string().min(3, 'ФИО обязательно').optional(),
   username: z.string().min(3, 'Имя пользователя слишком короткое'),
   password: z.string().refine(
     value => !value.trim() || value.trim().length >= 6,
@@ -63,8 +67,8 @@ const editSchema = z.object({
   objectPinned: z.string().optional(),
   objectPositions: z.array(z.string())
 })
-
 type FormState = {
+  fullName: string
   username: string
   password: string
   phoneNumber: string
@@ -75,6 +79,7 @@ type FormState = {
 }
 
 type FormSubmitState = {
+  fullName: string
   username: string
   password: string
   phoneNumber: string
@@ -92,8 +97,9 @@ const toast = useToast()
 const activeBuilding = useState<{ id: number, name: string } | null>('active-building')
 
 const state = reactive<FormState>({
+  fullName: '',
   username: '',
-  password: '',
+  password: DEFAULT_PASSWORD,
   phoneNumber: '',
   age: 18,
   workShift: 'day',
@@ -130,9 +136,39 @@ const pinnedObjectModel = computed({
   }
 })
 
+function transliterate(value: string) {
+  const map: Record<string, string> = {
+    а: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y',
+    к: 'k', қ: 'q', л: 'l', м: 'm', н: 'n', ң: 'ng', о: 'o', ө: 'o', п: 'p', р: 'r', с: 's', т: 't',
+    у: 'u', ұ: 'u', ү: 'u', ф: 'f', х: 'h', ҳ: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ы: 'y', э: 'e',
+    ю: 'yu', я: 'ya', ь: '', ъ: ''
+  }
+
+  return value
+    .toLowerCase()
+    .split('')
+    .map(char => map[char] ?? char)
+    .join('')
+}
+
+watch(() => state.fullName, (value) => {
+  if (isEditMode.value) return
+  const normalized = transliterate(value || '')
+    .replace(/[^a-z0-9\\s.-]+/g, ' ')
+    .replace(/\\s+/g, ' ')
+    .trim()
+  if (!normalized) {
+    state.username = ''
+    return
+  }
+  const parts = normalized.split(' ')
+  state.username = parts.length >= 2 ? `${parts[0]}.${parts.slice(1).join('.')}` : normalized.replace(/\\s+/g, '.')
+})
+
 function fillStateFromCustomer(customer?: EditableCustomer | null) {
+  state.fullName = customer?.fullName || ''
   state.username = customer?.username || ''
-  state.password = ''
+  state.password = customer ? '' : DEFAULT_PASSWORD
   state.phoneNumber = customer?.phoneNumber || ''
   state.age = customer?.age ?? 18
   state.workShift = customer?.workShift || 'day'
@@ -219,6 +255,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
       throw new Error('Выберите здание перед сохранением сотрудника.')
     }
 
+    const fullName = event.data.fullName.trim()
     const objectPinned = event.data.objectPinned?.trim() || ''
     const objectPositions = buildObjectPositions(event.data.objectPositions, event.data.objectPinned || '')
 
@@ -231,6 +268,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
         method: 'PATCH',
         body: {
           buildingId: activeBuilding.value?.id ?? null,
+          fullName,
           username: event.data.username.trim(),
           password: event.data.password.trim() || undefined,
           phoneNumber: event.data.phoneNumber.trim(),
@@ -258,9 +296,10 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
       }
 
       const form = new FormData()
+      form.append('fullName', fullName)
       form.append('username', event.data.username.trim())
       form.append('buildingId', String(activeBuilding.value?.id || ''))
-      form.append('password', event.data.password)
+      form.append('password', event.data.password || DEFAULT_PASSWORD)
       form.append('phoneNumber', event.data.phoneNumber.trim())
       form.append('age', String(event.data.age))
       form.append('workShift', event.data.workShift)
@@ -316,6 +355,9 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
         :on-submit="onSubmit"
         class="space-y-4"
       >
+        <UFormField label="ФИО" name="fullName">
+          <UInput v-model="state.fullName" class="w-full" placeholder="Сардор Тургунов" />
+        </UFormField>
         <UFormField label="Имя пользователя" name="username">
           <UInput v-model="state.username" class="w-full" placeholder="alex.smith" />
         </UFormField>
@@ -335,7 +377,8 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
             v-model="state.password"
             type="password"
             class="w-full"
-            :placeholder="isEditMode ? 'Оставьте пустым, чтобы не менять' : 'Надежный пароль'"
+            :placeholder="isEditMode ? 'Оставьте пустым, чтобы не менять' : `По умолчанию ${DEFAULT_PASSWORD}`"
+            :disabled="!isEditMode"
           />
         </UFormField>
 
@@ -442,3 +485,10 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
     </template>
   </UModal>
 </template>
+
+
+
+
+
+
+

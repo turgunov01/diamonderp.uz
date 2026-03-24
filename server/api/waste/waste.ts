@@ -1,5 +1,6 @@
 export type BinCategory = 'Макулатура' | 'Пластик' | 'Общее'
 export type BinStatus = 'available' | 'loaded'
+export type WasteDirection = 'in' | 'out'
 
 export interface WasteBinRow {
   id: number
@@ -19,6 +20,12 @@ export interface WasteReportRow {
   category: BinCategory
   amount_m3: number
   amount_kg: number
+  direction: WasteDirection
+  from_object_id?: number | null
+  to_object_id?: number | null
+  vehicle?: string | null
+  photo_url?: string | null
+  comment?: string | null
   created_at: string
 }
 
@@ -40,6 +47,12 @@ export interface WasteReport {
   category: BinCategory
   amountM3: number
   amountKg: number
+  direction: WasteDirection
+  fromObjectId?: number | null
+  toObjectId?: number | null
+  vehicle?: string | null
+  photoUrl?: string | null
+  comment?: string | null
   createdAt: string
 }
 
@@ -48,8 +61,8 @@ export function mapBinRow(row: WasteBinRow): WasteBin {
     id: row.id,
     objectId: row.object_id,
     category: row.category,
-    volumeM3: row.volume_m3,
-    weightKg: row.weight_kg,
+    volumeM3: Number(row.volume_m3 || 0),
+    weightKg: Number(row.weight_kg || 0),
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -62,8 +75,14 @@ export function mapReportRow(row: WasteReportRow): WasteReport {
     binId: row.bin_id,
     objectId: row.object_id,
     category: row.category,
-    amountM3: row.amount_m3,
-    amountKg: row.amount_kg,
+    amountM3: Number(row.amount_m3 || 0),
+    amountKg: Number(row.amount_kg || 0),
+    direction: row.direction,
+    fromObjectId: row.from_object_id ?? null,
+    toObjectId: row.to_object_id ?? null,
+    vehicle: row.vehicle ?? null,
+    photoUrl: row.photo_url ?? null,
+    comment: row.comment ?? null,
     createdAt: row.created_at
   }
 }

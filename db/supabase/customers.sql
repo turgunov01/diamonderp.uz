@@ -64,6 +64,9 @@ alter table public.customers
 alter table public.customers
   add column if not exists salary_currency text not null default 'UZS';
 
+alter table public.customers
+  add column if not exists role text not null default 'customer';
+
 create index if not exists customers_status_idx
   on public.customers(status, archived_at);
 create index if not exists customers_archived_at_idx

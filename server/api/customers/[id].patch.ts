@@ -181,6 +181,16 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     update.objectPositions = parseObjectPositions(input.objectPositions)
   }
 
+  if (input.role !== undefined) {
+    if (!isNonEmptyString(input.role)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Поле role должно быть строкой.'
+      })
+    }
+    update.role = input.role.trim()
+  }
+
   if (input.baseSalary !== undefined) {
     update.baseSalary = parseMoney(input.baseSalary, 'baseSalary', false)
   }

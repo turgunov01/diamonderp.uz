@@ -6,8 +6,12 @@ export interface CustomerRecord {
   buildingId?: number | null
   fullName: string
   username: string
+  role: string
   avatar: {
     src: string
+  }
+  if (body.role) {
+    update.role = body.role
   }
   password: string
   phoneNumber: string
@@ -35,6 +39,7 @@ export interface CreateCustomerBody {
   avatar: {
     src: string
   }
+  role?: string
   password: string
   phoneNumber: string
   passportFile: string
@@ -61,6 +66,7 @@ export interface UpdateCustomerBody {
   workShift?: WorkShift
   objectPinned?: string
   objectPositions?: string[]
+  role?: string
   baseSalary?: number
   positionBonus?: number
   status?: CustomerLifecycleStatus
@@ -76,6 +82,7 @@ export interface CustomerDbRow {
   username: string
   avatar: string
   password: string
+  role?: string
   phone_number: string
   passport_file: string
   passport_front_path?: string | null
@@ -100,6 +107,7 @@ export function mapCustomerDbRowToRecord(row: CustomerDbRow): CustomerRecord {
     buildingId: row.building_id ?? null,
     fullName: row.full_name,
     username: row.username,
+    role: row.role ?? 'customer',
     avatar: { src: row.avatar },
     password: row.password,
     phoneNumber: row.phone_number,
@@ -128,6 +136,7 @@ export function mapCreateBodyToDbInsert(body: CreateCustomerBody) {
     building_id: body.buildingId ?? null,
     avatar: body.avatar.src,
     password: body.password,
+    role: body.role ?? 'customer',
     phone_number: body.phoneNumber,
     passport_file: body.passportFile,
     passport_front_path: body.passportFrontPath ?? null,
@@ -150,6 +159,7 @@ export function mapUpdateBodyToDbUpdate(body: UpdateCustomerBody) {
     username?: string
     building_id?: number | null
     password?: string
+    role?: string
     phone_number?: string
     age?: number
     work_shift?: WorkShift
@@ -168,6 +178,9 @@ export function mapUpdateBodyToDbUpdate(body: UpdateCustomerBody) {
   }
   if (body.username) {
     update.username = body.username
+  }
+  if (body.role) {
+    update.role = body.role
   }
   if (body.buildingId !== undefined) {
     update.building_id = body.buildingId

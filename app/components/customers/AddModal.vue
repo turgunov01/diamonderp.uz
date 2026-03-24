@@ -7,6 +7,7 @@ type EditableCustomer = {
   fullName?: string
   username: string
   phoneNumber: string
+  role: 'customer' | 'hr' | 'admin' | 'procurement'
   age: number
   workShift: 'day' | 'night'
   objectPinned: string
@@ -42,6 +43,7 @@ const createSchema = z.object({
   username: z.string().min(3, 'Имя пользователя слишком короткое'),
   password: z.string().min(6, 'Пароль должен быть не менее 6 символов'),
   phoneNumber: z.string().min(7, 'Номер телефона слишком короткий'),
+  role: z.enum(['customer', 'hr', 'admin', 'procurement']),
   age: z.coerce
     .number()
     .int('Возраст должен быть целым числом')
@@ -59,6 +61,7 @@ const editSchema = z.object({
     'Пароль должен быть не менее 6 символов'
   ),
   phoneNumber: z.string().min(7, 'Номер телефона слишком короткий'),
+  role: z.enum(['customer', 'hr', 'admin', 'procurement']).optional(),
   age: z.coerce
     .number()
     .int('Возраст должен быть целым числом')
@@ -83,6 +86,7 @@ type FormSubmitState = {
   username: string
   password: string
   phoneNumber: string
+  role: 'customer' | 'hr' | 'admin' | 'procurement'
   age: number
   workShift: 'day' | 'night'
   objectPinned?: string
@@ -101,6 +105,7 @@ const state = reactive<FormState>({
   username: '',
   password: DEFAULT_PASSWORD,
   phoneNumber: '',
+  role: 'customer',
   age: 18,
   workShift: 'day',
   objectPinned: '',
@@ -170,6 +175,7 @@ function fillStateFromCustomer(customer?: EditableCustomer | null) {
   state.username = customer?.username || ''
   state.password = customer ? '' : DEFAULT_PASSWORD
   state.phoneNumber = customer?.phoneNumber || ''
+  state.role = 'customer'
   state.age = customer?.age ?? 18
   state.workShift = customer?.workShift || 'day'
   state.objectPinned = customer?.objectPinned || ''
@@ -274,6 +280,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
           phoneNumber: event.data.phoneNumber.trim(),
           age: event.data.age,
           workShift: event.data.workShift,
+          role: event.data.role || 'customer',
           objectPinned,
           objectPositions
         }
@@ -301,6 +308,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
       form.append('buildingId', String(activeBuilding.value?.id || ''))
       form.append('password', event.data.password || DEFAULT_PASSWORD)
       form.append('phoneNumber', event.data.phoneNumber.trim())
+      form.append('role', event.data.role || 'customer')
       form.append('age', String(event.data.age))
       form.append('workShift', event.data.workShift)
       form.append('objectPinned', objectPinned)
@@ -360,6 +368,19 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
         </UFormField>
         <UFormField label="Имя пользователя" name="username">
           <UInput v-model="state.username" class="w-full" placeholder="alex.smith" />
+        </UFormField>
+
+        <UFormField label="Роль" name="role">
+          <USelect
+            v-model="state.role"
+            :items="[
+              { label: 'Customer', value: 'customer' },
+              { label: 'HR', value: 'hr' },
+              { label: 'Admin', value: 'admin' },
+              { label: 'Procurement', value: 'procurement' }
+            ]"
+            class="w-full"
+          />
         </UFormField>
 
         <UFormField v-if="!isEditMode" label="Файл аватара">

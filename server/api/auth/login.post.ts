@@ -79,6 +79,7 @@ interface CustomerRow {
   password: string
   phone_number: string
   avatar: string | null
+  role?: string | null
   status?: string | null
   must_change_password?: boolean | null
 }
@@ -88,7 +89,7 @@ function mapCustomerToSession(row: CustomerRow): AuthSession {
     email: undefined,
     phone: row.phone_number,
     name: row.full_name || row.username,
-    role: 'customer',
+    role: (row.role as AuthRole | undefined) || 'customer',
     avatar: row.avatar
   }
 }
@@ -126,7 +127,7 @@ async function fetchCustomer(login: string) {
   const rows = await $fetch<CustomerRow[]>(`${url}/rest/v1/customers`, {
     headers,
     query: {
-      select: 'id,full_name,username,password,phone_number,avatar,status,must_change_password',
+      select: 'id,full_name,username,password,phone_number,avatar,status,must_change_password,role',
       or: `(${[
         `phone_number.eq.${normalized}`,
         `phone_number.eq.${login}`,

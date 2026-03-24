@@ -162,6 +162,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   const buildingId = parseOptionalBuildingId(input.buildingId)
   const baseSalary = parseOptionalMoney(input.baseSalary, 'baseSalary')
   const positionBonus = parseOptionalMoney(input.positionBonus, 'positionBonus')
+  const role = getOptionalString((input as any).role) || 'customer'
 
   if (!Array.isArray(input.objectPositions) || !input.objectPositions.length || input.objectPositions.some(position => !isNonEmptyString(position))) {
     throw createError({ statusCode: 400, statusMessage: 'Поле objectPositions должно быть непустым массивом строк.' })
@@ -176,6 +177,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
     passportFile,
     age,
     buildingId,
+    role,
     workShift: input.workShift,
     objectPinned,
     objectPositions: input.objectPositions.map(position => position.trim()),
@@ -385,6 +387,7 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
   const objectPositions = parseObjectPositions(fields.get('objectPositions'))
   const baseSalary = parseOptionalMoney(fields.get('baseSalary'), 'baseSalary')
   const positionBonus = parseOptionalMoney(fields.get('positionBonus'), 'positionBonus')
+  const role = getOptionalString(fields.get('role')) || 'customer'
   ensurePasswordSafe(password, fullName, username)
 
   if (!isWorkShift(workShiftRaw)) {
@@ -494,6 +497,7 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
     },
     password,
     phoneNumber,
+    role,
     passportFile,
     passportFrontPath: passportFrontPath ?? null,
     passportBackPath: passportBackPath ?? null,

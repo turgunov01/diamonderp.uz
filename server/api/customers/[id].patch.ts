@@ -30,12 +30,17 @@ function parseCustomerId(event: H3Event) {
   return customerId
 }
 
-function parseNonNegativeMoney(value: unknown, fieldName: string) {
+function parseMoney(value: unknown, fieldName: string, allowNegative = false) {
   const amount = typeof value === 'number' ? value : Number(value)
-  if (!Number.isInteger(amount) || amount < 0) {
+  const isInteger = Number.isInteger(amount)
+  const isValid = allowNegative ? isInteger : (isInteger && amount >= 0)
+
+  if (!isValid) {
     throw createError({
       statusCode: 400,
-      statusMessage: `Поле ${fieldName} должно быть целым числом не меньше 0.`
+      statusMessage: allowNegative
+        ? `Поле ${fieldName} должно быть целым числом.`
+        : `Поле ${fieldName} должно быть целым числом не меньше 0.`
     })
   }
 
@@ -177,12 +182,14 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
   }
 
   if (input.baseSalary !== undefined) {
-    update.baseSalary = parseNonNegativeMoney(input.baseSalary, 'baseSalary')
+    update.baseSalary = parseMoney(input.baseSalary, 'baseSalary', false)
   }
 
   if (input.positionBonus !== undefined) {
-    update.positionBonus = parseNonNegativeMoney(input.positionBonus, 'positionBonus')
+    update.positionBonus = parseMoney(input.positionBonus, 'positionBonus', true)
   }
+
+  let requestedStatus: UpdateCustomerBody['status'] | undefined
 
   if (input.status !== undefined) {
     const allowed = ['pending', 'active', 'inactive', 'archived']
@@ -192,7 +199,8 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
         statusMessage: 'Поле status должно быть pending, active, inactive или archived.'
       })
     }
-    update.status = input.status as UpdateCustomerBody['status']
+    requestedStatus = input.status as UpdateCustomerBody['status']
+    update.status = requestedStatus
   }
 
   if (input.mustChangePassword !== undefined) {
@@ -223,6 +231,20 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
       })
     }
     update.archivedAt = input.archivedAt as string | null
+  }
+
+  if (requestedStatus === 'archived') {
+    const comment = update.deactivationComment ?? (typeof input.deactivationComment === 'string' ? input.deactivationComment : '')
+    if (typeof comment !== 'string' || !comment.trim()) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Для архивации обязательно заполните комментарий deactivationComment.'
+      })
+    }
+    update.deactivationComment = comment.trim()
+    if (!update.archivedAt) {
+      update.archivedAt = new Date().toISOString()
+    }
   }
 
   if (Object.keys(update).length === 0) {

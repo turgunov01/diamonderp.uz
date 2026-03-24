@@ -28,7 +28,7 @@ export default eventHandler(async (event): Promise<WasteResponse> => {
     limit: '50'
   }
   if (filterByObject) {
-    reportQuery.object_id = `eq.${objectId}`
+    reportQuery.or = `(from_object_id.eq.${objectId},to_object_id.eq.${objectId},object_id.eq.${objectId})`
   }
 
   const [binsRows, reportRows] = await Promise.all([

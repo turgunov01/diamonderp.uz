@@ -108,6 +108,16 @@ const createForm = reactive({
   objectId: null as number | null
 })
 
+const estimatedWeight = computed(() => {
+  const volume = Number(createForm.volumeM3) || 0
+  const density = Number(createForm.densityKgPerM3) || 0
+  return Math.max(0, Math.round(volume * density))
+})
+
+watch([() => createForm.volumeM3, () => createForm.densityKgPerM3], () => {
+  createForm.weightKg = estimatedWeight.value
+})
+
 const operationForm = reactive({
   direction: 'out' as WasteDirection,
   binId: null as number | null,
@@ -119,6 +129,14 @@ const operationForm = reactive({
   photoUrl: '',
   comment: ''
 })
+
+const binDetailsOpen = ref(false)
+const selectedBin = ref<WasteBin | null>(null)
+
+function submitWasteRemoval() {
+  operationForm.direction = 'out'
+  void submitOperation()
+}
 
 function formatNumber(n: number) {
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(n)
@@ -144,6 +162,11 @@ function statusColor(status: BinStatus) {
 
 function directionLabel(direction: WasteDirection) {
   return direction === 'out' ? 'Вывоз' : 'Ввоз'
+}
+
+function openBinDetails(bin: WasteBin) {
+  selectedBin.value = { ...bin }
+  binDetailsOpen.value = true
 }
 
 async function submitOperation() {
@@ -261,6 +284,35 @@ async function updateBin(binId: number, patch: Partial<WasteBin>) {
         </div>
       </div>
 
+      <div class="rounded-lg border border-default bg-elevated/30 p-4 space-y-2">
+        <h4 class="font-semibold text-highlighted">Типы баков</h4>
+        <p class="text-xs text-muted">Справочник типов и что в них можно класть.</p>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="bg-elevated/40">
+                <th class="px-3 py-2 text-left">Тип</th>
+                <th class="px-3 py-2 text-left">Описание</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-t border-default">
+                <td class="px-3 py-2 font-medium">Макулатура</td>
+                <td class="px-3 py-2 text-muted">Бумага, картон, архивы без пластиковых обложек.</td>
+              </tr>
+              <tr class="border-t border-default">
+                <td class="px-3 py-2 font-medium">Пластик</td>
+                <td class="px-3 py-2 text-muted">ПЭТ, плёнка, тара; без металла и стекла.</td>
+              </tr>
+              <tr class="border-t border-default">
+                <td class="px-3 py-2 font-medium">Общее</td>
+                <td class="px-3 py-2 text-muted">Смешанные отходы без сортировки.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         <div class="rounded-lg border border-default bg-elevated/30">
           <div class="flex items-center justify-between px-4 py-3 border-b border-default/60">
@@ -280,13 +332,14 @@ async function updateBin(binId: number, patch: Partial<WasteBin>) {
                   <th class="px-3 py-2 text-left">Объём, м³</th>
                   <th class="px-3 py-2 text-left">Вес, кг</th>
                   <th class="px-3 py-2 text-left">Статус</th>
+                  <th class="px-3 py-2 text-left">Детали</th>
                   <th class="px-3 py-2 text-left" v-if="canManageWaste">Действия</th>
                 </tr>
               </thead>
               <tbody>
                 <template v-if="isLoading">
                   <tr v-for="n in 5" :key="`bin-loading-${n}`" class="border-t border-default">
-                    <td class="px-3 py-3" colspan="7">
+                    <td class="px-3 py-3" :colspan="canManageWaste ? 9 : 8">
                       <div class="h-4 w-full bg-default/50 rounded animate-pulse" />
                     </td>
                   </tr>
@@ -323,12 +376,15 @@ async function updateBin(binId: number, patch: Partial<WasteBin>) {
                         />
                       </div>
                     </td>
+                    <td class="px-3 py-2">
+                      <UButton size="xs" variant="ghost" color="neutral" label="Открыть" @click="openBinDetails(bin)" />
+                    </td>
                     <td v-if="canManageWaste" class="px-3 py-2 text-right text-xs text-muted">
                       {{ formatDate(bin.updatedAt) }}
                     </td>
                   </tr>
                   <tr v-if="!bins.length">
-                    <td class="px-3 py-4 text-muted" colspan="7">
+                    <td class="px-3 py-4 text-muted" :colspan="canManageWaste ? 9 : 8">
                       Контейнеры не найдены.
                     </td>
                   </tr>
@@ -383,18 +439,28 @@ async function updateBin(binId: number, patch: Partial<WasteBin>) {
             <UFormField label="Комментарий" class="sm:col-span-2">
               <UTextarea v-model="operationForm.comment" placeholder="Что увезли, состояние, примечание" />
             </UFormField>
-          </div>
-          <div class="flex items-center justify-end">
-            <UButton
-              v-if="canManageWaste"
-              icon="i-lucide-send"
-              label="Сохранить операцию"
-              :loading="isLoading"
-              @click="submitOperation"
-            />
-            <span v-else class="text-xs text-muted">Редактирование доступно только администратору</span>
-          </div>
         </div>
+        <div class="flex items-center justify-end">
+          <UButton
+            v-if="canManageWaste"
+            icon="i-lucide-send"
+            label="Сохранить операцию"
+            :loading="isLoading"
+            @click="submitOperation"
+          />
+          <UButton
+            v-if="canManageWaste"
+            class="ml-2"
+            icon="i-lucide-truck"
+            label="Создать запись вывоза"
+            color="primary"
+            variant="outline"
+            :loading="isLoading"
+            @click="submitWasteRemoval"
+          />
+          <span v-else class="text-xs text-muted">Редактирование доступно только администратору</span>
+        </div>
+      </div>
       </div>
 
       <div class="rounded-lg border border-default bg-elevated/30 mt-4">
@@ -467,6 +533,54 @@ async function updateBin(binId: number, patch: Partial<WasteBin>) {
     </template>
 
     <UModal
+      v-model:open="binDetailsOpen"
+      :title="selectedBin ? `Бак #${selectedBin.id}` : 'Бак'"
+      :description="selectedBin ? 'Детали контейнера и его тип' : ''"
+    >
+      <template #body>
+        <div v-if="selectedBin" class="space-y-3">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div class="rounded-md border border-default p-3">
+              <p class="text-xs text-muted">Тип</p>
+              <p class="font-medium">{{ selectedBin.category }}</p>
+            </div>
+            <div class="rounded-md border border-default p-3">
+              <p class="text-xs text-muted">Статус</p>
+              <UBadge :label="statusLabel(selectedBin.status)" :color="statusColor(selectedBin.status)" variant="subtle" />
+            </div>
+            <div class="rounded-md border border-default p-3">
+              <p class="text-xs text-muted">Объект</p>
+              <p class="font-medium">{{ objectNameById.get(selectedBin.objectId ?? -1) || '—' }}</p>
+            </div>
+            <div class="rounded-md border border-default p-3">
+              <p class="text-xs text-muted">Обновлён</p>
+              <p class="font-medium">{{ formatDate(selectedBin.updatedAt) }}</p>
+            </div>
+          </div>
+
+          <div class="rounded-md border border-default p-3">
+            <p class="text-xs text-muted mb-2">Параметры</p>
+            <div class="grid gap-2 sm:grid-cols-3">
+              <div>
+                <p class="text-xs text-muted">Объём</p>
+                <p class="font-medium">{{ formatNumber(selectedBin.volumeM3) }} м³</p>
+              </div>
+              <div>
+                <p class="text-xs text-muted">Вес (нетто)</p>
+                <p class="font-medium">{{ formatNumber(selectedBin.weightKg) }} кг</p>
+              </div>
+              <div>
+                <p class="text-xs text-muted">Создан</p>
+                <p class="font-medium">{{ formatDate(selectedBin.createdAt) }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p v-else class="text-sm text-muted">Выберите бак в таблице, чтобы увидеть детали.</p>
+      </template>
+    </UModal>
+
+    <UModal
       v-if="canManageWaste"
       v-model:open="createModalOpen"
       title="Создать бак"
@@ -502,6 +616,23 @@ async function updateBin(binId: number, patch: Partial<WasteBin>) {
               placeholder="Не выбран"
             />
           </UFormField>
+          <div class="rounded-md border border-default bg-default/60 p-3">
+            <p class="text-xs text-muted mb-2">Детали создаваемого бака</p>
+            <div class="grid gap-2 sm:grid-cols-3">
+              <div>
+                <p class="text-xs text-muted">Тип</p>
+                <p class="font-medium">{{ createForm.category }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-muted">Объём · Плотность</p>
+                <p class="font-medium">{{ formatNumber(createForm.volumeM3) }} м³ · {{ createForm.densityKgPerM3 }} кг/м³</p>
+              </div>
+              <div>
+                <p class="text-xs text-muted">Ожидаемый вес</p>
+                <p class="font-medium">{{ formatNumber(estimatedWeight) }} кг</p>
+              </div>
+            </div>
+          </div>
           <div class="flex items-center justify-end gap-2">
             <UButton
               label="Отмена"

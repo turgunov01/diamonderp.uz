@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { upperFirst } from 'scule'
 import { getPaginationRowModel } from '@tanstack/table-core'
@@ -48,6 +48,18 @@ interface SalaryFormulaConfig {
   penaltyMultiplier: string
 }
 
+interface Advance {
+  id: number
+  customerId: number
+  amount: number
+  currency: string
+  comment?: string | null
+  status: 'issued' | 'settled' | 'cancelled'
+  issuedAt: string
+  issuedBy?: string | null
+  settledAt?: string | null
+}
+
 function createDefaultSalaryFormulaConfig(): SalaryFormulaConfig {
   return {
     daysInMonth: '',
@@ -71,6 +83,9 @@ const selectedCustomer = ref<Customer | null>(null)
 const deletingSelected = ref(false)
 const editCustomerOpen = ref(false)
 const editingCustomer = ref<Customer | null>(null)
+const archiveModalOpen = ref(false)
+const archiveComment = ref('')
+const archivingCustomer = ref<Customer | null>(null)
 const salaryMonthSeed = useState<string>('hr-salary-month-seed', () => new Date().toISOString())
 const salaryFormulaOpen = ref(false)
 
@@ -87,6 +102,12 @@ const hrTabs = [{
 }, {
   label: 'Зарплаты',
   value: 'salaries'
+}, {
+  label: 'Авансы',
+  value: 'advances'
+}, {
+  label: 'Архив',
+  value: 'archive'
 }]
 const selectedHrTab = ref('users')
 
@@ -114,8 +135,25 @@ const salaryFormulaDraft = reactive<SalaryFormulaConfig>({
   minutesPerHour: salaryFormulaConfig.value.minutesPerHour,
   penaltyMultiplier: salaryFormulaConfig.value.penaltyMultiplier
 })
+const exportSalaryLoading = ref(false)
 
 const { data, status, error, refresh } = await useAutoRefreshFetch<Customer[]>('/api/customers', {
+  lazy: true,
+  default: () => [],
+  query: {
+    buildingId: computed(() => activeBuilding.value?.id)
+  }
+})
+
+const { data: archiveData, status: archiveStatus, refresh: refreshArchive } = await useAutoRefreshFetch<Customer[]>('/api/customers/archive', {
+  lazy: true,
+  default: () => [],
+  query: {
+    buildingId: computed(() => activeBuilding.value?.id)
+  }
+})
+
+const { data: advancesData, status: advancesStatus, refresh: refreshAdvances } = await useAutoRefreshFetch<Advance[]>('/api/customers/advances', {
   lazy: true,
   default: () => [],
   query: {
@@ -166,9 +204,28 @@ const {
     buildingId: computed(() => activeBuilding.value?.id)
   }
 })
-const safeCustomers = computed(() => data.value || [])
+const safeCustomers = computed(() =>
+  (data.value || []).filter(customer => customer.status !== 'archived')
+)
+const safeArchiveCustomers = computed(() => archiveData.value || [])
+const safeAdvances = computed(() => advancesData.value || [])
+const customerOptions = computed(() =>
+  safeCustomers.value.map(c => ({
+    label: `${c.fullName || c.username} (@${c.username})`,
+    value: c.id
+  }))
+)
+const customerNameById = computed(() => {
+  const map = new Map<number, string>()
+  for (const c of safeCustomers.value) {
+    map.set(c.id, c.fullName || c.username)
+  }
+  return map
+})
 const safeMonthlyActivities = computed(() => monthlyActivityData.value || [])
 const isLoading = computed(() => status.value === 'pending' || status.value === 'idle')
+const isArchiveLoading = computed(() => archiveStatus.value === 'pending' || archiveStatus.value === 'idle')
+const isAdvancesLoading = computed(() => advancesStatus.value === 'pending' || advancesStatus.value === 'idle')
 const isSalaryActivityLoading = computed(() =>
   monthlyActivityStatus.value === 'pending' || monthlyActivityStatus.value === 'idle'
 )
@@ -262,6 +319,33 @@ function saveSalaryFormulaConfig() {
   })
 }
 
+async function exportSalaryExcel() {
+  if (exportSalaryLoading.value) return
+  exportSalaryLoading.value = true
+  try {
+    const params = new URLSearchParams()
+    if (activeBuilding.value?.id) params.set('buildingId', String(activeBuilding.value.id))
+    const response = await fetch(`/api/customers/salary-export?${params.toString()}`)
+    if (!response.ok) throw new Error('Не удалось сформировать файл')
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'salaries.xlsx'
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.add({ title: 'Выгружено', description: 'Файл Excel сохранён', color: 'success' })
+  } catch (error: unknown) {
+    toast.add({
+      title: 'Ошибка выгрузки',
+      description: getErrorMessage(error) || 'Повторите позже',
+      color: 'error'
+    })
+  } finally {
+    exportSalaryLoading.value = false
+  }
+}
+
 watch(salaryFormulaOpen, (value) => {
   if (value) {
     resetSalaryFormulaDraft()
@@ -278,9 +362,22 @@ function openCustomerEdit(customer: Customer) {
   editCustomerOpen.value = true
 }
 
+function openArchiveCustomer(customer: Customer) {
+  archivingCustomer.value = customer
+  archiveComment.value = ''
+  archiveModalOpen.value = true
+}
+
 watch(editCustomerOpen, (value) => {
   if (!value) {
     editingCustomer.value = null
+  }
+})
+
+watch(archiveModalOpen, (value) => {
+  if (!value) {
+    archivingCustomer.value = null
+    archiveComment.value = ''
   }
 })
 
@@ -322,11 +419,11 @@ function getRowItems(row: Row<Customer>) {
       }
     },
     {
-      label: 'Удалить клиента',
-      icon: 'i-lucide-trash',
-      color: 'error',
+      label: 'Архивировать',
+      icon: 'i-lucide-archive',
+      color: 'warning',
       onSelect() {
-        void deleteCustomer(row.original)
+        openArchiveCustomer(row.original)
       }
     }
   ]
@@ -493,6 +590,19 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 const lateMinutesByEmployee = computed(() => {
   const totals: Record<number, number> = {}
 
@@ -505,6 +615,21 @@ const lateMinutesByEmployee = computed(() => {
   }
 
   return totals
+})
+
+const advanceFilterCustomerId = ref<number | null>(null)
+const advanceForm = reactive({
+  customerId: null as number | null,
+  amount: 0,
+  currency: 'UZS',
+  comment: '',
+  status: 'issued' as Advance['status']
+})
+
+const filteredAdvances = computed(() => {
+  const list = safeAdvances.value || []
+  if (!advanceFilterCustomerId.value) return list
+  return list.filter(a => a.customerId === advanceFilterCustomerId.value)
 })
 
 function getBaseSalary(customerId: number) {
@@ -545,6 +670,52 @@ function getLatePenalty(customerId: number) {
   return Math.round(perMinuteRate * effectivePenaltyMultiplier.value * lateMinutes)
 }
 
+async function archiveCustomer() {
+  if (!archivingCustomer.value) {
+    return
+  }
+  if (!archiveComment.value.trim()) {
+    toast.add({ title: 'Комментарий обязателен', color: 'warning' })
+    return
+  }
+
+  try {
+    await $fetch(`/api/customers/${archivingCustomer.value.id}`, {
+      method: 'PATCH',
+      body: {
+        status: 'archived',
+        archivedAt: new Date().toISOString(),
+        deactivationComment: archiveComment.value.trim()
+      }
+    })
+    toast.add({ title: 'Пользователь архивирован', color: 'success' })
+    archiveModalOpen.value = false
+    await Promise.all([refresh(), refreshArchive()])
+  } catch (error: unknown) {
+    toast.add({
+      title: 'Не удалось архивировать',
+      description: getErrorMessage(error),
+      color: 'error'
+    })
+  }
+}
+
+async function restoreCustomer(user: Customer) {
+  try {
+    await $fetch(`/api/customers/${user.id}/archive`, {
+      method: 'DELETE'
+    })
+    toast.add({ title: 'Пользователь активирован', color: 'success' })
+    await Promise.all([refresh(), refreshArchive()])
+  } catch (error: unknown) {
+    toast.add({
+      title: 'Не удалось активировать',
+      description: getErrorMessage(error),
+      color: 'error'
+    })
+  }
+}
+
 function getGrossSalary(customerId: number) {
   return getBaseSalary(customerId) + getPositionBonus(customerId)
 }
@@ -559,7 +730,15 @@ function updateSalaryDraft(customerId: number, field: 'baseSalary' | 'positionBo
     return
   }
 
-  draft[field] = String(value ?? '').replace(/[^\d]/g, '')
+  const allowNegative = field === 'positionBonus'
+  let str = String(value ?? '')
+  str = str.replace(/[^\d-]/g, '')
+  if (allowNegative) {
+    str = str.replace(/(?!^)-/g, '')
+  } else {
+    str = str.replace(/-/g, '')
+  }
+  draft[field] = str
 }
 
 function parseNonNegativeInteger(value: unknown, fieldName: string) {
@@ -578,6 +757,39 @@ function getErrorMessage(error: unknown) {
   }
 
   return undefined
+}
+
+async function createAdvance() {
+  if (!advanceForm.customerId) {
+    toast.add({ title: 'Выберите сотрудника', color: 'warning' })
+    return
+  }
+  if (!advanceForm.amount || advanceForm.amount <= 0) {
+    toast.add({ title: 'Сумма должна быть больше 0', color: 'warning' })
+    return
+  }
+
+  try {
+    await $fetch('/api/customers/advances', {
+      method: 'POST',
+      body: {
+        customerId: advanceForm.customerId,
+        amount: Math.round(advanceForm.amount),
+        currency: advanceForm.currency,
+        comment: advanceForm.comment || undefined,
+        buildingId: activeBuilding.value?.id ?? null
+      }
+    })
+    toast.add({ title: 'Аванс создан', color: 'success' })
+    Object.assign(advanceForm, { customerId: null, amount: 0, currency: 'UZS', comment: '', status: 'issued' as Advance['status'] })
+    await refreshAdvances()
+  } catch (error: unknown) {
+    toast.add({
+      title: 'Не удалось создать аванс',
+      description: getErrorMessage(error),
+      color: 'error'
+    })
+  }
 }
 
 function getPassportFiles(passportFile: string) {
@@ -922,6 +1134,109 @@ async function saveCustomerSalary(customer: Customer) {
           </div>
         </div>
 
+        <div v-else-if="selectedHrTab === 'advances'" class="space-y-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <UFormField label="Сотрудник" class="min-w-60">
+          <USelect
+            v-model="advanceFilterCustomerId"
+            :items="[{ label: 'Все', value: null }, ...customerOptions]"
+            placeholder="Фильтр по сотруднику"
+          />
+        </UFormField>
+        <UFormField label="Добавить аванс" class="flex-1">
+          <div class="grid gap-2 sm:grid-cols-4">
+            <USelect v-model="advanceForm.customerId" :items="customerOptions" placeholder="Сотрудник" />
+            <UInput v-model="advanceForm.amount" type="number" min="0" step="10000" placeholder="Сумма" />
+            <UInput v-model="advanceForm.comment" placeholder="Комментарий" />
+            <UButton label="Добавить" color="primary" icon="i-lucide-plus" @click="createAdvance" />
+          </div>
+        </UFormField>
+      </div>
+
+          <div class="rounded-lg border border-default bg-elevated/30 overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead>
+            <tr class="bg-elevated/50">
+              <th class="px-3 py-2 text-left">ID</th>
+              <th class="px-3 py-2 text-left">Сотрудник</th>
+              <th class="px-3 py-2 text-left">Сумма</th>
+              <th class="px-3 py-2 text-left">Статус</th>
+              <th class="px-3 py-2 text-left">Комментарий</th>
+              <th class="px-3 py-2 text-left">Дата</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="isAdvancesLoading">
+              <td class="px-3 py-3 text-muted" colspan="6">Загрузка...</td>
+            </tr>
+                <tr
+                  v-for="adv in filteredAdvances"
+                  :key="adv.id"
+                  class="border-t border-default"
+                >
+                  <td class="px-3 py-2">#{{ adv.id }}</td>
+                  <td class="px-3 py-2">{{ customerNameById.get(adv.customerId) || adv.customerId }}</td>
+                  <td class="px-3 py-2">{{ new Intl.NumberFormat('ru-RU').format(adv.amount) }} {{ adv.currency }}</td>
+                  <td class="px-3 py-2">
+                    <UBadge :label="adv.status" :color="adv.status === 'issued' ? 'warning' : 'success'" variant="subtle" />
+                  </td>
+                  <td class="px-3 py-2">{{ adv.comment || '—' }}</td>
+                  <td class="px-3 py-2">{{ formatDate(adv.issuedAt || adv.createdAt) }}</td>
+                </tr>
+                <tr v-if="!isAdvancesLoading && !filteredAdvances.length">
+                  <td class="px-3 py-3 text-muted" colspan="6">Авансов пока нет.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+    <div v-else-if="selectedHrTab === 'archive'" class="space-y-4">
+      <div class="text-sm text-muted">
+        Архивированные пользователи. При необходимости их можно восстановить.
+      </div>
+      <div class="rounded-lg border border-default bg-elevated/30 overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="bg-elevated/50">
+              <th class="px-3 py-2 text-left">ID</th>
+              <th class="px-3 py-2 text-left">Пользователь</th>
+              <th class="px-3 py-2 text-left">Комментарий</th>
+              <th class="px-3 py-2 text-left">Дата архивации</th>
+              <th class="px-3 py-2 text-left"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="isArchiveLoading">
+              <td class="px-3 py-3 text-muted" colspan="5">Загрузка...</td>
+            </tr>
+            <tr
+              v-for="user in safeArchiveCustomers"
+              :key="user.id"
+              class="border-t border-default"
+            >
+              <td class="px-3 py-2">#{{ user.id }}</td>
+              <td class="px-3 py-2">@{{ user.username }}</td>
+              <td class="px-3 py-2">{{ user.deactivationComment || '—' }}</td>
+              <td class="px-3 py-2">{{ user.archivedAt ? formatDate(user.archivedAt) : '—' }}</td>
+              <td class="px-3 py-2">
+                <UButton
+                  size="xs"
+                  color="primary"
+                  variant="outline"
+                  label="Активировать"
+                  @click="restoreCustomer(user)"
+                />
+              </td>
+            </tr>
+            <tr v-if="!isArchiveLoading && !safeArchiveCustomers.length">
+              <td class="px-3 py-3 text-muted" colspan="5">Архив пуст.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+        </div>
+
         <div v-else class="space-y-4">
           <div class="rounded-lg border border-default bg-elevated/30 p-4 text-sm text-muted">
             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -988,6 +1303,7 @@ async function saveCustomerSalary(customer: Customer) {
                       min="0"
                       step="1"
                       inputmode="numeric"
+                      disabled
                       @update:model-value="updateSalaryDraft(customer.id, 'baseSalary', $event)"
                     />
                   </td>
@@ -995,7 +1311,6 @@ async function saveCustomerSalary(customer: Customer) {
                     <UInput
                       :model-value="salaryDrafts[customer.id]?.positionBonus ?? ''"
                       type="number"
-                      min="0"
                       step="1"
                       inputmode="numeric"
                       @update:model-value="updateSalaryDraft(customer.id, 'positionBonus', $event)"
@@ -1025,9 +1340,19 @@ async function saveCustomerSalary(customer: Customer) {
             </table>
           </div>
 
-          <p class="text-xs text-muted">
-            Базовая зарплата по умолчанию: 1 000 000 сум.
-          </p>
+          <div class="flex items-center justify-between text-xs text-muted">
+            <p>Базовая зарплата по умолчанию: 1 000 000 сум.</p>
+            <UButton
+              size="xs"
+              color="primary"
+              variant="outline"
+              icon="i-lucide-file-spreadsheet"
+              :loading="exportSalaryLoading"
+              @click="exportSalaryExcel"
+            >
+              Выгрузить Excel
+            </UButton>
+          </div>
         </div>
       </div>
 
@@ -1192,6 +1517,34 @@ async function saveCustomerSalary(customer: Customer) {
         </template>
       </UModal>
 
+      <UModal
+        v-model:open="archiveModalOpen"
+        :title="archivingCustomer ? `Архивировать @${archivingCustomer.username}` : 'Архивировать пользователя'"
+        description="Удаление отключено. Архивирование требует обязательного комментария."
+      >
+        <template #body>
+          <div class="space-y-3">
+            <p class="text-sm text-muted">
+              Пользователь будет перемещен в раздел «Архив». Для продолжения добавьте пояснение.
+            </p>
+            <UFormField label="Комментарий (обязательно)">
+              <UTextarea
+                v-model="archiveComment"
+                placeholder="Причина архивации"
+                autoresize
+                :rows="3"
+              />
+            </UFormField>
+          </div>
+        </template>
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UButton label="Отмена" color="neutral" variant="subtle" @click="archiveModalOpen = false" />
+            <UButton label="Архивировать" color="primary" icon="i-lucide-archive" @click="archiveCustomer" />
+          </div>
+        </template>
+      </UModal>
+
       <CustomersAddModal
         v-if="editingCustomer"
         v-model:open="editCustomerOpen"
@@ -1202,3 +1555,5 @@ async function saveCustomerSalary(customer: Customer) {
     </template>
   </UDashboardPanel>
 </template>
+
+

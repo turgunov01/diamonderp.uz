@@ -36,6 +36,30 @@ alter table public.waste_reports
   add column if not exists photo_url text,
   add column if not exists comment text;
 
+-- Fix category check constraints (previously mojibake)
+alter table public.waste_bins drop constraint if exists waste_bins_category_check;
+alter table public.waste_bins add constraint waste_bins_category_check
+  check (category in ('Макулатура','Пластик','Общее'));
+
+alter table public.waste_reports drop constraint if exists waste_reports_category_check;
+alter table public.waste_reports add constraint waste_reports_category_check
+  check (category in ('Макулатура','Пластик','Общее'));
+
+-- Normalize previously stored mojibake values
+update public.waste_bins
+set category = case
+  when category = 'РњР°РєСѓР»Р°С‚СѓСЂР°' then 'Макулатура'
+  when category = 'РџР»Р°СЃС‚РёРє' then 'Пластик'
+  when category = 'РћР±С‰РµРµ' then 'Общее'
+  else category end;
+
+update public.waste_reports
+set category = case
+  when category = 'РњР°РєСѓР»Р°С‚СѓСЂР°' then 'Макулатура'
+  when category = 'РџР»Р°СЃС‚РёРє' then 'Пластик'
+  when category = 'РћР±С‰РµРµ' then 'Общее'
+  else category end;
+
 create index if not exists waste_reports_bin_id_idx on public.waste_reports(bin_id);
 create index if not exists waste_bins_object_idx on public.waste_bins(object_id);
 create index if not exists waste_reports_created_idx on public.waste_reports(created_at desc);

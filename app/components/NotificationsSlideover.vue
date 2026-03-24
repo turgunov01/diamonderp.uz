@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatTimeAgo } from '@vueuse/core'
 import type { Notification } from '~/types'
+import { usePersistentNotifications } from '~/composables/usePersistentNotifications'
 
 const { isNotificationsSlideoverOpen } = useDashboard()
 
@@ -8,6 +9,13 @@ const { data: notifications, status } = await useFetch<Notification[]>('/api/not
   default: () => []
 })
 const isMounted = ref(false)
+const { localNotifications } = usePersistentNotifications()
+
+const combinedNotifications = computed(() => {
+  const remote = notifications.value || []
+  const local = localNotifications.value || []
+  return [...local, ...remote].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+})
 
 onMounted(() => {
   isMounted.value = true
@@ -53,9 +61,9 @@ function formatNotificationDate(value: string) {
       </div>
 
       <NuxtLink
-        v-for="notification in notifications"
+        v-for="notification in combinedNotifications"
         :key="notification.id"
-        :to="`/inbox?id=${notification.id}`"
+        :to="notification.id > 0 ? `/inbox?id=${notification.id}` : undefined"
         class="px-3 py-2.5 rounded-md hover:bg-elevated/50 flex items-center gap-3 relative -mx-3 first:-mt-3 last:-mb-3"
       >
         <UChip

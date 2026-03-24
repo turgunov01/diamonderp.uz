@@ -42,6 +42,13 @@ create table if not exists public.signed_documents (
   user_agent text
 );
 
+-- Safe alters for existing deployments
+alter table public.signed_documents
+  add column if not exists signature_path text,
+  add column if not exists signature_json jsonb,
+  add column if not exists consent_checked boolean not null default false,
+  add column if not exists user_agent text;
+
 -- Safe upserts for existing deployments
 alter table public.signed_documents
   add column if not exists signature_path text,
@@ -152,4 +159,3 @@ values
   ('ГПХ базовый', 'Шаблон для ГПХ договора', 'gph', '<section><h1>Договор ГПХ</h1><p>{{employee_name}}</p></section>', '', 'seed/gph-template.json'),
   ('NDA сотрудника', 'Соглашение о неразглашении', 'nda', '<section><h1>NDA</h1><p>{{employee_name}}</p></section>', '', 'seed/nda-template.json')
 on conflict do nothing;
-

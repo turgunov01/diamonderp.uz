@@ -6,6 +6,11 @@ export function useAuth() {
     sameSite: 'lax',
     maxAge: 60 * 60 * 12
   })
+  const token = useCookie<string | null>('diamond-erp-token', {
+    default: () => null,
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 12
+  })
 
   const loggedIn = computed(() => Boolean(session.value))
 
@@ -16,16 +21,19 @@ export function useAuth() {
     })
 
     session.value = response.user
+    token.value = response.token
     return response.user
   }
 
   async function logout() {
     session.value = null
+    token.value = null
     await navigateTo('/login', { replace: true })
   }
 
   return {
     session,
+    token,
     loggedIn,
     login,
     logout

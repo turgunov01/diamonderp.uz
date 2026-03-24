@@ -79,7 +79,7 @@ alter table public.customers enable row level security;
 insert into storage.buckets (id, name, public)
 values
   ('customer-avatars', 'customer-avatars', true),
-  ('customer-passports', 'customer-passports', false)
+  ('customer-passports', 'customer-passports', true)
 on conflict (id) do update
 set public = excluded.public;
 

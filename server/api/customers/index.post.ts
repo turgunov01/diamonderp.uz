@@ -440,12 +440,14 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
   })
 
   let passportFile: string
+  let passportFrontPath: string | null = null
+  let passportBackPath: string | null = null
 
   if (passportFrontFile && passportBackFile) {
     const passportFrontName = sanitizeFileName(passportFrontFile.filename || 'passport-front')
     const passportBackName = sanitizeFileName(passportBackFile.filename || 'passport-back')
-    const passportFrontPath = `${safeUsername}/passports/${uniqueId}-front-${passportFrontName}`
-    const passportBackPath = `${safeUsername}/passports/${uniqueId}-back-${passportBackName}`
+    passportFrontPath = `${safeUsername}/passports/${uniqueId}-front-${passportFrontName}`
+    passportBackPath = `${safeUsername}/passports/${uniqueId}-back-${passportBackName}`
 
     await uploadStorageObject({
       url,

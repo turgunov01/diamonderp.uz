@@ -12,7 +12,8 @@ const query: Record<string, string> = {
   }
 
   if (Number.isInteger(buildingId) && buildingId > 0) {
-    query.building_id = `eq.${buildingId}`
+    // Include customers with exact building or legacy records without building
+    query.or = `(building_id.eq.${buildingId},building_id.is.null)`
   }
 
   let rows: CustomerDbRow[]

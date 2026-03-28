@@ -65,6 +65,7 @@ async function fetchUserByEmail(email: string) {
 
 function mapUserToSession(user: ErpUserRow): AuthSession {
   return {
+    id: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
@@ -86,6 +87,7 @@ interface CustomerRow {
 
 function mapCustomerToSession(row: CustomerRow): AuthSession {
   return {
+    id: row.id,
     email: undefined,
     phone: row.phone_number,
     name: row.full_name || row.username,
@@ -148,7 +150,6 @@ export default eventHandler(async (event): Promise<LoginResponse> => {
   const config = useRuntimeConfig(event)
   const jwtSecret = config.authTokenSecret || config.jwtSecret || config.privateToken || 'dev-secret'
 
-  // 1) Try ERP users (email/password)
   const matchedUser = await fetchUserByEmail(credentials.login.toLowerCase())
   if (matchedUser && matchedUser.is_active !== false && isAuthRole(matchedUser.role)) {
     const passwordMatches = await compare(credentials.password, matchedUser.password_hash)

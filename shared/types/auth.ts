@@ -1,6 +1,7 @@
 export type AuthRole = 'admin' | 'hr' | 'procurement' | 'customer'
 
 export interface AuthSession {
+  id: number
   email?: string
   phone?: string
   name: string

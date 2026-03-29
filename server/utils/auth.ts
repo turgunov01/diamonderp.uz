@@ -34,6 +34,7 @@ export interface CustomerProfileRow {
   role?: string | null
   status?: string | null
   must_change_password?: boolean | null
+  work_shift?: 'day' | 'night' | null
   building_id?: number | null
   object_pinned?: string | null
   object_positions?: string[] | null
@@ -276,7 +277,7 @@ export async function fetchCustomerProfileById(id: number) {
     const rows = await $fetch<CustomerProfileRow[]>(`${url}/rest/v1/customers`, {
       headers,
       query: {
-        select: 'id,full_name,username,phone_number,avatar,role,status,must_change_password,building_id,object_pinned,object_positions',
+        select: 'id,full_name,username,phone_number,avatar,role,status,must_change_password,work_shift,building_id,object_pinned,object_positions',
         id: `eq.${id}`,
         limit: '1'
       }
@@ -287,7 +288,7 @@ export async function fetchCustomerProfileById(id: number) {
     const rows = await $fetch<CustomerProfileRow[]>(`${url}/rest/v1/customers`, {
       headers,
       query: {
-        select: 'id,full_name,username,phone_number,avatar,role,status,must_change_password,object_pinned,object_positions',
+        select: 'id,full_name,username,phone_number,avatar,role,status,must_change_password,work_shift,object_pinned,object_positions',
         id: `eq.${id}`,
         limit: '1'
       }
@@ -349,3 +350,4 @@ export async function authenticateLogin(body: Partial<LoginRequestBody> | null |
     statusMessage: 'Invalid login or password.'
   })
 }
+

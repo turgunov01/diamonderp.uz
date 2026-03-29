@@ -1,3 +1,4 @@
+﻿import type { H3Event } from 'h3'
 import type { NavigationMenuItem } from '@nuxt/ui'
 import type { AuthSession } from '~~/shared/types/auth'
 import { filterNavigationItemsByRole } from '~~/shared/utils/access'
@@ -7,101 +8,114 @@ type SidebarLinks = NavigationMenuItem[][]
 const links: SidebarLinks = [
   [
     {
-      label: 'Дашборд',
+      label: 'Р”Р°С€Р±РѕСЂРґ',
       icon: 'i-lucide-line-chart',
       to: '/'
     },
     {
-      label: 'Заявки',
+      label: 'Р—Р°СЏРІРєРё',
       icon: 'i-lucide-inbox',
       to: '/inbox',
       badge: '4'
     },
     {
-      label: 'Кадры',
+      label: 'РљР°РґСЂС‹',
       icon: 'i-lucide-users',
       to: '/hr',
       defaultOpen: false,
       type: 'trigger',
       children: [
         {
-          label: 'Сотрудники',
+          label: 'РЎРѕС‚СЂСѓРґРЅРёРєРё',
           to: '/hr',
           exact: true
         },
         {
-          label: 'Активность сотрудников',
+          label: 'РђРєС‚РёРІРЅРѕСЃС‚СЊ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ',
           icon: 'i-heroicons-clock',
           to: '/hr/employee-activity',
           exact: true
         },
         {
-          label: 'Договоры',
+          label: 'Р”РѕРіРѕРІРѕСЂС‹',
           to: '/documents',
           exact: true
         }
       ]
     },
     {
-      label: 'Объекты',
+      label: 'РћР±СЉРµРєС‚С‹',
       icon: 'i-lucide-map',
-      to: '/objects'
+      to: '/objects',
+      type: 'trigger',
+      children: [
+        {
+          label: 'РЎРїРёСЃРѕРє РѕР±СЉРµРєС‚РѕРІ',
+          to: '/objects',
+          exact: true
+        },
+        {
+          label: 'Р—Р°РґР°С‡Рё',
+          to: '/objects/tasks',
+          exact: true
+        }
+      ]
     },
     {
-      label: 'Чаты',
+      label: 'Р§Р°С‚С‹',
       icon: 'i-lucide-message-circle',
       to: '/chats'
     },
     {
-      label: 'Отчеты',
+      label: 'РћС‚С‡РµС‚С‹',
       icon: 'i-lucide-bar-chart-3',
       to: '/reports',
       type: 'trigger',
       children: [
         {
-          label: 'Закупки',
+          label: 'Р—Р°РєСѓРїРєРё',
           to: '/expenses'
         },
         {
-          label: 'Отходы',
+          label: 'РћС‚С…РѕРґС‹',
           to: '/waste'
         },
         {
-          label: 'Кристаллизация',
+          label: 'РљСЂРёСЃС‚Р°Р»Р»РёР·Р°С†РёСЏ',
           to: '/reports/marble'
         },
         {
-          label: 'Дезинфекция',
+          label: 'Р”РµР·РёРЅС„РµРєС†РёСЏ',
           to: '/reports/sanitation'
         },
         {
-          label: 'Арома-диффузоры',
+          label: 'РђСЂРѕРјР°-РґРёС„С„СѓР·РѕСЂС‹',
           to: '/reports/aroma'
         }
       ]
     },
     {
-      label: 'Настройки',
+      label: 'РќР°СЃС‚СЂРѕР№РєРё',
       to: '/settings',
       icon: 'i-lucide-settings',
       defaultOpen: false,
       type: 'trigger',
       children: [
         {
-          label: 'Общее',
+          label: 'РћР±С‰РµРµ',
           to: '/settings',
           exact: true
         },
         {
-          label: 'Пользователи',
+          label: 'РџРѕР»СЊР·РѕРІР°С‚РµР»Рё',
           to: '/settings/members'
         },
         {
-          label: 'Уведомления',
+          label: 'РЈРІРµРґРѕРјР»РµРЅРёСЏ',
           to: '/settings/notifications'
         },
         {
-          label: 'Безопасность',
+          label: 'Р‘РµР·РѕРїР°СЃРЅРѕСЃС‚СЊ',
           to: '/settings/security'
         }
       ]
@@ -110,7 +124,7 @@ const links: SidebarLinks = [
   []
 ]
 
-function parseSession(event: Parameters<typeof eventHandler>[0]) {
+function parseSession(event: H3Event) {
   const rawSession = getCookie(event, 'diamond-erp-session')
 
   if (!rawSession) {
@@ -127,5 +141,8 @@ function parseSession(event: Parameters<typeof eventHandler>[0]) {
 export default eventHandler<SidebarLinks>((event) => {
   const session = parseSession(event)
 
-  return links.map(group => filterNavigationItemsByRole(group, session?.role ?? null))
+  return links.map(group => filterNavigationItemsByRole(group as any, session?.role ?? null) as NavigationMenuItem[])
 })
+
+
+

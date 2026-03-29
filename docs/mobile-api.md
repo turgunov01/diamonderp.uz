@@ -14,9 +14,11 @@
 
 ```text
 POST /api/mobile/auth/login
+GET /api/mobile/auth/shift
 GET /api/mobile/objects
 GET /api/mobile/documents
 GET /api/mobile/reports/aroma
+GET /api/mobile/tasks
 ```
 
 ## Авторизация
@@ -38,6 +40,7 @@ Authorization: Bearer <token>
 - `role`
 - `frontend`
 - `source`
+- `shift`
 
 Правила:
 
@@ -99,6 +102,18 @@ Authorization: Bearer <token>
     "objectIds": [8, 9],
     "objectNames": ["Lobby", "Office Floor 2"]
   },
+  "shift": {
+    "workShift": "day",
+    "label": "День",
+    "timezone": "Asia/Tashkent",
+    "shiftStartHour": 9,
+    "shiftEndHour": 21,
+    "isActiveNow": true,
+    "shouldLogoutNow": false,
+    "startedAt": "2026-03-29T04:00:00.000Z",
+    "logoutAt": "2026-03-29T16:00:00.000Z",
+    "nextShiftStartsAt": "2026-03-30T04:00:00.000Z"
+  },
   "objects": [
     {
       "id": 8,
@@ -129,6 +144,9 @@ Authorization: Bearer <token>
 Важно:
 
 - для `customer` при логине автоматически создается/возвращается запись attendance за день
+- для `customer` при логине также возвращается `shift`
+- если `shift.shouldLogoutNow=true`, мобильное приложение может сразу завершить сессию
+- если `shift.logoutAt` не `null`, это время рекомендованного logout по текущей смене
 - статус attendance считается по `Asia/Tashkent`
 - если вход до `09:00`, будет `on_time`
 - если после `09:00`, будет `late`
@@ -162,6 +180,18 @@ Authorization: Bearer <token>
     "objectIds": [8, 9],
     "objectNames": ["Lobby", "Office Floor 2"]
   },
+  "shift": {
+    "workShift": "day",
+    "label": "День",
+    "timezone": "Asia/Tashkent",
+    "shiftStartHour": 9,
+    "shiftEndHour": 21,
+    "isActiveNow": true,
+    "shouldLogoutNow": false,
+    "startedAt": "2026-03-29T04:00:00.000Z",
+    "logoutAt": "2026-03-29T16:00:00.000Z",
+    "nextShiftStartsAt": "2026-03-30T04:00:00.000Z"
+  },
   "objects": [
     {
       "id": 8,
@@ -175,6 +205,44 @@ Authorization: Bearer <token>
   ]
 }
 ```
+
+### GET `/api/mobile/auth/shift`
+
+Возвращает только информацию по смене текущего пользователя.
+
+Header:
+
+```http
+Authorization: Bearer <token>
+```
+
+Ответ:
+
+```json
+{
+  "role": "customer",
+  "frontend": "employee",
+  "source": "customer",
+  "shift": {
+    "workShift": "day",
+    "label": "День",
+    "timezone": "Asia/Tashkent",
+    "shiftStartHour": 9,
+    "shiftEndHour": 21,
+    "isActiveNow": true,
+    "shouldLogoutNow": false,
+    "startedAt": "2026-03-29T04:00:00.000Z",
+    "logoutAt": "2026-03-29T16:00:00.000Z",
+    "nextShiftStartsAt": "2026-03-30T04:00:00.000Z"
+  }
+}
+```
+
+Примечание:
+
+- `day` считается как `09:00-21:00` по `Asia/Tashkent`
+- `night` считается как `21:00-09:00` по `Asia/Tashkent`
+- `logoutAt` заполнен только если пользователь сейчас внутри своей смены
 
 ## 2. Objects
 
@@ -432,6 +500,104 @@ Query params:
 }
 ```
 
+## 5. Tasks
+
+### GET `/api/mobile/tasks`
+
+Возвращает to-do листы, назначенные текущему сотруднику.
+
+Query params:
+
+- `status` — опционально: `open`, `in_progress`, `completed`
+
+Пример:
+
+```http
+GET /api/mobile/tasks?status=open
+Authorization: Bearer <token>
+```
+
+Ответ:
+
+```json
+{
+  "role": "customer",
+  "frontend": "employee",
+  "items": [
+    {
+      "id": 44,
+      "objectId": 8,
+      "objectName": "Lobby",
+      "employeeId": 25,
+      "employeeName": "Ali Valiyev",
+      "title": "Открытие смены",
+      "note": "Пройтись по входной группе до 09:15",
+      "dueDate": "2026-03-30",
+      "status": "in_progress",
+      "totalItems": 4,
+      "completedItems": 2,
+      "progressPercent": 50,
+      "items": [
+        {
+          "id": 101,
+          "taskListId": 44,
+          "title": "Проверить входную группу",
+          "isDone": true,
+          "completedAt": "2026-03-30T04:01:00.000Z",
+          "sortOrder": 0
+        }
+      ]
+    }
+  ]
+}
+```
+
+### PATCH `/api/mobile/tasks/:taskId/items/:itemId`
+
+Отмечает пункт чек-листа как выполненный или возвращает обратно в невыполненные.
+
+Body:
+
+```json
+{
+  "done": true
+}
+```
+
+Пример:
+
+```http
+PATCH /api/mobile/tasks/44/items/101
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+Ответ:
+
+```json
+{
+  "role": "customer",
+  "frontend": "employee",
+  "task": {
+    "id": 44,
+    "status": "completed",
+    "completedItems": 4,
+    "totalItems": 4,
+    "progressPercent": 100,
+    "items": [
+      {
+        "id": 101,
+        "taskListId": 44,
+        "title": "Проверить входную группу",
+        "isDone": true,
+        "completedAt": "2026-03-30T04:15:00.000Z",
+        "sortOrder": 0
+      }
+    ]
+  }
+}
+```
+
 ## Рекомендуемый Flow Для Мобильного Приложения
 
 1. Вызвать `POST /api/mobile/auth/login`
@@ -443,6 +609,8 @@ Query params:
 7. Для документов использовать `GET /api/mobile/documents`
 8. Для подписи использовать `POST /api/mobile/documents/sign`
 9. Для отчетов использовать `GET /api/mobile/reports/*`
+10. Для задач использовать `GET /api/mobile/tasks`
+11. Для отметки выполнения использовать `PATCH /api/mobile/tasks/:taskId/items/:itemId`
 
 ## Основные Ошибки
 
@@ -451,4 +619,3 @@ Query params:
 - `403` — нет доступа к объекту или документу
 - `404` — сущность не найдена
 - `409` — конфликт, например документ уже подписан
-

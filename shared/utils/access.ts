@@ -2,7 +2,7 @@ import type { AuthRole } from '../types/auth'
 
 type AccessMatcher = (path: string) => boolean
 
-type NavigationItemLike<T> = T & {
+type NavigationItemLike<T> = {
   to?: string
   children?: T[]
 }
@@ -35,7 +35,7 @@ function prefix(targetPath: string): AccessMatcher {
   }
 }
 
-const roleAccessMatchers: Record<AuthRole, AccessMatcher[]> = {
+const roleAccessMatchers: Partial<Record<AuthRole, AccessMatcher[]>> = {
   admin: [() => true],
   hr: [
     exact('/'),
@@ -52,6 +52,7 @@ const roleAccessMatchers: Record<AuthRole, AccessMatcher[]> = {
     exact('/inbox'),
     exact('/chats'),
     exact('/objects'),
+    exact('/objects/tasks'),
     exact('/expenses'),
     exact('/reports/aroma')
   ]
@@ -70,10 +71,10 @@ export function canAccessPath(role: AuthRole | null | undefined, path: string) {
     return false
   }
 
-  return roleAccessMatchers[role].some(match => match(path))
+  return (roleAccessMatchers[role] || []).some(match => match(path))
 }
 
-export function filterNavigationItemsByRole<T extends NavigationItemLike<T>>(
+export function filterNavigationItemsByRole<T extends { to?: string, children?: T[] }>(
   items: T[],
   role: AuthRole | null | undefined
 ): T[] {

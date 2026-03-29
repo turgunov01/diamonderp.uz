@@ -4,6 +4,8 @@ definePageMeta({
   ssr: true
 })
 
+type WorkShift = 'day' | 'night'
+
 type SanitationEvent = {
   id: number
   objectId: number | null
@@ -16,8 +18,20 @@ type SanitationEvent = {
   createdAt: string
 }
 
+type SanitationCustomer = {
+  id: number
+  buildingId?: number | null
+  username: string
+  role?: string
+  status?: 'pending' | 'active' | 'inactive' | 'archived'
+  workShift: WorkShift
+  objectPinned: string
+  objectPositions: string[]
+}
+
 const toast = useToast()
 const { canManageSanitation } = useRoleAccess()
+const activeBuilding = useState<{ id: number, name: string } | null>('active-building')
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
 
 const {
@@ -32,6 +46,19 @@ const {
   { default: () => ({ events: [] }), watch: [activeObject] }
 )
 
+const { data: customers } = await useAutoRefreshAsyncData<SanitationCustomer[]>(
+  'sanitation-customers',
+  () => $fetch('/api/customers', {
+    query: {
+      buildingId: activeBuilding.value?.id
+    }
+  }),
+  {
+    default: () => [],
+    watch: [activeBuilding]
+  }
+)
+
 const events = computed(() => data.value?.events || [])
 const disinfectionEvents = computed(() => events.value.filter(e => e.type === 'disinfection'))
 const deratizationEvents = computed(() => events.value.filter(e => e.type === 'deratization'))
@@ -43,12 +70,53 @@ const createModalOpen = ref(false)
 const creating = ref(false)
 const createForm = reactive({
   type: 'disinfection' as 'disinfection' | 'deratization',
-  performedAt: new Date().toISOString().slice(0, 16), // datetime-local format
-  team: '',
-  executors: '',
+  performedAt: new Date().toISOString().slice(0, 16),
+  team: 'day' as WorkShift,
+  executors: [] as string[],
   notes: '',
   photos: ''
 })
+
+const shiftItems: Array<{ label: string, value: WorkShift }> = [
+  { label: 'День', value: 'day' },
+  { label: 'Ночь', value: 'night' }
+]
+
+const buildingName = computed(() => activeBuilding.value?.name?.trim() || '')
+
+const availableExecutors = computed(() => {
+  if (!buildingName.value) {
+    return []
+  }
+
+  return (customers.value || []).filter((customer) => {
+    if (customer.workShift !== createForm.team) {
+      return false
+    }
+
+    if (customer.role && customer.role !== 'customer') {
+      return false
+    }
+
+    if (customer.status === 'inactive' || customer.status === 'archived') {
+      return false
+    }
+
+    return true
+  })
+})
+
+const executorItems = computed(() =>
+  availableExecutors.value.map((customer) => ({
+    label: `@${customer.username}`,
+    value: customer.username
+  }))
+)
+
+watch(availableExecutors, () => {
+  const allowedUsernames = new Set(availableExecutors.value.map(customer => customer.username))
+  createForm.executors = createForm.executors.filter(username => allowedUsernames.has(username))
+}, { immediate: true })
 
 function addDays(date: Date, days: number) {
   const d = new Date(date)
@@ -82,6 +150,13 @@ function formatDateTime(value?: string | Date | null) {
   })
 }
 
+function formatTeamLabel(team?: string | null) {
+  if (!team) return '—'
+  if (team === 'day') return 'День'
+  if (team === 'night') return 'Ночь'
+  return team
+}
+
 function statusForDate(target: Date | null) {
   if (!target) return { label: 'Назначьте', color: 'neutral', variant: 'subtle' }
   const now = new Date()
@@ -93,7 +168,9 @@ function statusForDate(target: Date | null) {
 async function submitEvent() {
   if (!canManageSanitation.value) return
   if (creating.value) return
+
   creating.value = true
+
   try {
     await $fetch('/api/reports/sanitation/event', {
       method: 'POST',
@@ -105,15 +182,16 @@ async function submitEvent() {
         notes: createForm.notes || null,
         photos: createForm.photos
           .split(/\n|,/)
-          .map(p => p.trim())
+          .map(photo => photo.trim())
           .filter(Boolean),
         objectId: activeObject.value?.id ?? null
       }
     })
+
     toast.add({ title: 'Запись сохранена', color: 'success' })
     createModalOpen.value = false
-    createForm.team = ''
-    createForm.executors = ''
+    createForm.team = 'day'
+    createForm.executors = []
     createForm.notes = ''
     createForm.photos = ''
     createForm.performedAt = new Date().toISOString().slice(0, 16)
@@ -167,11 +245,11 @@ async function submitEvent() {
         <div class="grid gap-3 sm:grid-cols-3">
           <UPageCard icon="i-lucide-bug" title="Последняя дезинфекция" variant="subtle">
             <p class="text-lg font-semibold text-highlighted">{{ formatDate(lastDisinfection?.performedAt) }}</p>
-            <p class="text-xs text-muted">{{ lastDisinfection?.team || 'данных нет' }}</p>
+            <p class="text-xs text-muted">{{ lastDisinfection ? formatTeamLabel(lastDisinfection.team) : 'данных нет' }}</p>
           </UPageCard>
           <UPageCard icon="i-lucide-shield-check" title="Последняя дератизация" variant="subtle">
             <p class="text-lg font-semibold text-highlighted">{{ formatDate(lastDeratization?.performedAt) }}</p>
-            <p class="text-xs text-muted">{{ lastDeratization?.team || 'данных нет' }}</p>
+            <p class="text-xs text-muted">{{ lastDeratization ? formatTeamLabel(lastDeratization.team) : 'данных нет' }}</p>
           </UPageCard>
           <UPageCard icon="i-lucide-calendar-clock" title="График" variant="subtle">
             <p class="text-sm text-muted">
@@ -190,7 +268,7 @@ async function submitEvent() {
           <div class="flex items-center justify-between px-4 py-3 border-b border-default/60">
             <div>
               <h3 class="font-semibold text-highlighted leading-tight">История проведений</h3>
-              <p class="text-xs text-muted">Команда, исполнители, фотоотчёты</p>
+              <p class="text-xs text-muted">Смена, исполнители, фотоотчёты</p>
             </div>
             <UBadge :label="events.length" variant="subtle" />
           </div>
@@ -200,7 +278,7 @@ async function submitEvent() {
                 <tr class="bg-elevated/40">
                   <th class="px-3 py-2 text-left">Тип</th>
                   <th class="px-3 py-2 text-left">Дата</th>
-                  <th class="px-3 py-2 text-left">Команда</th>
+                  <th class="px-3 py-2 text-left">Смена</th>
                   <th class="px-3 py-2 text-left">Исполнители</th>
                   <th class="px-3 py-2 text-left">Фото</th>
                   <th class="px-3 py-2 text-left">Заметки</th>
@@ -224,7 +302,7 @@ async function submitEvent() {
                       {{ event.type === 'disinfection' ? 'Дезинфекция' : 'Дератизация' }}
                     </td>
                     <td class="px-3 py-2">{{ formatDateTime(event.performedAt) }}</td>
-                    <td class="px-3 py-2">{{ event.team }}</td>
+                    <td class="px-3 py-2">{{ formatTeamLabel(event.team) }}</td>
                     <td class="px-3 py-2">
                       <UBadge
                         v-for="exec in event.executors"
@@ -270,7 +348,7 @@ async function submitEvent() {
         v-if="canManageSanitation"
         v-model:open="createModalOpen"
         title="Новая обработка"
-        description="Запишите факт дезинфекции или дератизации, добавьте исполнителей и фотоотчёт."
+        description="Запишите факт дезинфекции или дератизации: выберите смену и исполнителей по текущему объекту."
       >
         <template #body>
           <div class="space-y-3">
@@ -287,12 +365,28 @@ async function submitEvent() {
               <UFormField label="Дата и время проведения">
                 <UInput v-model="createForm.performedAt" type="datetime-local" class="w-full" />
               </UFormField>
-              <UFormField label="Команда">
-                <UInput v-model="createForm.team" class="w-full" placeholder="Например: CleanPro Group" />
+              <UFormField label="Смена">
+                <USelect v-model="createForm.team" :items="shiftItems" class="w-full" />
               </UFormField>
             </div>
-            <UFormField label="Исполнители (через запятую)">
-              <UInput v-model="createForm.executors" class="w-full" placeholder="Иванов, Петров" />
+            <UFormField :label="`Сотрудники смены${buildingName ? ` (${buildingName})` : ''}`">
+              <USelectMenu
+                v-model="createForm.executors"
+                :items="executorItems"
+                :disabled="!buildingName"
+                multiple
+                searchable
+                value-key="value"
+                label-key="label"
+                placeholder="Выберите сотрудников"
+                class="w-full"
+              />
+              <p v-if="!buildingName" class="text-xs text-muted mt-1">
+                Сначала выберите здание, чтобы получить состав смены.
+              </p>
+              <p v-else-if="!executorItems.length" class="text-xs text-muted mt-1">
+                Для здания «{{ buildingName }}» нет сотрудников на смене «{{ formatTeamLabel(createForm.team).toLowerCase() }}».
+              </p>
             </UFormField>
             <UFormField label="Ссылки на фото (каждая с новой строки или через запятую)">
               <UTextarea v-model="createForm.photos" class="w-full" rows="3" placeholder="https://...jpg" />

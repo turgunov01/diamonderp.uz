@@ -77,9 +77,8 @@ const { canManageObjectTasks } = useRoleAccess()
 const search = ref('')
 const createModalOpen = ref(false)
 const creating = ref(false)
-const selectedObject = ref<ObjectTaskCard | null>(null)
 const form = reactive({
-  objectId: null as number | null,
+  objectId: undefined as number | undefined,
   employeeId: undefined as number | undefined,
   title: '',
   note: '',
@@ -118,8 +117,7 @@ watch(createModalOpen, (isOpen) => {
     return
   }
 
-  selectedObject.value = null
-  form.objectId = null
+  form.objectId = undefined
   form.employeeId = undefined
   form.title = ''
   form.note = ''
@@ -165,11 +163,32 @@ const totalEmployees = computed(() => {
 })
 
 const totalOpenTasks = computed(() => filteredObjects.value.reduce((sum, object) => sum + object.openTasks + object.inProgressTasks, 0))
+const objectOptions = computed(() => {
+  return objects.value.map(object => ({
+    label: object.name,
+    value: object.id
+  }))
+})
+const selectedObject = computed(() => {
+  return objects.value.find(object => object.id === form.objectId) || null
+})
 const employeeOptions = computed(() => {
   return (selectedObject.value?.employees || []).map(employee => ({
     label: `${employee.name} · @${employee.username}`,
     value: employee.id
   }))
+})
+
+watch(() => form.objectId, (objectId) => {
+  if (!objectId) {
+    form.employeeId = undefined
+    return
+  }
+
+  const availableEmployeeIds = new Set((selectedObject.value?.employees || []).map(employee => employee.id))
+  if (!form.employeeId || !availableEmployeeIds.has(form.employeeId)) {
+    form.employeeId = selectedObject.value?.employees[0]?.id
+  }
 })
 
 function formatDate(value?: string | null) {
@@ -232,12 +251,12 @@ function isTaskOverdue(task: ObjectTask) {
   return new Date(`${task.dueDate}T00:00:00`).getTime() < today.getTime()
 }
 
-function openCreateModal(object: ObjectTaskCard) {
+function openCreateModal(object?: ObjectTaskCard | null) {
   if (!canManageObjectTasks.value) {
     return
   }
 
-  if (!object.employees.length) {
+  if (object && !object.employees.length) {
     toast.add({
       title: 'Нет доступных сотрудников',
       description: 'У выбранного объекта нет активных сотрудников с мобильным доступом.',
@@ -246,10 +265,9 @@ function openCreateModal(object: ObjectTaskCard) {
     return
   }
 
-  selectedObject.value = object
-  form.objectId = object.id
-  form.employeeId = object.employees[0]?.id
-  form.title = `${object.name}: новый чек-лист`
+  form.objectId = object?.id
+  form.employeeId = object?.employees[0]?.id
+  form.title = object ? `${object.name}: новый чек-лист` : ''
   form.note = ''
   form.dueDate = ''
   form.items = ['']
@@ -270,11 +288,19 @@ function removeTodoItem(index: number) {
 }
 
 async function submitTaskList() {
-  if (!canManageObjectTasks.value || creating.value || !selectedObject.value) {
+  if (!canManageObjectTasks.value || creating.value) {
     return
   }
 
   const items = form.items.map(item => item.trim()).filter(Boolean)
+  if (!selectedObject.value || !form.objectId) {
+    toast.add({
+      title: 'Выберите объект',
+      color: 'warning'
+    })
+    return
+  }
+
   if (!form.employeeId) {
     toast.add({
       title: 'Выберите сотрудника',
@@ -350,6 +376,12 @@ async function submitTaskList() {
               label="Только чтение"
               color="neutral"
               variant="subtle"
+            />
+            <UButton
+              v-if="canManageObjectTasks"
+              icon="i-lucide-plus"
+              label="Новый to-do"
+              @click="openCreateModal()"
             />
             <UButton
               icon="i-lucide-refresh-ccw"
@@ -548,8 +580,13 @@ async function submitTaskList() {
       >
         <template #body>
           <div class="space-y-4">
-            <UFormField label="Объект">
-              <UInput :model-value="selectedObject?.name || ''" class="w-full" disabled />
+            <UFormField label="Объект" required>
+              <USelect
+                v-model="form.objectId"
+                :items="objectOptions"
+                class="w-full"
+                placeholder="Выберите объект"
+              />
             </UFormField>
 
             <UFormField label="Сотрудник" required>
@@ -557,9 +594,14 @@ async function submitTaskList() {
                 v-model="form.employeeId"
                 :items="employeeOptions"
                 class="w-full"
-                placeholder="Выберите сотрудника"
+                :disabled="!selectedObject"
+                placeholder="Сначала выберите объект"
               />
             </UFormField>
+
+            <p v-if="selectedObject && !employeeOptions.length" class="text-sm text-warning">
+              У выбранного объекта нет сотрудников с мобильным доступом. Назначить такой список сейчас нельзя.
+            </p>
 
             <UFormField label="Название списка" required>
               <UInput

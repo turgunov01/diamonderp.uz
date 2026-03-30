@@ -8,7 +8,7 @@
   type SignedDocumentDbRow
 } from '../../documents/documents'
 import { normalizePhone } from '../../../utils/auth'
-import { requireMobileAccess } from '../../../utils/mobile-access'
+import { isFrontlineMobileAccess, requireMobileAccess } from '../../../utils/mobile-access'
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
 
 interface MobileSignBody {
@@ -78,7 +78,7 @@ function toBuffer(dataUrl: string) {
 
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
-  if (access.source !== 'customer' || !access.customer || !access.user.phone) {
+  if (!isFrontlineMobileAccess(access) || !access.user.phone) {
     throw createError({
       statusCode: 403,
       statusMessage: 'Only employee accounts can sign mobile documents.'

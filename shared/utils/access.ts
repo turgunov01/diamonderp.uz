@@ -7,7 +7,7 @@ type NavigationItemLike<T> = {
   children?: T[]
 }
 
-const ALL_ROLES: AuthRole[] = ['admin', 'hr', 'procurement']
+const WEB_ROLES: AuthRole[] = ['admin', 'hr', 'procurement']
 
 function normalizePath(path: string) {
   if (!path) {
@@ -59,7 +59,7 @@ const roleAccessMatchers: Partial<Record<AuthRole, AccessMatcher[]>> = {
 }
 
 export function getDefaultRouteForRole(role?: AuthRole | null) {
-  if (!role || !ALL_ROLES.includes(role)) {
+  if (!role || !WEB_ROLES.includes(role)) {
     return '/'
   }
 
@@ -67,7 +67,7 @@ export function getDefaultRouteForRole(role?: AuthRole | null) {
 }
 
 export function canAccessPath(role: AuthRole | null | undefined, path: string) {
-  if (!role || !ALL_ROLES.includes(role)) {
+  if (!role || !WEB_ROLES.includes(role)) {
     return false
   }
 
@@ -101,5 +101,9 @@ export function getRoleLabel(role: AuthRole | null | undefined) {
   if (role === 'admin') return 'Администратор'
   if (role === 'hr') return 'HR'
   if (role === 'procurement') return 'Закупщик'
+  if (role === 'manager') return 'Менеджер'
+  if (role === 'supervisor') return 'Супервайзер'
+  if (role === 'cleaner') return 'Клинер'
+  if (role === 'customer') return 'Сотрудник'
   return 'Пользователь'
 }

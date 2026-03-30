@@ -1,10 +1,10 @@
-﻿import { listEmployeeObjectTasks, parseOptionalObjectTaskStatus } from '../../../utils/object-tasks'
-import { requireMobileAccess } from '../../../utils/mobile-access'
+import { listEmployeeObjectTasks, parseOptionalObjectTaskStatus } from '../../../utils/object-tasks'
+import { isFrontlineMobileAccess, requireMobileAccess } from '../../../utils/mobile-access'
 
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
 
-  if (access.source !== 'customer' || !access.customer) {
+  if (!isFrontlineMobileAccess(access)) {
     throw createError({
       statusCode: 403,
       statusMessage: 'Only employee accounts can access mobile tasks.'
@@ -21,4 +21,5 @@ export default eventHandler(async (event) => {
     items
   }
 })
+
 

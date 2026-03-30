@@ -44,8 +44,11 @@ Authorization: Bearer <token>
 
 Правила:
 
-- `role=customer` -> `frontend=employee`
-- `role=admin|hr|procurement` -> `frontend=erp`
+- `role=customer|cleaner` -> `frontend=employee`
+- `role=manager` -> `frontend=manager`
+- `role=supervisor` -> `frontend=supervisor`
+- `role=procurement` -> `frontend=procurement`
+- `role=admin|hr` -> `frontend=erp`
 
 Это можно использовать в мобильном приложении для разделения микрофронтенда.
 

@@ -7,6 +7,7 @@ import {
   type WorkShift
 } from './customers'
 import type { H3Event } from 'h3'
+import { isAuthRole } from '../../utils/auth'
 
 interface MultipartPart {
   name?: string
@@ -163,6 +164,10 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   const baseSalary = parseOptionalMoney(input.baseSalary, 'baseSalary')
   const positionBonus = parseOptionalMoney(input.positionBonus, 'positionBonus')
   const role = getOptionalString((input as any).role) || 'customer'
+
+  if (!isAuthRole(role)) {
+    throw createError({ statusCode: 400, statusMessage: 'Поле role содержит недопустимую роль.' })
+  }
 
   if (!Array.isArray(input.objectPositions) || !input.objectPositions.length || input.objectPositions.some(position => !isNonEmptyString(position))) {
     throw createError({ statusCode: 400, statusMessage: 'Поле objectPositions должно быть непустым массивом строк.' })

@@ -7,7 +7,7 @@ type EditableCustomer = {
   fullName?: string
   username: string
   phoneNumber: string
-  role: 'customer' | 'hr' | 'admin' | 'procurement'
+  role: 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
   age: number
   workShift: 'day' | 'night'
   objectPinned: string
@@ -37,13 +37,22 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { default: false })
 const NOT_PINNED_VALUE = '__not_pinned__'
 const DEFAULT_PASSWORD = '12345678'
+const CUSTOMER_ROLE_OPTIONS = [
+  { label: 'Cleaner', value: 'cleaner' },
+  { label: 'Customer', value: 'customer' },
+  { label: 'Manager', value: 'manager' },
+  { label: 'Supervisor', value: 'supervisor' },
+  { label: 'Procurement', value: 'procurement' },
+  { label: 'HR', value: 'hr' },
+  { label: 'Admin', value: 'admin' }
+] as const
 
 const createSchema = z.object({
   fullName: z.string().min(3, 'ФИО обязательно'),
   username: z.string().min(3, 'Имя пользователя слишком короткое'),
   password: z.string().min(6, 'Пароль должен быть не менее 6 символов'),
   phoneNumber: z.string().min(7, 'Номер телефона слишком короткий'),
-  role: z.enum(['customer', 'hr', 'admin', 'procurement']),
+  role: z.enum(['customer', 'cleaner', 'manager', 'supervisor', 'procurement', 'hr', 'admin']),
   age: z.coerce
     .number()
     .int('Возраст должен быть целым числом')
@@ -61,7 +70,7 @@ const editSchema = z.object({
     'Пароль должен быть не менее 6 символов'
   ),
   phoneNumber: z.string().min(7, 'Номер телефона слишком короткий'),
-  role: z.enum(['customer', 'hr', 'admin', 'procurement']).optional(),
+  role: z.enum(['customer', 'cleaner', 'manager', 'supervisor', 'procurement', 'hr', 'admin']).optional(),
   age: z.coerce
     .number()
     .int('Возраст должен быть целым числом')
@@ -75,7 +84,7 @@ type FormState = {
   username: string
   password: string
   phoneNumber: string
-  role: 'customer' | 'hr' | 'admin' | 'procurement'
+  role: 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
   age: number
   workShift: 'day' | 'night'
   objectPinned: string
@@ -87,7 +96,7 @@ type FormSubmitState = {
   username: string
   password: string
   phoneNumber: string
-  role: 'customer' | 'hr' | 'admin' | 'procurement'
+  role: 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
   age: number
   workShift: 'day' | 'night'
   objectPinned?: string
@@ -374,12 +383,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
         <UFormField label="Роль" name="role">
           <USelect
             v-model="state.role"
-            :items="[
-              { label: 'Customer', value: 'customer' },
-              { label: 'HR', value: 'hr' },
-              { label: 'Admin', value: 'admin' },
-              { label: 'Procurement', value: 'procurement' }
-            ]"
+            :items="CUSTOMER_ROLE_OPTIONS"
             class="w-full"
           />
         </UFormField>

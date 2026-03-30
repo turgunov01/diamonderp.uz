@@ -3,7 +3,7 @@ import { resolveMobileShiftInfo } from '../../../utils/mobile-shift'
 
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
-  const shift = access.source === 'customer'
+  const shift = access.customer
     ? resolveMobileShiftInfo(access.customer?.work_shift)
     : null
 

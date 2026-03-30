@@ -3,7 +3,7 @@ import type { AuthRole, AuthSession } from '~~/shared/types/auth'
 import {
   fetchCustomerProfileById,
   fetchErpUserById,
-  isAuthRole,
+  isErpAuthRole,
   mapCustomerToSession,
   mapUserToSession,
   verifyAuthToken,
@@ -23,6 +23,9 @@ interface ObjectRow {
   is_active?: boolean | null
 }
 
+export type MobileFrontend = 'erp' | 'employee' | 'manager' | 'supervisor' | 'procurement'
+export type MobileSource = 'erp' | AuthRole
+
 export interface MobileObjectRecord {
   id: number
   buildingId?: number | null
@@ -34,9 +37,9 @@ export interface MobileObjectRecord {
 }
 
 export interface MobileAccessContext {
-  source: 'customer' | 'erp'
+  source: MobileSource
   role: AuthRole
-  frontend: 'employee' | 'erp'
+  frontend: MobileFrontend
   user: AuthSession
   payload: VerifiedAuthTokenPayload
   customer?: CustomerProfileRow
@@ -59,8 +62,34 @@ function mapObjectRow(row: ObjectRow): MobileObjectRecord {
   }
 }
 
-function getFrontend(role: AuthRole): 'employee' | 'erp' {
-  return role === 'customer' ? 'employee' : 'erp'
+function getFrontend(role: AuthRole): MobileFrontend {
+  if (role === 'admin' || role === 'hr') {
+    return 'erp'
+  }
+
+  if (role === 'manager') {
+    return 'manager'
+  }
+
+  if (role === 'supervisor') {
+    return 'supervisor'
+  }
+
+  if (role === 'procurement') {
+    return 'procurement'
+  }
+
+  return 'employee'
+}
+
+export function isFrontlineMobileRole(role: AuthRole): role is 'customer' | 'cleaner' {
+  return role === 'customer' || role === 'cleaner'
+}
+
+export function isFrontlineMobileAccess(
+  context: Pick<MobileAccessContext, 'role' | 'customer'>
+) {
+  return Boolean(context.customer) && isFrontlineMobileRole(context.role)
 }
 
 function readBearerToken(event: H3Event) {
@@ -116,7 +145,7 @@ async function buildCustomerAccess(customer: CustomerProfileRow, payload: Verifi
     : []
 
   return {
-    source: 'customer',
+    source: user.role,
     role: user.role,
     frontend: getFrontend(user.role),
     user,
@@ -130,7 +159,7 @@ async function buildCustomerAccess(customer: CustomerProfileRow, payload: Verifi
 }
 
 async function buildErpAccess(userRow: ErpUserAuthRow, payload: VerifiedAuthTokenPayload): Promise<MobileAccessContext> {
-  if (userRow.is_active === false || !isAuthRole(userRow.role)) {
+  if (userRow.is_active === false || !isErpAuthRole(userRow.role)) {
     throw createError({
       statusCode: 401,
       statusMessage: 'User is inactive.'

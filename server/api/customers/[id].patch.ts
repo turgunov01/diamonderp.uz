@@ -1,5 +1,6 @@
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
 import { deleteEmployeeActivitiesByEmployeeId } from '../../utils/employee-activity'
+import { isAuthRole } from '../../utils/auth'
 import {
   mapCustomerDbRowToRecord,
   mapUpdateBodyToDbUpdate,
@@ -182,10 +183,10 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
   }
 
   if (input.role !== undefined) {
-    if (!isNonEmptyString(input.role)) {
+    if (!isNonEmptyString(input.role) || !isAuthRole(input.role.trim())) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле role должно быть строкой.'
+        statusMessage: 'Поле role содержит недопустимую роль.'
       })
     }
     update.role = input.role.trim()

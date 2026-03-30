@@ -1,5 +1,10 @@
 ﻿import { normalizePhone } from '../../../utils/auth'
-import { parseRequestedObjectId, requireMobileAccess, resolveScopedObjectIds } from '../../../utils/mobile-access'
+import {
+  isFrontlineMobileAccess,
+  parseRequestedObjectId,
+  requireMobileAccess,
+  resolveScopedObjectIds
+} from '../../../utils/mobile-access'
 import { buildEqOrInFilter, encodeIn } from '../../../utils/postgrest'
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
 import {
@@ -38,6 +43,7 @@ async function fetchRowsOrEmpty<T>(request: () => Promise<T[]>) {
 
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
+  const frontlineAccess = isFrontlineMobileAccess(access)
   const requestedObjectId = parseRequestedObjectId(getQuery(event).objectId)
   const objectIds = resolveScopedObjectIds(access, requestedObjectId)
 
@@ -86,7 +92,7 @@ export default eventHandler(async (event) => {
   const customerId = access.customer?.id
   const currentPhone = normalizePhone(access.user.phone)
 
-  const visibleDispatchRows = access.source === 'customer'
+  const visibleDispatchRows = frontlineAccess
     ? dispatchRows.filter((row) => {
       const recipientIds = Array.isArray(row.recipient_ids) ? row.recipient_ids : []
       const recipientPhones = Array.isArray(row.recipient_phones) ? row.recipient_phones : []
@@ -95,7 +101,7 @@ export default eventHandler(async (event) => {
     })
     : dispatchRows
 
-  const visibleSignedRows = access.source === 'customer'
+  const visibleSignedRows = frontlineAccess
     ? signedRows.filter(row => normalizePhone(row.phone_number) === currentPhone)
     : signedRows
 
@@ -111,7 +117,7 @@ export default eventHandler(async (event) => {
     }
   }
 
-  const visibleTemplateRows = access.source === 'customer'
+  const visibleTemplateRows = frontlineAccess
     ? templateRows.filter(row => templateIds.has(row.id))
     : templateRows
 
@@ -149,7 +155,7 @@ export default eventHandler(async (event) => {
       recipients: dispatch.recipientIds
         .map(id => recipientMap.get(id))
         .filter(Boolean) as DispatchRecipient[],
-      assignedToCurrentUser: access.source === 'customer',
+      assignedToCurrentUser: frontlineAccess,
       signedByCurrentUser: signedByDispatchId.has(dispatch.id)
     }))
 

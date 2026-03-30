@@ -1,16 +1,16 @@
 ﻿import type { LoginRequestBody } from '~~/shared/types/auth'
 import { authenticateLogin } from '../../../utils/auth'
 import { recordEmployeeActivity } from '../../../utils/employee-activity'
-import { resolveMobileAccessFromPayload } from '../../../utils/mobile-access'
+import { isFrontlineMobileAccess, resolveMobileAccessFromPayload } from '../../../utils/mobile-access'
 import { resolveMobileShiftInfo } from '../../../utils/mobile-shift'
 
 export default eventHandler(async (event) => {
   const result = await authenticateLogin(await readBody<Partial<LoginRequestBody>>(event))
   const access = await resolveMobileAccessFromPayload(result.payload)
-  const activity = result.source === 'customer'
-    ? await recordEmployeeActivity({ employeeId: result.user.id })
+  const activity = isFrontlineMobileAccess(access)
+    ? await recordEmployeeActivity({ employeeId: access.user.id })
     : null
-  const shift = access.source === 'customer'
+  const shift = access.customer
     ? resolveMobileShiftInfo(access.customer?.work_shift)
     : null
 

@@ -1,4 +1,4 @@
-﻿import { requireMobileAccess } from '../../../../../utils/mobile-access'
+import { isFrontlineMobileAccess, requireMobileAccess } from '../../../../../utils/mobile-access'
 import { updateObjectTaskItemCompletion } from '../../../../../utils/object-tasks'
 
 interface UpdateTaskItemBody {
@@ -8,7 +8,7 @@ interface UpdateTaskItemBody {
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
 
-  if (access.source !== 'customer' || !access.customer) {
+  if (!isFrontlineMobileAccess(access)) {
     throw createError({
       statusCode: 403,
       statusMessage: 'Only employee accounts can update mobile tasks.'
@@ -39,4 +39,5 @@ export default eventHandler(async (event) => {
     task
   }
 })
+
 

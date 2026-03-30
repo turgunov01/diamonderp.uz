@@ -1,4 +1,11 @@
-export type AuthRole = 'admin' | 'hr' | 'procurement' | 'customer'
+export type AuthRole =
+  | 'admin'
+  | 'hr'
+  | 'procurement'
+  | 'manager'
+  | 'supervisor'
+  | 'customer'
+  | 'cleaner'
 
 export interface AuthSession {
   id: number

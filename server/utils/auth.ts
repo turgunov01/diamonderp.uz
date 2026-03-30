@@ -62,7 +62,17 @@ function getAuthSecret() {
 }
 
 export function isAuthRole(value: unknown): value is AuthRole {
-  return value === 'admin' || value === 'hr' || value === 'procurement' || value === 'customer'
+  return value === 'admin'
+    || value === 'hr'
+    || value === 'procurement'
+    || value === 'manager'
+    || value === 'supervisor'
+    || value === 'customer'
+    || value === 'cleaner'
+}
+
+export function isErpAuthRole(value: unknown): value is AuthRole {
+  return value === 'admin' || value === 'hr' || value === 'procurement'
 }
 
 export function mapUserToSession(user: ErpUserAuthRow): AuthSession {
@@ -302,7 +312,7 @@ export async function authenticateLogin(body: Partial<LoginRequestBody> | null |
   const credentials = normalizeCredentials(body)
   const matchedUser = await fetchUserByEmail(credentials.login.toLowerCase())
 
-  if (matchedUser && matchedUser.is_active !== false && isAuthRole(matchedUser.role)) {
+  if (matchedUser && matchedUser.is_active !== false && isErpAuthRole(matchedUser.role)) {
     const passwordMatches = await compare(credentials.password, matchedUser.password_hash)
       .catch(() => false)
 

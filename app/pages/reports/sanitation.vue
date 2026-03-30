@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import type { AuthRole } from '~~/shared/types/auth'
+
 definePageMeta({
   title: 'Дезинфекция и дератизация',
   ssr: true
 })
 
 type WorkShift = 'day' | 'night'
+type SanitationRoleFilter = 'all' | AuthRole
 
 type SanitationEvent = {
   id: number
@@ -72,6 +75,7 @@ const createForm = reactive({
   type: 'disinfection' as 'disinfection' | 'deratization',
   performedAt: new Date().toISOString().slice(0, 16),
   team: 'day' as WorkShift,
+  roleFilter: 'all' as SanitationRoleFilter,
   executors: [] as string[],
   notes: '',
   photos: ''
@@ -81,6 +85,17 @@ const shiftItems: Array<{ label: string, value: WorkShift }> = [
   { label: 'День', value: 'day' },
   { label: 'Ночь', value: 'night' }
 ]
+
+function getRoleLabel(role?: string | null) {
+  if (role === 'admin') return 'Админ'
+  if (role === 'hr') return 'HR'
+  if (role === 'procurement') return 'Закупщик'
+  if (role === 'manager') return 'Менеджер'
+  if (role === 'supervisor') return 'Супервайзер'
+  if (role === 'cleaner') return 'Клинер'
+  if (role === 'customer') return 'Сотрудник'
+  return 'Без роли'
+}
 
 const buildingName = computed(() => activeBuilding.value?.name?.trim() || '')
 
@@ -94,10 +109,6 @@ const availableExecutors = computed(() => {
       return false
     }
 
-    if (customer.role && customer.role !== 'customer') {
-      return false
-    }
-
     if (customer.status === 'inactive' || customer.status === 'archived') {
       return false
     }
@@ -106,15 +117,46 @@ const availableExecutors = computed(() => {
   })
 })
 
+const roleFilterItems = computed(() => {
+  const roles = Array.from(new Set(
+    availableExecutors.value
+      .map(customer => customer.role)
+      .filter((role): role is AuthRole => typeof role === 'string' && role.trim().length > 0)
+  ))
+
+  return [
+    { label: 'Все роли', value: 'all' as SanitationRoleFilter },
+    ...roles.map(role => ({
+      label: getRoleLabel(role),
+      value: role as SanitationRoleFilter
+    }))
+  ]
+})
+
+const filteredExecutors = computed(() => {
+  if (createForm.roleFilter === 'all') {
+    return availableExecutors.value
+  }
+
+  return availableExecutors.value.filter(customer => customer.role === createForm.roleFilter)
+})
+
 const executorItems = computed(() =>
-  availableExecutors.value.map((customer) => ({
-    label: `@${customer.username}`,
+  filteredExecutors.value.map((customer) => ({
+    label: `${getRoleLabel(customer.role)} · @${customer.username}`,
     value: customer.username
   }))
 )
 
-watch(availableExecutors, () => {
-  const allowedUsernames = new Set(availableExecutors.value.map(customer => customer.username))
+watch(roleFilterItems, () => {
+  const allowedRoles = new Set(roleFilterItems.value.map(item => item.value))
+  if (!allowedRoles.has(createForm.roleFilter)) {
+    createForm.roleFilter = 'all'
+  }
+}, { immediate: true })
+
+watch(filteredExecutors, () => {
+  const allowedUsernames = new Set(filteredExecutors.value.map(customer => customer.username))
   createForm.executors = createForm.executors.filter(username => allowedUsernames.has(username))
 }, { immediate: true })
 
@@ -191,6 +233,7 @@ async function submitEvent() {
     toast.add({ title: 'Запись сохранена', color: 'success' })
     createModalOpen.value = false
     createForm.team = 'day'
+    createForm.roleFilter = 'all'
     createForm.executors = []
     createForm.notes = ''
     createForm.photos = ''
@@ -369,6 +412,14 @@ async function submitEvent() {
                 <USelect v-model="createForm.team" :items="shiftItems" class="w-full" />
               </UFormField>
             </div>
+            <UFormField label="Роль сотрудников">
+              <USelect
+                v-model="createForm.roleFilter"
+                :items="roleFilterItems"
+                :disabled="!buildingName"
+                class="w-full"
+              />
+            </UFormField>
             <UFormField :label="`Сотрудники смены${buildingName ? ` (${buildingName})` : ''}`">
               <USelectMenu
                 v-model="createForm.executors"
@@ -385,7 +436,11 @@ async function submitEvent() {
                 Сначала выберите здание, чтобы получить состав смены.
               </p>
               <p v-else-if="!executorItems.length" class="text-xs text-muted mt-1">
-                Для здания «{{ buildingName }}» нет сотрудников на смене «{{ formatTeamLabel(createForm.team).toLowerCase() }}».
+                Для здания «{{ buildingName }}» нет сотрудников
+                <template v-if="createForm.roleFilter !== 'all'">
+                  с ролью «{{ getRoleLabel(createForm.roleFilter).toLowerCase() }}»
+                </template>
+                на смене «{{ formatTeamLabel(createForm.team).toLowerCase() }}».
               </p>
             </UFormField>
             <UFormField label="Ссылки на фото (каждая с новой строки или через запятую)">

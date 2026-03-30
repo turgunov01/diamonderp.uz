@@ -327,7 +327,7 @@ function isAssignableEmployee(customer: TaskCustomerRow, objectName: string) {
   const role = customer.role || 'customer'
   const status = customer.status || 'active'
 
-  if (role !== 'customer') {
+  if (role !== 'customer' && role !== 'cleaner') {
     return false
   }
 

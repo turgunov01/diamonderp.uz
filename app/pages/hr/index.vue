@@ -15,6 +15,8 @@ interface Customer {
   password: string
   phoneNumber: string
   passportFile: string
+  passportFrontPath?: string
+  passportBackPath?: string
   age: number
   workShift: 'day' | 'night'
   objectPinned: string
@@ -29,6 +31,13 @@ interface Customer {
 }
 
 type CustomerStatus = 'active' | 'inactive'
+
+interface PassportFileEntry {
+  label: string
+  value: string
+  url: string
+  isImage: boolean
+}
 
 interface ShiftDraft {
   workShift: 'day' | 'night'
@@ -76,6 +85,7 @@ const UDropdownMenu = resolveComponent('UDropdownMenu')
 const UCheckbox = resolveComponent('UCheckbox')
 
 const toast = useToast()
+const runtimeConfig = useRuntimeConfig()
 const table = useTemplateRef('table')
 const activeBuilding = useState<{ id: number, name: string } | null>('active-building')
 const customerInfoOpen = ref(false)
@@ -792,22 +802,67 @@ async function createAdvance() {
   }
 }
 
-function getPassportFiles(passportFile: string) {
-  try {
-    const parsed = JSON.parse(passportFile) as { front?: string, back?: string }
-    const files = [
-      parsed.front ? { label: 'Лицевая сторона', value: parsed.front } : null,
-      parsed.back ? { label: 'Обратная сторона', value: parsed.back } : null
-    ].filter(Boolean)
+function isImageLike(path: string) {
+  return /\.(png|jpe?g|webp|gif|bmp|avif|tiff)$/i.test(path)
+}
 
-    if (files.length) {
-      return files as { label: string, value: string }[]
-    }
-  } catch {
-    // Older records can still store one file path as plain text.
+function buildPassportPublicUrl(rawPath: string) {
+  const trimmed = rawPath?.trim()
+  if (!trimmed) {
+    return ''
   }
 
-  return [{ label: 'Файл', value: passportFile }]
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed
+  }
+
+  const baseUrl = runtimeConfig.public?.supabaseUrl
+  if (!baseUrl) {
+    return trimmed
+  }
+
+  const normalizedBase = baseUrl.replace(/\/+$/, '')
+  const normalizedPath = trimmed.replace(/^\/+/, '')
+
+  if (normalizedPath.startsWith('storage/v1/object')) {
+    return `${normalizedBase}/${normalizedPath}`
+  }
+
+  return `${normalizedBase}/storage/v1/object/public/${normalizedPath}`
+}
+
+function parsePassportJson(passportFile: string) {
+  try {
+    const parsed = JSON.parse(passportFile) as { front?: string, back?: string }
+    return parsed
+  } catch {
+    return {}
+  }
+}
+
+function getPassportEntries(customer: Customer): PassportFileEntry[] {
+  const entries: PassportFileEntry[] = []
+  const parsed = customer.passportFile ? parsePassportJson(customer.passportFile) : {}
+
+  const pushEntry = (label: string, raw?: string | null) => {
+    if (!raw) return
+    const url = buildPassportPublicUrl(raw)
+    entries.push({
+      label,
+      value: raw,
+      url,
+      isImage: isImageLike(raw)
+    })
+  }
+
+  pushEntry('Лицевая сторона', customer.passportFrontPath || parsed.front)
+  pushEntry('Обратная сторона', customer.passportBackPath || parsed.back)
+
+  if (!entries.length) {
+    pushEntry('Файл паспорта', customer.passportFile)
+  }
+
+  return entries
 }
 
 function getCustomerStatus(customer: Customer): CustomerStatus {
@@ -1481,20 +1536,40 @@ async function saveCustomerSalary(customer: Customer) {
               </div>
               <div class="rounded-md border border-default p-3 sm:col-span-2">
                 <p class="text-xs text-muted">
-                  Файл паспорта
+                  Паспорт
                 </p>
-                <div class="space-y-2">
+                <div class="grid gap-3 sm:grid-cols-2">
                   <div
-                    v-for="passport in getPassportFiles(selectedCustomer.passportFile)"
+                    v-for="passport in getPassportEntries(selectedCustomer)"
                     :key="passport.label"
+                    class="space-y-1"
                   >
                     <p class="text-xs text-muted">
                       {{ passport.label }}
                     </p>
-                    <p class="font-medium break-all">
-                      {{ passport.value }}
-                    </p>
+                    <a
+                      :href="passport.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="group block"
+                    >
+                      <img
+                        v-if="passport.isImage"
+                        :src="passport.url"
+                        :alt="passport.label"
+                        class="w-full rounded-md border border-default bg-default object-cover aspect-[4/3] transition group-hover:shadow-md"
+                      />
+                      <p
+                        v-else
+                        class="font-medium break-all text-highlighted underline group-hover:text-primary"
+                      >
+                        {{ passport.value }}
+                      </p>
+                    </a>
                   </div>
+                  <p v-if="!getPassportEntries(selectedCustomer).length" class="text-sm text-muted sm:col-span-2">
+                    Паспорт не прикреплен.
+                  </p>
                 </div>
               </div>
             </div>

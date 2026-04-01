@@ -210,8 +210,32 @@ function getSupabaseErrorCode(error: unknown) {
   return typeof data?.code === 'string' ? data.code : undefined
 }
 
+function getErrorStatusCode(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return undefined
+  }
+
+  const statusCode = (error as { statusCode?: number }).statusCode
+  const status = (error as { status?: number }).status
+  if (typeof statusCode === 'number') return statusCode
+  if (typeof status === 'number') return status
+  return undefined
+}
+
 function isMissingTableError(error: unknown) {
-  return getSupabaseErrorCode(error) === '42P01'
+  const code = getSupabaseErrorCode(error)
+  const status = getErrorStatusCode(error)
+
+  return code === '42P01' // Postgres undefined_table
+    || code === 'PGRST302' // PostgREST: relation not found
+    || status === 404 // Fallback: Supabase may return plain 404 with message "Not Found"
+}
+
+function throwMissingTaskTablesError() {
+  throw createError({
+    statusCode: 500,
+    statusMessage: 'Таблицы object_task_lists/object_task_items не найдены. Примените миграцию db/supabase/object_tasks.sql в Supabase.'
+  })
 }
 
 async function fetchRowsOrEmpty<T>(request: () => Promise<T[]>) {
@@ -615,25 +639,34 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   const headers = getSupabaseServerHeaders(serviceRoleKey)
   const now = new Date().toISOString()
 
-  const [createdList] = await $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
-    method: 'POST',
-    headers: {
-      ...headers,
-      Prefer: 'return=representation'
-    },
-    body: {
-      object_id: objectId,
-      employee_id: employeeId,
-      title,
-      note,
-      due_date: dueDate,
-      status: 'open',
-      created_by_id: input.creator?.id ?? null,
-      created_by_name: input.creator?.name ?? null,
-      created_by_role: input.creator?.role ?? null,
-      updated_at: now
+  let createdList: ObjectTaskListDbRow | undefined
+
+  try {
+    ;[createdList] = await $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        Prefer: 'return=representation'
+      },
+      body: {
+        object_id: objectId,
+        employee_id: employeeId,
+        title,
+        note,
+        due_date: dueDate,
+        status: 'open',
+        created_by_id: input.creator?.id ?? null,
+        created_by_name: input.creator?.name ?? null,
+        created_by_role: input.creator?.role ?? null,
+        updated_at: now
+      }
+    })
+  } catch (error: unknown) {
+    if (isMissingTableError(error)) {
+      throwMissingTaskTablesError()
     }
-  })
+    throw error
+  }
 
   if (!createdList) {
     throw createError({
@@ -662,6 +695,9 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
     })
   } catch (error: unknown) {
     await deleteTaskList(createdList.id).catch(() => undefined)
+    if (isMissingTableError(error)) {
+      throwMissingTaskTablesError()
+    }
     throw error
   }
 

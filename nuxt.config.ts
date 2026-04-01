@@ -21,7 +21,8 @@ export default defineNuxtConfig({
       passportBucket: import.meta.env.SUPABASE_PASSPORT_BUCKET || 'customer-passports',
       documentTemplateBucket: import.meta.env.SUPABASE_DOCUMENT_TEMPLATE_BUCKET || 'document-templates',
       documentTemplateUploadBucket: import.meta.env.SUPABASE_DOCUMENT_TEMPLATE_UPLOAD_BUCKET || 'document-template-uploads',
-      documentSignatureBucket: import.meta.env.SUPABASE_DOCUMENT_SIGNATURE_BUCKET || 'document-signatures'
+      documentSignatureBucket: import.meta.env.SUPABASE_DOCUMENT_SIGNATURE_BUCKET || 'document-signatures',
+      taskPhotoBucket: import.meta.env.SUPABASE_TASK_PHOTO_BUCKET || 'object-task-photos'
     },
     public: {
       supabaseUrl: import.meta.env.NUXT_PUBLIC_SUPABASE_URL || import.meta.env.SUPABASE_URL || '',

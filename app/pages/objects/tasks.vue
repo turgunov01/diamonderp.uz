@@ -22,6 +22,7 @@ type ObjectTaskItem = {
   isDone: boolean
   completedAt: string | null
   sortOrder: number
+  proofPhotoUrl?: string | null
 }
 
 type ObjectTask = {
@@ -551,9 +552,32 @@ async function submitTaskList() {
                         <div class="h-full rounded-full bg-primary transition-all" :style="{ width: `${task.progressPercent}%` }" />
                       </div>
                       <ul class="space-y-1 pt-1 text-sm text-muted">
-                        <li v-for="item in task.items.slice(0, 3)" :key="item.id" class="flex items-center gap-2">
-                          <span :class="item.isDone ? 'text-success' : 'text-muted'">{{ item.isDone ? '[x]' : '[ ]' }}</span>
-                          <span :class="item.isDone ? 'line-through text-muted' : 'text-toned'">{{ item.title }}</span>
+                        <li
+                          v-for="item in task.items.slice(0, 3)"
+                          :key="item.id"
+                          class="flex items-center gap-3"
+                        >
+                          <span :class="item.isDone ? 'text-success' : 'text-muted'">
+                            {{ item.isDone ? '[x]' : '[ ]' }}
+                          </span>
+                          <div class="flex flex-col gap-1">
+                            <span :class="item.isDone ? 'line-through text-muted' : 'text-toned'">
+                              {{ item.title }}
+                            </span>
+                            <a
+                              v-if="item.proofPhotoUrl"
+                              :href="item.proofPhotoUrl"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="block max-w-[180px]"
+                            >
+                              <img
+                                :src="item.proofPhotoUrl"
+                                alt="Фото выполнения"
+                                class="w-full rounded-md border border-default object-cover"
+                              />
+                            </a>
+                          </div>
                         </li>
                       </ul>
                     </div>

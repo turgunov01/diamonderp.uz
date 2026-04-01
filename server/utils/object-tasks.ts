@@ -46,6 +46,7 @@ interface ObjectTaskItemDbRow {
   title: string
   is_done?: boolean | null
   completed_at?: string | null
+  proof_photo_path?: string | null
   sort_order?: number | null
   created_at?: string | null
   updated_at?: string | null
@@ -69,6 +70,7 @@ export interface ObjectTaskItemRecord {
   isDone: boolean
   completedAt: string | null
   sortOrder: number
+  proofPhotoUrl: string | null
 }
 
 export interface ObjectTaskRecord {
@@ -149,6 +151,11 @@ interface UpdateObjectTaskItemCompletionInput {
   itemId: number
   employeeId: number
   done: boolean
+  photoFile?: {
+    filename?: string
+    type?: string
+    data: Uint8Array
+  }
 }
 
 const TASK_MANAGER_ROLES: AuthRole[] = ['admin', 'procurement']
@@ -238,6 +245,80 @@ function throwMissingTaskTablesError() {
   })
 }
 
+function sanitizeFileName(fileName: string) {
+  return fileName
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+}
+
+function encodeStoragePath(path: string) {
+  return path.split('/').map(part => encodeURIComponent(part)).join('/')
+}
+
+async function ensureStorageBucket(options: {
+  url: string
+  serviceRoleKey: string
+  bucket: string
+  isPublic: boolean
+}) {
+  try {
+    await $fetch(`${options.url}/storage/v1/bucket`, {
+      method: 'POST',
+      headers: {
+        ...getSupabaseServerHeaders(options.serviceRoleKey),
+        'Content-Type': 'application/json'
+      },
+      body: {
+        id: options.bucket,
+        name: options.bucket,
+        public: options.isPublic
+      }
+    })
+  } catch (error: unknown) {
+    const statusCode = getErrorStatusCode(error)
+    if (statusCode === 400 || statusCode === 409) {
+      return
+    }
+
+    const data = (error as { data?: { message?: string } }).data
+    if (typeof data?.message === 'string' && data.message.toLowerCase().includes('already exists')) {
+      return
+    }
+
+    throw createError({
+      statusCode: 500,
+      statusMessage: `Не удалось подготовить бакет "${options.bucket}".`
+    })
+  }
+}
+
+async function uploadStorageObject(options: {
+  url: string
+  serviceRoleKey: string
+  bucket: string
+  path: string
+  data: Uint8Array
+  contentType: string
+}) {
+  try {
+    await $fetch(`${options.url}/storage/v1/object/${options.bucket}/${encodeStoragePath(options.path)}`, {
+      method: 'POST',
+      headers: {
+        ...getSupabaseServerHeaders(options.serviceRoleKey),
+        'Content-Type': options.contentType,
+        'x-upsert': 'true'
+      },
+      body: options.data
+    })
+  } catch {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `Не удалось загрузить файл в бакет "${options.bucket}".`
+    })
+  }
+}
+
 async function fetchRowsOrEmpty<T>(request: () => Promise<T[]>) {
   try {
     return await request()
@@ -306,13 +387,19 @@ function mapEmployeeRow(row: TaskCustomerRow): ObjectTaskEmployeeRecord {
 }
 
 function mapTaskItemRow(row: ObjectTaskItemDbRow): ObjectTaskItemRecord {
+  const { url, taskPhotoBucket } = getSupabaseServerConfig()
+  const base = url.replace(/\/+$/, '')
+  const photoPath = row.proof_photo_path || null
   return {
     id: row.id,
     taskListId: row.task_list_id,
     title: row.title,
     isDone: row.is_done === true,
     completedAt: row.completed_at || null,
-    sortOrder: row.sort_order ?? 0
+    sortOrder: row.sort_order ?? 0,
+    proofPhotoUrl: photoPath
+      ? `${base}/storage/v1/object/public/${taskPhotoBucket}/${encodeStoragePath(photoPath)}`
+      : null
   }
 }
 
@@ -455,7 +542,7 @@ async function fetchTaskItems(taskListIds: number[]) {
   return await fetchRowsOrEmpty<ObjectTaskItemDbRow>(() => $fetch<ObjectTaskItemDbRow[]>(`${url}/rest/v1/object_task_items`, {
     headers: getSupabaseServerHeaders(serviceRoleKey),
     query: {
-      select: 'id,task_list_id,title,is_done,completed_at,sort_order,created_at,updated_at',
+      select: 'id,task_list_id,title,is_done,completed_at,proof_photo_path,sort_order,created_at,updated_at',
       task_list_id: `in.(${taskListIds.join(',')})`,
       order: 'sort_order.asc,id.asc'
     }
@@ -735,7 +822,7 @@ async function fetchTaskItem(taskId: number, itemId: number) {
   const rows = await fetchRowsOrEmpty<ObjectTaskItemDbRow>(() => $fetch<ObjectTaskItemDbRow[]>(`${url}/rest/v1/object_task_items`, {
     headers: getSupabaseServerHeaders(serviceRoleKey),
     query: {
-      select: 'id,task_list_id,title,is_done,completed_at,sort_order,created_at,updated_at',
+      select: 'id,task_list_id,title,is_done,completed_at,proof_photo_path,sort_order,created_at,updated_at',
       id: `eq.${itemId}`,
       task_list_id: `eq.${taskId}`,
       limit: '1'
@@ -777,6 +864,39 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   const headers = getSupabaseServerHeaders(serviceRoleKey)
   const now = new Date().toISOString()
 
+  const isCompleting = input.done === true && existingItem.is_done !== true
+  if (isCompleting && !input.photoFile && !existingItem.proof_photo_path) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Photo is required to complete this item.'
+    })
+  }
+
+  let proofPhotoPath = existingItem.proof_photo_path || null
+
+  if (input.photoFile) {
+    const { taskPhotoBucket } = getSupabaseServerConfig()
+    await ensureStorageBucket({
+      url,
+      serviceRoleKey,
+      bucket: taskPhotoBucket,
+      isPublic: true
+    })
+
+    const safeName = sanitizeFileName(input.photoFile.filename || 'task-proof')
+    const uniqueId = `${taskId}-${itemId}-${Date.now()}`
+    proofPhotoPath = `${employeeId}/tasks/${uniqueId}-${safeName}`
+
+    await uploadStorageObject({
+      url,
+      serviceRoleKey,
+      bucket: taskPhotoBucket,
+      path: proofPhotoPath,
+      data: input.photoFile.data,
+      contentType: input.photoFile.type || 'application/octet-stream'
+    })
+  }
+
   const [updatedItem] = await $fetch<ObjectTaskItemDbRow[]>(`${url}/rest/v1/object_task_items`, {
     method: 'PATCH',
     headers: {
@@ -790,7 +910,8 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     body: {
       is_done: input.done,
       completed_at: input.done ? now : null,
-      updated_at: now
+      updated_at: now,
+      proof_photo_path: proofPhotoPath
     }
   })
 

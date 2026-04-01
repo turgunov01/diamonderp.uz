@@ -6,6 +6,7 @@ interface SupabaseServerConfig {
   documentTemplateBucket: string
   documentTemplateUploadBucket: string
   documentSignatureBucket: string
+  taskPhotoBucket: string
 }
 
 function normalizeUrl(value: string) {
@@ -21,6 +22,7 @@ export function getSupabaseServerConfig(): SupabaseServerConfig {
   const documentTemplateBucket = config.supabase?.documentTemplateBucket
   const documentTemplateUploadBucket = config.supabase?.documentTemplateUploadBucket
   const documentSignatureBucket = config.supabase?.documentSignatureBucket
+  const taskPhotoBucket = config.supabase?.taskPhotoBucket
 
   if (typeof url !== 'string' || !url.length) {
     throw createError({
@@ -49,7 +51,10 @@ export function getSupabaseServerConfig(): SupabaseServerConfig {
       : 'document-template-uploads',
     documentSignatureBucket: typeof documentSignatureBucket === 'string' && documentSignatureBucket.length
       ? documentSignatureBucket
-      : 'document-signatures'
+      : 'document-signatures',
+    taskPhotoBucket: typeof taskPhotoBucket === 'string' && taskPhotoBucket.length
+      ? taskPhotoBucket
+      : 'object-task-photos'
   }
 }
 

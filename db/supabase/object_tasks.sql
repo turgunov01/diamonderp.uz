@@ -21,6 +21,7 @@ create table if not exists public.object_task_items (
   title text not null,
   is_done boolean not null default false,
   completed_at timestamptz,
+  proof_photo_path text,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -44,6 +45,7 @@ alter table public.object_task_items
   add column if not exists title text,
   add column if not exists is_done boolean not null default false,
   add column if not exists completed_at timestamptz,
+  add column if not exists proof_photo_path text,
   add column if not exists sort_order integer not null default 0,
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists updated_at timestamptz not null default now();
@@ -54,6 +56,7 @@ create index if not exists object_task_lists_status_idx on public.object_task_li
 create index if not exists object_task_lists_due_date_idx on public.object_task_lists(due_date);
 create index if not exists object_task_items_task_list_id_idx on public.object_task_items(task_list_id);
 create index if not exists object_task_items_is_done_idx on public.object_task_items(is_done);
+create index if not exists object_task_items_proof_photo_path_idx on public.object_task_items(proof_photo_path);
 
 alter table public.object_task_lists enable row level security;
 alter table public.object_task_items enable row level security;

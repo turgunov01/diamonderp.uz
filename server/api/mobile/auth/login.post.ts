@@ -5,6 +5,8 @@ import { isFrontlineMobileAccess, resolveMobileAccessFromPayload } from '../../.
 import { resolveMobileShiftInfo } from '../../../utils/mobile-shift'
 
 export default eventHandler(async (event) => {
+  const TOKEN_MAX_AGE = 60 * 60 * 24 // 24h, matches signAuthToken default
+  const isProd = process.env.NODE_ENV === 'production'
   const result = await authenticateLogin(await readBody<Partial<LoginRequestBody>>(event))
   const access = await resolveMobileAccessFromPayload(result.payload)
   const activity = isFrontlineMobileAccess(access)
@@ -13,6 +15,15 @@ export default eventHandler(async (event) => {
   const shift = access.customer
     ? resolveMobileShiftInfo(access.customer?.work_shift)
     : null
+
+  // Also drop the token into a cookie so tools like Postman / browsers keep the session.
+  setCookie(event, 'diamond-erp-token', result.token, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: TOKEN_MAX_AGE
+  })
 
   return {
     user: access.user,

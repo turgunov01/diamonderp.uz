@@ -30,4 +30,3 @@ export default eventHandler(async (event) => {
     activity
   }
 })
-

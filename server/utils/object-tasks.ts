@@ -812,6 +812,35 @@ export async function listEmployeeObjectTasks(employeeId: number, status?: Objec
   return sortTasks(taskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
 }
 
+export async function listEmployeeObjectTasksByObject(
+  employeeId: number,
+  objectId: number,
+  status?: ObjectTaskStatus
+) {
+  const normalizedEmployeeId = parsePositiveInteger(employeeId, 'employeeId')
+  const normalizedObjectId = parsePositiveInteger(objectId, 'objectId')
+
+  const [taskLists, customers, objects] = await Promise.all([
+    fetchTaskLists({ employeeIds: [normalizedEmployeeId], objectIds: [normalizedObjectId], status }),
+    fetchCustomers({ customerIds: [normalizedEmployeeId] }),
+    fetchObjects({ objectIds: [normalizedObjectId] })
+  ])
+
+  if (!objects.length) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Object not found.'
+    })
+  }
+
+  const taskItems = await fetchTaskItems(taskLists.map(task => task.id))
+  const objectById = new Map(objects.map(object => [object.id, object]))
+  const customerById = new Map(customers.map(customer => [customer.id, customer]))
+  const itemsByTaskId = buildItemsMap(taskItems)
+
+  return sortTasks(taskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+}
+
 async function fetchTaskListById(taskId: number) {
   const rows = await fetchTaskLists({ listIds: [taskId] })
   return rows[0] || null
@@ -950,5 +979,39 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
 
   return buildTaskRecord(updatedTaskList || taskList, mappedItems, objectById, customerById)
+}
+
+export async function getEmployeeTaskById(employeeId: number, taskId: number) {
+  const normalizedEmployeeId = parsePositiveInteger(employeeId, 'employeeId')
+  const normalizedTaskId = parsePositiveInteger(taskId, 'taskId')
+
+  const taskList = await fetchTaskListById(normalizedTaskId)
+  if (!taskList) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Task not found.'
+    })
+  }
+
+  if (taskList.employee_id !== normalizedEmployeeId) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Task access denied.'
+    })
+  }
+
+  const [taskItems, objects, customers] = await Promise.all([
+    fetchTaskItems([normalizedTaskId]),
+    typeof taskList.object_id === 'number' && taskList.object_id > 0
+      ? fetchObjects({ objectIds: [taskList.object_id] })
+      : Promise.resolve([]),
+    fetchCustomers({ customerIds: [normalizedEmployeeId] })
+  ])
+
+  const objectById = new Map(objects.map(object => [object.id, object]))
+  const customerById = new Map(customers.map(customer => [customer.id, customer]))
+  const items = taskItems.map(mapTaskItemRow)
+
+  return buildTaskRecord(taskList, items, objectById, customerById)
 }
 

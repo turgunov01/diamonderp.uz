@@ -1,5 +1,5 @@
-import { isFrontlineMobileAccess, requireMobileAccess } from '../../../../../utils/mobile-access'
-import { getEmployeeTaskById } from '../../../../../utils/object-tasks'
+import { isFrontlineMobileAccess, requireMobileAccess } from '../../../../utils/mobile-access'
+import { getEmployeeTaskById } from '../../../../utils/object-tasks'
 
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)

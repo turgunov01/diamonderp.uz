@@ -4,7 +4,7 @@ import type { EmployeeAdvanceDbRow } from './advances'
 import { mapCustomerDbRowToRecord, type CustomerDbRow } from './customers'
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey, passportBucket } = getSupabaseServerConfig()
   const buildingIdRaw = getQuery(event).buildingId
   const buildingId = typeof buildingIdRaw === 'string' ? Number(buildingIdRaw) : NaN
 
@@ -76,10 +76,21 @@ export default eventHandler(async (event) => {
 
   const buildPublicUrl = (path?: string | null) => {
     if (!path) return ''
-    // if already absolute
     if (/^https?:\/\//i.test(path)) return path
+
     const base = url.replace(/\/+$/, '')
-    return `${base}/storage/v1/object/public/${path.replace(/^\/+/, '')}`
+    const normalized = path.replace(/^\/+/, '')
+    const withBucket = normalized.startsWith('storage/v1/object')
+      ? normalized
+      : normalized.startsWith(`${passportBucket}/`)
+        ? normalized
+        : `${passportBucket}/${normalized}`
+
+    if (withBucket.startsWith('storage/v1/object')) {
+      return `${base}/${withBucket}`
+    }
+
+    return `${base}/storage/v1/object/public/${withBucket}`
   }
 
   customers.forEach(c => {

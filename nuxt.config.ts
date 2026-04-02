@@ -26,7 +26,11 @@ export default defineNuxtConfig({
     },
     public: {
       supabaseUrl: import.meta.env.NUXT_PUBLIC_SUPABASE_URL || import.meta.env.SUPABASE_URL || '',
-      supabaseAnonKey: import.meta.env.NUXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      supabaseAnonKey: import.meta.env.NUXT_PUBLIC_SUPABASE_ANON_KEY || '',
+      supabasePassportBucket:
+        import.meta.env.NUXT_PUBLIC_SUPABASE_PASSPORT_BUCKET
+        || import.meta.env.SUPABASE_PASSPORT_BUCKET
+        || 'customer-passports'
     }
   },
 

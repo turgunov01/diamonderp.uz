@@ -817,6 +817,7 @@ function buildPassportPublicUrl(rawPath: string) {
   }
 
   const baseUrl = runtimeConfig.public?.supabaseUrl
+  const bucket = runtimeConfig.public?.supabasePassportBucket || 'customer-passports'
   if (!baseUrl) {
     return trimmed
   }
@@ -824,11 +825,17 @@ function buildPassportPublicUrl(rawPath: string) {
   const normalizedBase = baseUrl.replace(/\/+$/, '')
   const normalizedPath = trimmed.replace(/^\/+/, '')
 
-  if (normalizedPath.startsWith('storage/v1/object')) {
-    return `${normalizedBase}/${normalizedPath}`
+  const pathWithBucket = normalizedPath.startsWith('storage/v1/object')
+    ? normalizedPath
+    : normalizedPath.startsWith(`${bucket}/`)
+      ? normalizedPath
+      : `${bucket}/${normalizedPath}`
+
+  if (pathWithBucket.startsWith('storage/v1/object')) {
+    return `${normalizedBase}/${pathWithBucket}`
   }
 
-  return `${normalizedBase}/storage/v1/object/public/${normalizedPath}`
+  return `${normalizedBase}/storage/v1/object/public/${pathWithBucket}`
 }
 
 function parsePassportJson(passportFile: string) {

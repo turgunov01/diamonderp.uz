@@ -7,6 +7,8 @@ import { isFrontlineMobileAccess, requireMobileAccess } from '../../../../../uti
 //   /api/mobile/tasks/:taskId/items/:itemId
 // where taskId comes from the task list payload.
 export default eventHandler(async (event) => {
+  setHeader(event, 'Content-Type', 'application/json; charset=utf-8')
+
   const access = await requireMobileAccess(event)
 
   if (!isFrontlineMobileAccess(access)) {

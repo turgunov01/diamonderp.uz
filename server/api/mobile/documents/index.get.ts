@@ -240,12 +240,34 @@ export default eventHandler(async (event) => {
       templateName: item.templateId ? templateNameById.get(item.templateId) : undefined
     }))
 
+  const documents = signed.map(item => ({
+    id: item.id,
+    dispatchId: item.dispatchId,
+    templateId: item.templateId,
+    templateName: item.templateName,
+    fileUrl: item.fileUrl,
+    signedAt: item.signedAt,
+    signedVia: item.signedVia,
+    employeeName: item.employeeName,
+    phoneNumber: item.phoneNumber
+  }))
+
+  if (frontlineAccess) {
+    return {
+      role: access.role,
+      frontend: access.frontend,
+      objectIds,
+      documents
+    }
+  }
+
   return {
     role: access.role,
     frontend: access.frontend,
     objectIds,
     templates,
     dispatches,
-    signed
+    signed,
+    documents
   }
 })

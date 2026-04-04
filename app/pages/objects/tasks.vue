@@ -192,6 +192,64 @@ watch(() => form.objectId, (objectId) => {
   }
 })
 
+const expandedObjectId = ref<number | null>(null)
+
+function toggleObject(id: number) {
+  expandedObjectId.value = expandedObjectId.value === id ? null : id
+}
+
+function getEmployeeTaskSnapshot(employeeId: number, tasks: ObjectTask[]) {
+  const myTasks = tasks.filter(task => task.employeeId === employeeId)
+  const recentTimestamps: number[] = []
+
+  myTasks.forEach(task => {
+    if (task.updatedAt) recentTimestamps.push(new Date(task.updatedAt).getTime())
+    else if (task.createdAt) recentTimestamps.push(new Date(task.createdAt).getTime())
+
+    task.items?.forEach(item => {
+      if (item.completedAt) {
+        recentTimestamps.push(new Date(item.completedAt).getTime())
+      }
+    })
+  })
+
+  const recentCompletion = recentTimestamps.length
+    ? new Date(Math.max(...recentTimestamps)).toISOString()
+    : null
+
+  const hasOpenTasks = myTasks.some(task => task.status !== 'completed')
+
+  return {
+    tasks: myTasks,
+    taskCount: myTasks.length,
+    hasOpenTasks,
+    recentCompletion
+  }
+}
+
+const objectList = computed(() => {
+  return filteredObjects.value.map(object => {
+    const employeeInfo = (object.employees || []).map(employee => {
+      const snapshot = getEmployeeTaskSnapshot(employee.id, object.tasks || [])
+      return {
+        ...employee,
+        ...snapshot
+      }
+    }).sort((a, b) => {
+      if (a.hasOpenTasks !== b.hasOpenTasks) return a.hasOpenTasks ? -1 : 1
+      if (b.taskCount !== a.taskCount) return b.taskCount - a.taskCount
+      const aTs = a.recentCompletion ? new Date(a.recentCompletion).getTime() : 0
+      const bTs = b.recentCompletion ? new Date(b.recentCompletion).getTime() : 0
+      return bTs - aTs
+    })
+
+    return {
+      ...object,
+      employeeInfo
+    }
+  })
+})
+
 function formatDate(value?: string | null) {
   if (!value) {
     return 'Без срока'
@@ -415,8 +473,8 @@ async function submitTaskList() {
 
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-highlighted">Карточки объектов</h2>
-            <p class="text-sm text-muted">Назначайте сотрудникам чек-листы, которые будут доступны в мобильном приложении.</p>
+            <h2 class="text-lg font-semibold text-highlighted">Список объектов и задач</h2>
+            <p class="text-sm text-muted">Нажмите на объект, чтобы раскрыть сотрудников и их чек-листы.</p>
           </div>
 
           <UInput
@@ -435,14 +493,21 @@ async function submitTaskList() {
           <p class="text-sm text-muted">По текущему фильтру объекты и задачи не найдены.</p>
         </div>
 
-        <div v-else class="grid gap-4 xl:grid-cols-2">
+        <div v-else class="space-y-4">
           <section
-            v-for="object in filteredObjects"
+            v-for="object in objectList"
             :key="object.id"
-            class="rounded-2xl border border-default bg-gradient-to-br from-elevated via-elevated/95 to-primary/5 shadow-sm"
+            class="rounded-2xl border border-default bg-elevated/40 shadow-sm"
           >
-            <div class="flex flex-col gap-4 p-5">
-              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div
+              class="w-full text-left cursor-pointer"
+              role="button"
+              tabindex="0"
+              @click="toggleObject(object.id)"
+              @keydown.enter.prevent="toggleObject(object.id)"
+              @keydown.space.prevent="toggleObject(object.id)"
+            >
+              <div class="flex flex-col gap-2 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div class="space-y-1">
                   <div class="flex flex-wrap items-center gap-2">
                     <h3 class="text-lg font-semibold text-highlighted">{{ object.name }}</h3>
@@ -451,148 +516,145 @@ async function submitTaskList() {
                       :color="object.isActive ? 'success' : 'neutral'"
                       variant="subtle"
                     />
+                    <UBadge :label="`${object.employeeCount} сотрудников`" color="neutral" variant="subtle" />
+                    <UBadge :label="`Задач: ${object.totalTasks}`" color="primary" variant="outline" />
                   </div>
                   <p class="text-sm text-muted">{{ object.address || object.description || 'Адрес не указан' }}</p>
                   <p class="text-xs text-muted">{{ object.code ? `Код: ${object.code}` : 'Без кода' }}</p>
                 </div>
 
-                <UButton
-                  v-if="canManageObjectTasks"
-                  icon="i-lucide-plus"
-                  label="Создать to-do"
-                  @click="openCreateModal(object)"
-                />
-              </div>
+                <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1 text-xs text-muted">
+                    <span>Открыто:</span>
+                    <UBadge :label="object.openTasks + object.inProgressTasks" color="warning" variant="soft" />
+                    <span>Закрыто:</span>
+                    <UBadge :label="object.completedTasks" color="success" variant="soft" />
+                  </div>
 
-              <div class="grid gap-3 sm:grid-cols-3">
-                <div class="rounded-xl border border-default/70 bg-default/40 p-3">
-                  <p class="text-xs uppercase tracking-wide text-muted">Сотрудники</p>
-                  <p class="mt-1 text-xl font-semibold text-highlighted">{{ object.employeeCount }}</p>
-                </div>
-                <div class="rounded-xl border border-default/70 bg-default/40 p-3">
-                  <p class="text-xs uppercase tracking-wide text-muted">В работе</p>
-                  <p class="mt-1 text-xl font-semibold text-highlighted">{{ object.openTasks + object.inProgressTasks }}</p>
-                </div>
-                <div class="rounded-xl border border-default/70 bg-default/40 p-3">
-                  <p class="text-xs uppercase tracking-wide text-muted">Закрыто</p>
-                  <p class="mt-1 text-xl font-semibold text-highlighted">{{ object.completedTasks }}</p>
-                </div>
-              </div>
-
-              <div class="space-y-2">
-                <div class="flex items-center justify-between">
-                  <p class="text-xs font-medium uppercase tracking-wide text-muted">Мобильная команда</p>
-                  <span class="text-xs text-muted">{{ object.employees.length }} чел.</span>
-                </div>
-                <div v-if="object.employees.length" class="flex flex-wrap gap-2">
-                  <UBadge
-                    v-for="employee in object.employees.slice(0, 5)"
-                    :key="employee.id"
-                    :label="`${employee.name} · @${employee.username}`"
+                  <UButton
+                    v-if="canManageObjectTasks"
+                    icon="i-lucide-plus"
                     color="neutral"
+                    variant="ghost"
+                    @click.stop="openCreateModal(object)"
+                  />
+
+                  <UButton
+                    :icon="expandedObjectId === object.id ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    aria-label="Показать сотрудников"
+                    @click.stop="toggleObject(object.id)"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <transition name="fade">
+              <div v-if="expandedObjectId === object.id" class="border-t border-default/70 bg-default/20 p-5">
+                <div class="flex flex-wrap items-center gap-3">
+                  <h4 class="text-sm font-semibold text-highlighted">Сотрудники объекта</h4>
+                  <UBadge
+                    :label="`${object.employeeInfo.filter(emp => emp.taskCount > 0).length} с задачами`"
+                    color="primary"
                     variant="subtle"
                   />
                   <UBadge
-                    v-if="object.employees.length > 5"
-                    :label="`+${object.employees.length - 5}`"
-                    color="primary"
-                    variant="soft"
+                    :label="`${object.employeeInfo.length} всего`"
+                    color="neutral"
+                    variant="subtle"
                   />
                 </div>
-                <p v-else class="text-sm text-muted">Нет сотрудников с мобильным доступом для этого объекта.</p>
-              </div>
 
-              <div class="space-y-3 border-t border-default/70 pt-4">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <p class="text-sm font-semibold text-highlighted">Последние списки задач</p>
-                    <p class="text-xs text-muted">Статус, срок и прогресс по чек-листу</p>
-                  </div>
-                  <UBadge :label="object.totalTasks" color="neutral" variant="subtle" />
-                </div>
-
-                <div v-if="object.tasks.length" class="space-y-3">
+                <div v-if="object.employeeInfo.length" class="mt-3 divide-y divide-default/70 rounded-xl border border-default/70 bg-default/30">
                   <div
-                    v-for="task in object.tasks.slice(0, 3)"
-                    :key="task.id"
-                    class="rounded-xl border border-default/70 bg-default/35 p-4"
+                    v-for="employee in object.employeeInfo"
+                    :key="employee.id"
+                    class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div class="space-y-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <p class="font-medium text-highlighted">{{ task.title }}</p>
-                          <UBadge
-                            :label="getTaskStatusLabel(task.status)"
-                            :color="getTaskStatusColor(task.status)"
-                            variant="subtle"
-                          />
-                          <UBadge
-                            v-if="isTaskOverdue(task)"
-                            label="Просрочено"
-                            color="error"
-                            variant="soft"
-                          />
-                        </div>
-                        <p class="text-sm text-muted">{{ task.employeeName }}<span v-if="task.employeeUsername"> · @{{ task.employeeUsername }}</span></p>
-                        <p v-if="task.note" class="text-sm text-toned">{{ task.note }}</p>
+                    <div class="space-y-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="font-medium text-highlighted">{{ employee.name }}</span>
+                        <UBadge :label="`@${employee.username}`" color="neutral" variant="subtle" />
+                        <UBadge
+                          :label="employee.taskCount ? `Задач: ${employee.taskCount}` : 'Без задач'"
+                          :color="employee.taskCount ? 'primary' : 'neutral'"
+                          variant="soft"
+                        />
+                        <UBadge
+                          v-if="employee.hasOpenTasks"
+                          label="Есть открытые"
+                          color="warning"
+                          variant="outline"
+                        />
                       </div>
-
-                      <div class="text-left text-xs text-muted sm:text-right">
-                        <p>Срок: {{ formatDate(task.dueDate) }}</p>
-                        <p>Обновлено: {{ formatDateTime(task.updatedAt || task.createdAt) }}</p>
-                      </div>
+                      <p class="text-xs text-muted">
+                        {{ employee.phone || 'Телефон не указан' }} · Статус: {{ employee.status || '—' }}
+                      </p>
                     </div>
 
-                    <div class="mt-3 space-y-2">
-                      <div class="flex items-center justify-between text-xs text-muted">
+                    <div class="text-right text-xs text-muted w-full sm:w-52">
+                      <p v-if="employee.recentCompletion">Последняя активность: {{ formatDateTime(employee.recentCompletion) }}</p>
+                      <p v-else>Активность не найдена</p>
+                    </div>
+                  </div>
+                </div>
+                <p v-else class="mt-3 text-sm text-muted">У объекта нет сотрудников с мобильным доступом.</p>
+
+                <div class="mt-4 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm font-semibold text-highlighted">Недавние задачи</p>
+                    <UBadge :label="object.totalTasks" color="neutral" variant="subtle" />
+                  </div>
+
+                  <div v-if="object.tasks.length" class="space-y-2">
+                    <div
+                      v-for="task in object.tasks.slice(0, 4)"
+                      :key="task.id"
+                      class="rounded-xl border border-default/70 bg-default/35 p-4"
+                    >
+                      <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="space-y-1">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <p class="font-medium text-highlighted">{{ task.title }}</p>
+                            <UBadge
+                              :label="getTaskStatusLabel(task.status)"
+                              :color="getTaskStatusColor(task.status)"
+                              variant="subtle"
+                            />
+                            <UBadge
+                              v-if="isTaskOverdue(task)"
+                              label="Просрочено"
+                              color="error"
+                              variant="soft"
+                            />
+                          </div>
+                          <p class="text-sm text-muted">
+                            {{ task.employeeName }}<span v-if="task.employeeUsername"> · @{{ task.employeeUsername }}</span>
+                          </p>
+                          <p v-if="task.note" class="text-sm text-toned">{{ task.note }}</p>
+                        </div>
+
+                        <div class="text-left text-xs text-muted sm:text-right">
+                          <p>Срок: {{ formatDate(task.dueDate) }}</p>
+                          <p>Обновлено: {{ formatDateTime(task.updatedAt || task.createdAt) }}</p>
+                        </div>
+                      </div>
+
+                      <div class="mt-3 flex items-center justify-between text-xs text-muted">
                         <span>Прогресс</span>
                         <span>{{ task.completedItems }}/{{ task.totalItems }}</span>
                       </div>
                       <div class="h-2 overflow-hidden rounded-full bg-default/70">
                         <div class="h-full rounded-full bg-primary transition-all" :style="{ width: `${task.progressPercent}%` }" />
                       </div>
-                      <ul class="space-y-1 pt-1 text-sm text-muted">
-                        <li
-                          v-for="item in task.items.slice(0, 3)"
-                          :key="item.id"
-                          class="flex items-center gap-3"
-                        >
-                          <span :class="item.isDone ? 'text-success' : 'text-muted'">
-                            {{ item.isDone ? '[x]' : '[ ]' }}
-                          </span>
-                          <div class="flex flex-col gap-1">
-                            <span :class="item.isDone ? 'line-through text-muted' : 'text-toned'">
-                              {{ item.title }}
-                            </span>
-                            <a
-                              v-if="item.proofPhotoUrl"
-                              :href="item.proofPhotoUrl"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              class="block max-w-[180px]"
-                            >
-                              <img
-                                :src="item.proofPhotoUrl"
-                                alt="Фото выполнения"
-                                class="w-full rounded-md border border-default object-cover"
-                              />
-                            </a>
-                          </div>
-                        </li>
-                      </ul>
                     </div>
                   </div>
-
-                  <p v-if="object.tasks.length > 3" class="text-xs text-muted">
-                    Еще {{ object.tasks.length - 3 }} списк{{ object.tasks.length - 3 === 1 ? 'а' : 'ов' }} задач на объекте.
-                  </p>
-                </div>
-
-                <div v-else class="rounded-xl border border-dashed border-default/70 bg-default/20 p-4 text-sm text-muted">
-                  Для этого объекта еще не назначены to-do листы.
+                  <p v-else class="text-sm text-muted">Для этого объекта еще не назначены to-do листы.</p>
                 </div>
               </div>
-            </div>
+            </transition>
           </section>
         </div>
       </div>

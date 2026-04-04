@@ -193,6 +193,12 @@ watch(() => form.objectId, (objectId) => {
 })
 
 const expandedObjectId = ref<number | null>(null)
+const employeeModalOpen = ref(false)
+const selectedEmployee = ref<{
+  employee: ObjectTaskEmployee & { taskCount?: number, hasOpenTasks?: boolean, recentCompletion?: string | null }
+  tasks: ObjectTask[]
+  objectName: string
+} | null>(null)
 
 function toggleObject(id: number) {
   expandedObjectId.value = expandedObjectId.value === id ? null : id
@@ -249,6 +255,15 @@ const objectList = computed(() => {
     }
   })
 })
+
+function openEmployeeModal(employee: any, object: any) {
+  selectedEmployee.value = {
+    employee,
+    tasks: employee.tasks || [],
+    objectName: object.name
+  }
+  employeeModalOpen.value = true
+}
 
 function formatDate(value?: string | null) {
   if (!value) {
@@ -571,7 +586,12 @@ async function submitTaskList() {
                   <div
                     v-for="employee in object.employeeInfo"
                     :key="employee.id"
-                    class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between cursor-pointer rounded-lg hover:bg-default/50 transition-colors"
+                    role="button"
+                    tabindex="0"
+                    @click="openEmployeeModal(employee, object)"
+                    @keydown.enter.prevent="openEmployeeModal(employee, object)"
+                    @keydown.space.prevent="openEmployeeModal(employee, object)"
                   >
                     <div class="space-y-1">
                       <div class="flex flex-wrap items-center gap-2">
@@ -658,6 +678,96 @@ async function submitTaskList() {
           </section>
         </div>
       </div>
+
+      <UModal
+        v-model:open="employeeModalOpen"
+        :title="selectedEmployee ? `${selectedEmployee.employee.name} · @${selectedEmployee.employee.username}` : 'Сотрудник'"
+        :description="selectedEmployee ? `Объект: ${selectedEmployee.objectName}` : ''"
+        size="xl"
+      >
+        <template #body>
+          <div v-if="selectedEmployee" class="space-y-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <UBadge :label="selectedEmployee.employee.status || '—'" color="neutral" variant="subtle" />
+              <UBadge :label="selectedEmployee.employee.phone || 'Телефон не указан'" color="neutral" variant="subtle" />
+              <UBadge :label="`Задач: ${selectedEmployee.tasks.length}`" color="primary" variant="outline" />
+              <UBadge
+                v-if="selectedEmployee.employee.hasOpenTasks"
+                label="Есть открытые"
+                color="warning"
+                variant="soft"
+              />
+              <span v-if="selectedEmployee.employee.recentCompletion" class="text-xs text-muted">
+                Последняя активность: {{ formatDateTime(selectedEmployee.employee.recentCompletion) }}
+              </span>
+            </div>
+
+            <div v-if="selectedEmployee.tasks.length" class="space-y-3">
+              <div
+                v-for="task in selectedEmployee.tasks"
+                :key="task.id"
+                class="rounded-xl border border-default/70 bg-default/30 p-4"
+              >
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div class="space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <p class="font-medium text-highlighted">{{ task.title }}</p>
+                      <UBadge
+                        :label="getTaskStatusLabel(task.status)"
+                        :color="getTaskStatusColor(task.status)"
+                        variant="subtle"
+                      />
+                      <UBadge
+                        v-if="isTaskOverdue(task)"
+                        label="Просрочено"
+                        color="error"
+                        variant="soft"
+                      />
+                    </div>
+                    <p class="text-xs text-muted">Срок: {{ formatDate(task.dueDate) }} · Обновлено: {{ formatDateTime(task.updatedAt || task.createdAt) }}</p>
+                    <p v-if="task.note" class="text-sm text-toned">{{ task.note }}</p>
+                  </div>
+                  <div class="text-xs text-muted text-right">
+                    <p>Прогресс: {{ task.completedItems }}/{{ task.totalItems }}</p>
+                    <div class="mt-1 h-2 overflow-hidden rounded-full bg-default/70 w-36">
+                      <div class="h-full rounded-full bg-primary transition-all" :style="{ width: `${task.progressPercent}%` }" />
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="task.items?.length" class="mt-3 space-y-2">
+                  <div
+                    v-for="item in task.items"
+                    :key="item.id"
+                    class="rounded-lg border border-default/60 bg-default/20 p-3 text-sm text-muted"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span :class="item.isDone ? 'text-success line-through' : 'text-toned'">
+                        {{ item.title }}
+                      </span>
+                      <span :class="item.isDone ? 'text-success' : 'text-muted'">{{ item.isDone ? 'Выполнено' : 'Открыто' }}</span>
+                    </div>
+                    <div v-if="item.proofPhotoUrls?.length" class="mt-2 flex flex-wrap gap-2">
+                      <a
+                        v-for="(photo, idx) in item.proofPhotoUrls"
+                        :key="`${item.id}-${idx}`"
+                        :href="photo"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="block w-20 h-20 overflow-hidden rounded-md border border-default"
+                      >
+                        <img :src="photo" alt="Доказательство" class="h-full w-full object-cover" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p v-else class="text-sm text-muted">У сотрудника пока нет назначенных задач.</p>
+          </div>
+          <div v-else class="text-sm text-muted">Выберите сотрудника из списка.</div>
+        </template>
+      </UModal>
 
       <UModal
         v-model:open="createModalOpen"

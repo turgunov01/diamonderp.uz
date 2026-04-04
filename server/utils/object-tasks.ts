@@ -71,6 +71,8 @@ export interface ObjectTaskItemRecord {
   completedAt: string | null
   sortOrder: number
   proofPhotoUrl: string | null
+  proofPhotoUrls: string[]
+  images: string[]
 }
 
 export interface ObjectTaskRecord {
@@ -151,11 +153,11 @@ interface UpdateObjectTaskItemCompletionInput {
   itemId: number
   employeeId: number
   done: boolean
-  photoFile?: {
+  photoFiles?: {
     filename?: string
     type?: string
     data: Uint8Array
-  }
+  }[]
 }
 
 const TASK_MANAGER_ROLES: AuthRole[] = ['admin', 'procurement']
@@ -389,7 +391,24 @@ function mapEmployeeRow(row: TaskCustomerRow): ObjectTaskEmployeeRecord {
 function mapTaskItemRow(row: ObjectTaskItemDbRow): ObjectTaskItemRecord {
   const { url, taskPhotoBucket } = getSupabaseServerConfig()
   const base = url.replace(/\/+$/, '')
-  const photoPath = row.proof_photo_path || null
+  const raw = row.proof_photo_path || null
+  let paths: string[] = []
+
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        paths = parsed.filter((p): p is string => typeof p === 'string' && p.trim().length)
+      } else if (typeof parsed === 'string' && parsed.trim()) {
+        paths = [parsed.trim()]
+      }
+    } catch {
+      paths = [raw]
+    }
+  }
+
+  const proofPhotoUrls = paths.map(path => `${base}/storage/v1/object/public/${taskPhotoBucket}/${encodeStoragePath(path)}`)
+
   return {
     id: row.id,
     taskListId: row.task_list_id,
@@ -397,9 +416,9 @@ function mapTaskItemRow(row: ObjectTaskItemDbRow): ObjectTaskItemRecord {
     isDone: row.is_done === true,
     completedAt: row.completed_at || null,
     sortOrder: row.sort_order ?? 0,
-    proofPhotoUrl: photoPath
-      ? `${base}/storage/v1/object/public/${taskPhotoBucket}/${encodeStoragePath(photoPath)}`
-      : null
+    proofPhotoUrl: proofPhotoUrls[0] || null,
+    proofPhotoUrls,
+    images: proofPhotoUrls
   }
 }
 
@@ -893,17 +912,28 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   const headers = getSupabaseServerHeaders(serviceRoleKey)
   const now = new Date().toISOString()
 
+  const existingPaths = (() => {
+    try {
+      const parsed = existingItem.proof_photo_path ? JSON.parse(existingItem.proof_photo_path) : []
+      if (Array.isArray(parsed)) return parsed.filter((p: unknown) => typeof p === 'string' && p.trim().length)
+      if (typeof parsed === 'string' && parsed.trim()) return [parsed.trim()]
+      return []
+    } catch {
+      return existingItem.proof_photo_path ? [existingItem.proof_photo_path] : []
+    }
+  })()
+
   const isCompleting = input.done === true && existingItem.is_done !== true
-  if (isCompleting && !input.photoFile && !existingItem.proof_photo_path) {
+  if (isCompleting && (!input.photoFiles || !input.photoFiles.length) && !existingPaths.length) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Photo is required to complete this item.'
     })
   }
 
-  let proofPhotoPath = existingItem.proof_photo_path || null
+  let proofPhotoPaths = [...existingPaths]
 
-  if (input.photoFile) {
+  if (input.photoFiles?.length) {
     const { taskPhotoBucket } = getSupabaseServerConfig()
     await ensureStorageBucket({
       url,
@@ -912,18 +942,22 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
       isPublic: true
     })
 
-    const safeName = sanitizeFileName(input.photoFile.filename || 'task-proof')
-    const uniqueId = `${taskId}-${itemId}-${Date.now()}`
-    proofPhotoPath = `${employeeId}/tasks/${uniqueId}-${safeName}`
+    for (const file of input.photoFiles) {
+      const safeName = sanitizeFileName(file.filename || 'task-proof')
+      const uniqueId = `${taskId}-${itemId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const proofPath = `${employeeId}/tasks/${uniqueId}-${safeName}`
 
-    await uploadStorageObject({
-      url,
-      serviceRoleKey,
-      bucket: taskPhotoBucket,
-      path: proofPhotoPath,
-      data: input.photoFile.data,
-      contentType: input.photoFile.type || 'application/octet-stream'
-    })
+      await uploadStorageObject({
+        url,
+        serviceRoleKey,
+        bucket: taskPhotoBucket,
+        path: proofPath,
+        data: file.data,
+        contentType: file.type || 'application/octet-stream'
+      })
+
+      proofPhotoPaths.push(proofPath)
+    }
   }
 
   const [updatedItem] = await $fetch<ObjectTaskItemDbRow[]>(`${url}/rest/v1/object_task_items`, {
@@ -940,7 +974,7 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
       is_done: input.done,
       completed_at: input.done ? now : null,
       updated_at: now,
-      proof_photo_path: proofPhotoPath
+      proof_photo_path: proofPhotoPaths.length ? JSON.stringify(proofPhotoPaths) : null
     }
   })
 

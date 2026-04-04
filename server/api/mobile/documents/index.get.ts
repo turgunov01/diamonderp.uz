@@ -62,35 +62,109 @@ export default eventHandler(async (event) => {
   const headers = getSupabaseServerHeaders(serviceRoleKey)
   const objectFilter = buildEqOrInFilter(objectIds)
 
-  const [templateRows, dispatchRows, signedRows] = await Promise.all([
-    fetchRowsOrEmpty<DocumentTemplateDbRow>(() => $fetch<DocumentTemplateDbRow[]>(`${url}/rest/v1/document_templates`, {
-      headers,
-      query: {
-        select: 'id,object_id,name,description,contract_type,html,css,storage_path,created_at,updated_at',
-        object_id: objectFilter,
-        order: 'id.desc'
-      }
-    })),
+  const customerId = access.customer?.id
+  const rawPhone = (access.user.phone || '').trim()
+  const currentPhone = normalizePhone(access.user.phone)
+  const objectFilterForOr = objectIds.length === 1
+    ? `object_id.eq.${objectIds[0]}`
+    : `object_id.in.${encodeIn(objectIds)}`
+
+  const dispatchQuery: Record<string, string> = {
+    select: 'id,object_id,template_id,title,recipient_ids,recipient_phones,recipient_count,signed_count,status,sent_at',
+    order: 'id.desc'
+  }
+
+  if (frontlineAccess) {
+    const orFilters: string[] = []
+    if (objectIds.length) {
+      orFilters.push(objectFilterForOr)
+    }
+    if (typeof customerId === 'number') {
+      orFilters.push(`recipient_ids.cs.{${customerId}}`)
+    }
+    if (currentPhone) {
+      orFilters.push(`recipient_phones.cs.{${currentPhone}}`)
+    }
+    if (rawPhone) {
+      orFilters.push(`recipient_phones.cs.{${rawPhone}}`)
+    }
+    if (orFilters.length) {
+      dispatchQuery.or = `(${orFilters.join(',')})`
+    }
+  } else {
+    dispatchQuery.object_id = objectFilter
+  }
+
+  const signedQuery: Record<string, string> = {
+    select: 'id,object_id,dispatch_id,template_id,employee_name,phone_number,signed_at,signed_via,file_url,signature_path',
+    order: 'signed_at.desc'
+  }
+
+  if (frontlineAccess) {
+    const orFilters: string[] = []
+    if (objectIds.length) {
+      orFilters.push(objectFilterForOr)
+    }
+    if (currentPhone) {
+      orFilters.push(`phone_number.eq.${currentPhone}`)
+    }
+    if (rawPhone) {
+      orFilters.push(`phone_number.eq.${rawPhone}`)
+    }
+    if (orFilters.length) {
+      signedQuery.or = `(${orFilters.join(',')})`
+    }
+  } else {
+    signedQuery.object_id = objectFilter
+  }
+
+  const [dispatchRows, signedRows] = await Promise.all([
     fetchRowsOrEmpty<DocumentDispatchDbRow>(() => $fetch<DocumentDispatchDbRow[]>(`${url}/rest/v1/document_dispatches`, {
       headers,
-      query: {
-        select: 'id,object_id,template_id,title,recipient_ids,recipient_phones,recipient_count,signed_count,status,sent_at',
-        object_id: objectFilter,
-        order: 'id.desc'
-      }
+      query: dispatchQuery
     })),
     fetchRowsOrEmpty<SignedDocumentDbRow>(() => $fetch<SignedDocumentDbRow[]>(`${url}/rest/v1/signed_documents`, {
       headers,
-      query: {
-        select: 'id,object_id,dispatch_id,template_id,employee_name,phone_number,signed_at,signed_via,file_url,signature_path',
-        object_id: objectFilter,
-        order: 'signed_at.desc'
-      }
+      query: signedQuery
     }))
   ])
 
-  const customerId = access.customer?.id
-  const currentPhone = normalizePhone(access.user.phone)
+  const templateIdsFromRows = new Set<number>()
+  dispatchRows.forEach(row => {
+    if (Number.isInteger(row.template_id) && (row.template_id ?? 0) > 0) {
+      templateIdsFromRows.add(row.template_id as number)
+    }
+  })
+  signedRows.forEach(row => {
+    if (Number.isInteger(row.template_id) && (row.template_id ?? 0) > 0) {
+      templateIdsFromRows.add(row.template_id as number)
+    }
+  })
+
+  const templateQuery: Record<string, string> = {
+    select: 'id,object_id,name,description,contract_type,html,css,storage_path,created_at,updated_at',
+    order: 'id.desc'
+  }
+
+  if (frontlineAccess) {
+    const orFilters: string[] = []
+    if (objectIds.length) {
+      orFilters.push(objectFilterForOr)
+    }
+    if (templateIdsFromRows.size) {
+      orFilters.push(`id.in.${encodeIn(Array.from(templateIdsFromRows))}`)
+    }
+    if (orFilters.length) {
+      templateQuery.or = `(${orFilters.join(',')})`
+    }
+  } else {
+    templateQuery.object_id = objectFilter
+  }
+
+  const templateRows = await fetchRowsOrEmpty<DocumentTemplateDbRow>(() => $fetch<DocumentTemplateDbRow[]>(`${url}/rest/v1/document_templates`, {
+    headers,
+    query: templateQuery
+  }))
 
   const visibleDispatchRows = frontlineAccess
     ? dispatchRows.filter((row) => {

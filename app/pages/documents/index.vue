@@ -241,17 +241,23 @@ const templateSelectItems = computed(() => {
 })
 
 const availableCustomers = computed(() => {
+  const list = customers.value || []
   if (!objectName.value) {
-    return customers.value || []
+    return list
   }
 
-  return (customers.value || []).filter((customer) => {
-    if (customer.objectPinned === objectName.value) {
-      return true
-    }
-
-    return customer.objectPositions.includes(objectName.value)
+  const preferred = list.filter((customer) => {
+    const pinned = (customer.objectPinned || '').trim()
+    const positions = customer.objectPositions || []
+    return pinned === objectName.value || positions.includes(objectName.value)
   })
+
+  if (!preferred.length) {
+    return list
+  }
+
+  const preferredIds = new Set(preferred.map(customer => customer.id))
+  return [...preferred, ...list.filter(customer => !preferredIds.has(customer.id))]
 })
 
 const customerSelectItems = computed(() => {

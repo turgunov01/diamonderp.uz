@@ -87,8 +87,8 @@ export function isFrontlineMobileRole(role: AuthRole): role is 'customer' | 'cle
 }
 
 export function isFrontlineMobileAccess(
-  context: Pick<MobileAccessContext, 'role' | 'customer'>
-) {
+  context: MobileAccessContext
+): context is MobileAccessContext & { role: 'customer' | 'cleaner', customer: CustomerProfileRow } {
   return Boolean(context.customer) && isFrontlineMobileRole(context.role)
 }
 
@@ -142,7 +142,7 @@ async function buildCustomerAccess(customer: CustomerProfileRow, payload: Verifi
   const buildingObjects = await fetchObjectsByBuilding(customer.building_id ?? null)
   const objects = allowedObjectNames.length
     ? buildingObjects.filter(object => allowedObjectNames.includes(object.name.trim()))
-    : []
+    : (isFrontlineMobileRole(user.role) ? [] : buildingObjects)
 
   return {
     source: user.role,

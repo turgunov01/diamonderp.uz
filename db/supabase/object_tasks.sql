@@ -8,6 +8,11 @@ create table if not exists public.object_task_lists (
   note text,
   due_date date,
   status text not null default 'open' check (status in ('open', 'in_progress', 'completed')),
+  review_status text not null default 'none' check (review_status in ('none', 'pending', 'approved', 'rejected')),
+  reviewer_id bigint references public.customers(id) on delete set null,
+  review_requested_at timestamptz,
+  reviewed_at timestamptz,
+  review_comment text,
   created_by_id bigint,
   created_by_name text,
   created_by_role text,
@@ -34,11 +39,25 @@ alter table public.object_task_lists
   add column if not exists note text,
   add column if not exists due_date date,
   add column if not exists status text not null default 'open',
+  add column if not exists review_status text not null default 'none',
+  add column if not exists reviewer_id bigint references public.customers(id) on delete set null,
+  add column if not exists review_requested_at timestamptz,
+  add column if not exists reviewed_at timestamptz,
+  add column if not exists review_comment text,
   add column if not exists created_by_id bigint,
   add column if not exists created_by_name text,
   add column if not exists created_by_role text,
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists updated_at timestamptz not null default now();
+
+do $$
+begin
+  alter table public.object_task_lists
+    add constraint object_task_lists_review_status_check
+    check (review_status in ('none', 'pending', 'approved', 'rejected'));
+exception
+  when duplicate_object then null;
+end $$;
 
 alter table public.object_task_items
   add column if not exists task_list_id bigint references public.object_task_lists(id) on delete cascade,
@@ -54,6 +73,9 @@ create index if not exists object_task_lists_object_id_idx on public.object_task
 create index if not exists object_task_lists_employee_id_idx on public.object_task_lists(employee_id);
 create index if not exists object_task_lists_status_idx on public.object_task_lists(status);
 create index if not exists object_task_lists_due_date_idx on public.object_task_lists(due_date);
+create index if not exists object_task_lists_review_status_idx on public.object_task_lists(review_status);
+create index if not exists object_task_lists_reviewer_id_idx on public.object_task_lists(reviewer_id);
+create index if not exists object_task_lists_review_requested_at_idx on public.object_task_lists(review_requested_at);
 create index if not exists object_task_items_task_list_id_idx on public.object_task_items(task_list_id);
 create index if not exists object_task_items_is_done_idx on public.object_task_items(is_done);
 create index if not exists object_task_items_proof_photo_path_idx on public.object_task_items(proof_photo_path);

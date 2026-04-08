@@ -33,6 +33,11 @@ interface ObjectTaskListDbRow {
   note?: string | null
   due_date?: string | null
   status?: string | null
+  review_status?: string | null
+  reviewer_id?: number | null
+  review_requested_at?: string | null
+  reviewed_at?: string | null
+  review_comment?: string | null
   created_by_id?: number | null
   created_by_name?: string | null
   created_by_role?: string | null
@@ -53,6 +58,7 @@ interface ObjectTaskItemDbRow {
 }
 
 export type ObjectTaskStatus = 'open' | 'in_progress' | 'completed'
+export type ObjectTaskReviewStatus = 'none' | 'pending' | 'approved' | 'rejected'
 
 export interface ObjectTaskEmployeeRecord {
   id: number
@@ -88,6 +94,11 @@ export interface ObjectTaskRecord {
   note: string | null
   dueDate: string | null
   status: ObjectTaskStatus
+  reviewStatus: ObjectTaskReviewStatus
+  reviewerId: number | null
+  reviewRequestedAt: string | null
+  reviewedAt: string | null
+  reviewComment: string | null
   createdById: number | null
   createdByName: string | null
   createdByRole: string | null
@@ -135,7 +146,9 @@ interface FetchTaskListOptions {
   listIds?: number[]
   objectIds?: number[]
   employeeIds?: number[]
+  reviewerIds?: number[]
   status?: ObjectTaskStatus
+  reviewStatus?: ObjectTaskReviewStatus
 }
 
 interface CreateObjectTaskListInput {
@@ -176,6 +189,18 @@ function normalizeDisplayName(customer?: TaskCustomerRow | null) {
 
 function isObjectTaskStatus(value: unknown): value is ObjectTaskStatus {
   return value === 'open' || value === 'in_progress' || value === 'completed'
+}
+
+function isObjectTaskReviewStatus(value: unknown): value is ObjectTaskReviewStatus {
+  return value === 'none' || value === 'pending' || value === 'approved' || value === 'rejected'
+}
+
+function normalizeReviewStatus(value?: string | null): ObjectTaskReviewStatus {
+  if (isObjectTaskReviewStatus(value)) {
+    return value
+  }
+
+  return 'none'
 }
 
 function parseDueDate(value?: string | null) {
@@ -398,7 +423,7 @@ function mapTaskItemRow(row: ObjectTaskItemDbRow): ObjectTaskItemRecord {
     try {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
-        paths = parsed.filter((p): p is string => typeof p === 'string' && p.trim().length)
+        paths = parsed.filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
       } else if (typeof parsed === 'string' && parsed.trim()) {
         paths = [parsed.trim()]
       }
@@ -523,9 +548,13 @@ async function fetchTaskLists(options: FetchTaskListOptions = {}) {
     return []
   }
 
+  if (options.reviewerIds && !options.reviewerIds.length) {
+    return []
+  }
+
   const { url, serviceRoleKey } = getSupabaseServerConfig()
   const query: Record<string, string> = {
-    select: 'id,object_id,employee_id,title,note,due_date,status,created_by_id,created_by_name,created_by_role,created_at,updated_at',
+    select: 'id,object_id,employee_id,title,note,due_date,status,review_status,reviewer_id,review_requested_at,reviewed_at,review_comment,created_by_id,created_by_name,created_by_role,created_at,updated_at',
     order: 'updated_at.desc'
   }
 
@@ -541,8 +570,16 @@ async function fetchTaskLists(options: FetchTaskListOptions = {}) {
     query.employee_id = `in.(${options.employeeIds.join(',')})`
   }
 
+  if (options.reviewerIds?.length) {
+    query.reviewer_id = `in.(${options.reviewerIds.join(',')})`
+  }
+
   if (options.status) {
     query.status = `eq.${options.status}`
+  }
+
+  if (options.reviewStatus) {
+    query.review_status = `eq.${options.reviewStatus}`
   }
 
   return await fetchRowsOrEmpty<ObjectTaskListDbRow>(() => $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
@@ -579,6 +616,7 @@ function buildTaskRecord(
   const completedItems = items.filter(item => item.isDone).length
   const totalItems = items.length
   const status = deriveTaskStatus(items)
+  const reviewStatus = normalizeReviewStatus(row.review_status)
 
   return {
     id: row.id,
@@ -593,6 +631,11 @@ function buildTaskRecord(
     note: row.note || null,
     dueDate: row.due_date || null,
     status,
+    reviewStatus,
+    reviewerId: row.reviewer_id ?? null,
+    reviewRequestedAt: row.review_requested_at || null,
+    reviewedAt: row.reviewed_at || null,
+    reviewComment: row.review_comment || null,
     createdById: row.created_by_id ?? null,
     createdByName: row.created_by_name || null,
     createdByRole: row.created_by_role || null,
@@ -637,6 +680,21 @@ export function parseOptionalObjectTaskStatus(value: unknown) {
   throw createError({
     statusCode: 400,
     statusMessage: 'Invalid task status.'
+  })
+}
+
+export function parseOptionalObjectTaskReviewStatus(value: unknown) {
+  if (value === undefined || value === null || value === '') {
+    return undefined
+  }
+
+  if (isObjectTaskReviewStatus(value)) {
+    return value
+  }
+
+  throw createError({
+    statusCode: 400,
+    statusMessage: 'Invalid task review status.'
   })
 }
 
@@ -860,6 +918,153 @@ export async function listEmployeeObjectTasksByObject(
   return sortTasks(taskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
 }
 
+export async function listReviewerObjectTasks(
+  reviewerId: number,
+  objectIds: number[],
+  reviewStatus: ObjectTaskReviewStatus = 'pending'
+) {
+  const normalizedReviewerId = parsePositiveInteger(reviewerId, 'reviewerId')
+  const normalizedObjectIds = Array.from(new Set(objectIds
+    .map(value => typeof value === 'number' ? value : Number(value))
+    .filter((value): value is number => Number.isInteger(value) && value > 0)))
+
+  if (!normalizedObjectIds.length) {
+    return []
+  }
+
+  const status = reviewStatus === 'pending' || reviewStatus === 'approved'
+    ? 'completed'
+    : undefined
+
+  const taskLists = await fetchTaskLists({
+    objectIds: normalizedObjectIds,
+    status,
+    reviewStatus
+  })
+
+  const visibleTaskLists = taskLists.filter((task) => {
+    if (typeof task.reviewer_id !== 'number' || !Number.isInteger(task.reviewer_id) || task.reviewer_id <= 0) {
+      return true
+    }
+
+    return task.reviewer_id === normalizedReviewerId
+  })
+
+  const taskItems = await fetchTaskItems(visibleTaskLists.map(task => task.id))
+  const employeeIds = Array.from(new Set(visibleTaskLists
+    .map(task => task.employee_id)
+    .filter((value): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0)))
+  const taskObjectIds = Array.from(new Set(visibleTaskLists
+    .map(task => task.object_id)
+    .filter((value): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0)))
+
+  const [objects, customers] = await Promise.all([
+    taskObjectIds.length ? fetchObjects({ objectIds: taskObjectIds }) : Promise.resolve([]),
+    employeeIds.length ? fetchCustomers({ customerIds: employeeIds }) : Promise.resolve([])
+  ])
+
+  const objectById = new Map(objects.map(object => [object.id, object]))
+  const customerById = new Map(customers.map(customer => [customer.id, customer]))
+  const itemsByTaskId = buildItemsMap(taskItems)
+
+  return sortTasks(visibleTaskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+}
+
+export async function listReviewerObjectTasksByObject(
+  reviewerId: number,
+  objectId: number,
+  reviewStatus: ObjectTaskReviewStatus = 'pending'
+) {
+  const normalizedReviewerId = parsePositiveInteger(reviewerId, 'reviewerId')
+  const normalizedObjectId = parsePositiveInteger(objectId, 'objectId')
+  const status = reviewStatus === 'pending' || reviewStatus === 'approved'
+    ? 'completed'
+    : undefined
+
+  const taskLists = await fetchTaskLists({
+    objectIds: [normalizedObjectId],
+    status,
+    reviewStatus
+  })
+
+  const visibleTaskLists = taskLists.filter((task) => {
+    if (typeof task.reviewer_id !== 'number' || !Number.isInteger(task.reviewer_id) || task.reviewer_id <= 0) {
+      return true
+    }
+
+    return task.reviewer_id === normalizedReviewerId
+  })
+
+  const taskItems = await fetchTaskItems(visibleTaskLists.map(task => task.id))
+  const employeeIds = Array.from(new Set(visibleTaskLists
+    .map(task => task.employee_id)
+    .filter((value): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0)))
+  const objects = await fetchObjects({ objectIds: [normalizedObjectId] })
+
+  if (!objects.length) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Object not found.'
+    })
+  }
+
+  const customers = employeeIds.length ? await fetchCustomers({ customerIds: employeeIds }) : []
+  const objectById = new Map(objects.map(object => [object.id, object]))
+  const customerById = new Map(customers.map(customer => [customer.id, customer]))
+  const itemsByTaskId = buildItemsMap(taskItems)
+
+  return sortTasks(visibleTaskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+}
+
+export async function getReviewerTaskById(reviewerId: number, taskId: number) {
+  const normalizedReviewerId = parsePositiveInteger(reviewerId, 'reviewerId')
+  const normalizedTaskId = parsePositiveInteger(taskId, 'taskId')
+
+  const taskList = await fetchTaskListById(normalizedTaskId)
+  if (!taskList) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Task not found.'
+    })
+  }
+
+  const reviewStatus = normalizeReviewStatus(taskList.review_status)
+  if (reviewStatus === 'none') {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Task not found.'
+    })
+  }
+
+  if (
+    typeof taskList.reviewer_id === 'number'
+    && Number.isInteger(taskList.reviewer_id)
+    && taskList.reviewer_id > 0
+    && taskList.reviewer_id !== normalizedReviewerId
+  ) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Task review access denied.'
+    })
+  }
+
+  const [taskItems, objects, customers] = await Promise.all([
+    fetchTaskItems([normalizedTaskId]),
+    typeof taskList.object_id === 'number' && taskList.object_id > 0
+      ? fetchObjects({ objectIds: [taskList.object_id] })
+      : Promise.resolve([]),
+    typeof taskList.employee_id === 'number' && taskList.employee_id > 0
+      ? fetchCustomers({ customerIds: [taskList.employee_id] })
+      : Promise.resolve([])
+  ])
+
+  const objectById = new Map(objects.map(object => [object.id, object]))
+  const customerById = new Map(customers.map(customer => [customer.id, customer]))
+  const items = taskItems.map(mapTaskItemRow)
+
+  return buildTaskRecord(taskList, items, objectById, customerById)
+}
+
 async function fetchTaskListById(taskId: number) {
   const rows = await fetchTaskLists({ listIds: [taskId] })
   return rows[0] || null
@@ -900,6 +1105,14 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     })
   }
 
+  const reviewStatus = normalizeReviewStatus(taskList.review_status)
+  if (reviewStatus === 'pending' || reviewStatus === 'approved') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Task is locked for review.'
+    })
+  }
+
   const existingItem = await fetchTaskItem(taskId, itemId)
   if (!existingItem) {
     throw createError({
@@ -915,7 +1128,7 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   const existingPaths = (() => {
     try {
       const parsed = existingItem.proof_photo_path ? JSON.parse(existingItem.proof_photo_path) : []
-      if (Array.isArray(parsed)) return parsed.filter((p: unknown) => typeof p === 'string' && p.trim().length)
+      if (Array.isArray(parsed)) return parsed.filter((p: unknown) => typeof p === 'string' && p.trim().length > 0)
       if (typeof parsed === 'string' && parsed.trim()) return [parsed.trim()]
       return []
     } catch {
@@ -989,6 +1202,20 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   const mappedItems = allItems.map(mapTaskItemRow)
   const nextStatus = deriveTaskStatus(mappedItems)
 
+  const previousStatus = isObjectTaskStatus(taskList.status) ? taskList.status : 'open'
+  const isNewCompletion = nextStatus === 'completed' && previousStatus !== 'completed'
+  const taskListPatch: Record<string, unknown> = {
+    status: nextStatus,
+    updated_at: now
+  }
+
+  if (isNewCompletion) {
+    taskListPatch.review_status = 'pending'
+    taskListPatch.review_requested_at = now
+    taskListPatch.reviewed_at = null
+    taskListPatch.review_comment = null
+  }
+
   const [updatedTaskList] = await $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
     method: 'PATCH',
     headers: {
@@ -998,10 +1225,7 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     query: {
       id: `eq.${taskId}`
     },
-    body: {
-      status: nextStatus,
-      updated_at: now
-    }
+    body: taskListPatch
   })
 
   const [objects, customers] = await Promise.all([
@@ -1047,5 +1271,137 @@ export async function getEmployeeTaskById(employeeId: number, taskId: number) {
   const items = taskItems.map(mapTaskItemRow)
 
   return buildTaskRecord(taskList, items, objectById, customerById)
+}
+
+type ObjectTaskReviewDecision = 'approved' | 'rejected'
+
+function isReviewDecision(value: unknown): value is ObjectTaskReviewDecision {
+  return value === 'approved' || value === 'rejected'
+}
+
+export async function reviewObjectTaskList(input: {
+  taskId: number
+  reviewerId: number
+  decision: ObjectTaskReviewDecision
+  comment?: string | null
+}) {
+  const taskId = parsePositiveInteger(input.taskId, 'taskId')
+  const reviewerId = parsePositiveInteger(input.reviewerId, 'reviewerId')
+
+  if (!isReviewDecision(input.decision)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Invalid review decision.'
+    })
+  }
+
+  const comment = typeof input.comment === 'string' ? input.comment.trim() : null
+  if (input.decision === 'rejected' && !comment) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'comment is required to reject a task.'
+    })
+  }
+
+  const taskList = await fetchTaskListById(taskId)
+  if (!taskList) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Task not found.'
+    })
+  }
+
+  const reviewStatus = normalizeReviewStatus(taskList.review_status)
+  if (reviewStatus !== 'pending') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Task is not pending review.'
+    })
+  }
+
+  if (
+    typeof taskList.reviewer_id === 'number'
+    && Number.isInteger(taskList.reviewer_id)
+    && taskList.reviewer_id > 0
+    && taskList.reviewer_id !== reviewerId
+  ) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Task review access denied.'
+    })
+  }
+
+  const existingItems = await fetchTaskItems([taskId])
+  const mappedItems = existingItems.map(mapTaskItemRow)
+  const derivedStatus = deriveTaskStatus(mappedItems)
+
+  if (derivedStatus !== 'completed') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Task is not completed yet.'
+    })
+  }
+
+  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const now = new Date().toISOString()
+
+  if (input.decision === 'rejected') {
+    await $fetch(`${url}/rest/v1/object_task_items`, {
+      method: 'PATCH',
+      headers,
+      query: {
+        task_list_id: `eq.${taskId}`
+      },
+      body: {
+        is_done: false,
+        completed_at: null,
+        proof_photo_path: null,
+        updated_at: now
+      }
+    })
+  }
+
+  const patchBody: Record<string, unknown> = {
+    review_status: input.decision,
+    reviewer_id: reviewerId,
+    reviewed_at: now,
+    review_comment: comment,
+    updated_at: now
+  }
+
+  if (input.decision === 'rejected') {
+    patchBody.status = 'open'
+  }
+
+  const [updatedTaskList] = await $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
+    method: 'PATCH',
+    headers: {
+      ...headers,
+      Prefer: 'return=representation'
+    },
+    query: {
+      id: `eq.${taskId}`
+    },
+    body: patchBody
+  })
+
+  const refreshedItems = input.decision === 'rejected'
+    ? (await fetchTaskItems([taskId])).map(mapTaskItemRow)
+    : mappedItems
+
+  const [objects, customers] = await Promise.all([
+    typeof taskList.object_id === 'number' && taskList.object_id > 0
+      ? fetchObjects({ objectIds: [taskList.object_id] })
+      : Promise.resolve([]),
+    typeof taskList.employee_id === 'number' && taskList.employee_id > 0
+      ? fetchCustomers({ customerIds: [taskList.employee_id] })
+      : Promise.resolve([])
+  ])
+
+  const objectById = new Map(objects.map(object => [object.id, object]))
+  const customerById = new Map(customers.map(customer => [customer.id, customer]))
+
+  return buildTaskRecord(updatedTaskList || taskList, refreshedItems, objectById, customerById)
 }
 

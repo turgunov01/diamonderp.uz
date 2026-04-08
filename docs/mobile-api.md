@@ -507,11 +507,15 @@ Query params:
 
 ### GET `/api/mobile/tasks`
 
-Возвращает to-do листы, назначенные текущему сотруднику.
+Возвращает to-do листы:
+
+- для `role=customer|cleaner`: задачи, назначенные сотруднику
+- для `role=manager`: задачи на проверку (после завершения клинером)
 
 Query params:
 
-- `status` — опционально: `open`, `in_progress`, `completed`
+- `status` — опционально: `open`, `in_progress`, `completed` (для `customer|cleaner`)
+- `reviewStatus` — опционально: `pending`, `approved`, `rejected` (для `manager`, default: `pending`)
 
 Пример:
 
@@ -600,6 +604,32 @@ Content-Type: application/json
   }
 }
 ```
+
+### POST `/api/mobile/tasks/:taskId/review` (или `PATCH`)
+
+Доступ: `role=manager`.
+
+Body:
+
+```json
+{
+  "decision": "approved"
+}
+```
+
+или
+
+```json
+{
+  "decision": "rejected",
+  "comment": "Недостаточная фотофиксация, переделать."
+}
+```
+
+Поведение:
+
+- `approved`: фиксирует проверку, задача остаётся `completed` и получает `reviewStatus=approved`
+- `rejected`: возвращает задачу клинеру (чек-лист сбрасывается, `status=open`, `reviewStatus=rejected`)
 
 ## Рекомендуемый Flow Для Мобильного Приложения
 

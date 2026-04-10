@@ -57,7 +57,7 @@ const links: SidebarLinks = [
         {
           label: 'Задачи',
           to: '/objects/tasks',
-          exact: true
+          exact: false
         }
       ]
     },
@@ -141,5 +141,5 @@ function parseSession(event: H3Event) {
 export default eventHandler<SidebarLinks>((event) => {
   const session = parseSession(event)
 
-  return links.map(group => filterNavigationItemsByRole(group as any, session?.role ?? null) as NavigationMenuItem[])
+  return links.map(group => filterNavigationItemsByRole<NavigationMenuItem>(group, session?.role ?? null))
 })

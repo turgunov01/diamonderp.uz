@@ -698,7 +698,7 @@ export function parseOptionalObjectTaskReviewStatus(value: unknown) {
   })
 }
 
-export async function buildObjectTaskOverview(buildingId?: number) : Promise<ObjectTaskOverview> {
+export async function buildObjectTaskOverview(buildingId?: number): Promise<ObjectTaskOverview> {
   const objects = await fetchObjects({ buildingId })
   const objectIds = objects.map(object => object.id)
   const [customers, taskLists] = await Promise.all([
@@ -932,7 +932,7 @@ export async function listReviewerObjectTasks(
     return []
   }
 
-  const status = reviewStatus === 'pending' || reviewStatus === 'approved'
+  const status = reviewStatus === 'pending' || reviewStatus === 'approved' || reviewStatus === 'none'
     ? 'completed'
     : undefined
 
@@ -942,7 +942,20 @@ export async function listReviewerObjectTasks(
     reviewStatus
   })
 
-  const visibleTaskLists = taskLists.filter((task) => {
+  let legacyCompletedLists: ObjectTaskListDbRow[] = []
+  if (reviewStatus === 'pending') {
+    legacyCompletedLists = await fetchTaskLists({
+      objectIds: normalizedObjectIds,
+      status: 'completed',
+      reviewStatus: 'none'
+    })
+  }
+
+  const combinedLists = legacyCompletedLists.length
+    ? Array.from(new Map([...taskLists, ...legacyCompletedLists].map(row => [row.id, row])).values())
+    : taskLists
+
+  const visibleTaskLists = combinedLists.filter((task) => {
     if (typeof task.reviewer_id !== 'number' || !Number.isInteger(task.reviewer_id) || task.reviewer_id <= 0) {
       return true
     }
@@ -967,7 +980,21 @@ export async function listReviewerObjectTasks(
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
   const itemsByTaskId = buildItemsMap(taskItems)
 
-  return sortTasks(visibleTaskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+  const tasks = visibleTaskLists.map((row) => {
+    const task = buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)
+
+    if (reviewStatus === 'pending' && task.status === 'completed' && task.reviewStatus === 'none') {
+      return {
+        ...task,
+        reviewStatus: 'pending',
+        reviewRequestedAt: task.reviewRequestedAt || task.updatedAt || task.createdAt || null
+      }
+    }
+
+    return task
+  })
+
+  return sortTasks(tasks)
 }
 
 export async function listReviewerObjectTasksByObject(
@@ -977,7 +1004,7 @@ export async function listReviewerObjectTasksByObject(
 ) {
   const normalizedReviewerId = parsePositiveInteger(reviewerId, 'reviewerId')
   const normalizedObjectId = parsePositiveInteger(objectId, 'objectId')
-  const status = reviewStatus === 'pending' || reviewStatus === 'approved'
+  const status = reviewStatus === 'pending' || reviewStatus === 'approved' || reviewStatus === 'none'
     ? 'completed'
     : undefined
 
@@ -987,7 +1014,20 @@ export async function listReviewerObjectTasksByObject(
     reviewStatus
   })
 
-  const visibleTaskLists = taskLists.filter((task) => {
+  let legacyCompletedLists: ObjectTaskListDbRow[] = []
+  if (reviewStatus === 'pending') {
+    legacyCompletedLists = await fetchTaskLists({
+      objectIds: [normalizedObjectId],
+      status: 'completed',
+      reviewStatus: 'none'
+    })
+  }
+
+  const combinedLists = legacyCompletedLists.length
+    ? Array.from(new Map([...taskLists, ...legacyCompletedLists].map(row => [row.id, row])).values())
+    : taskLists
+
+  const visibleTaskLists = combinedLists.filter((task) => {
     if (typeof task.reviewer_id !== 'number' || !Number.isInteger(task.reviewer_id) || task.reviewer_id <= 0) {
       return true
     }
@@ -1013,7 +1053,21 @@ export async function listReviewerObjectTasksByObject(
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
   const itemsByTaskId = buildItemsMap(taskItems)
 
-  return sortTasks(visibleTaskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+  const tasks = visibleTaskLists.map((row) => {
+    const task = buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)
+
+    if (reviewStatus === 'pending' && task.status === 'completed' && task.reviewStatus === 'none') {
+      return {
+        ...task,
+        reviewStatus: 'pending',
+        reviewRequestedAt: task.reviewRequestedAt || task.updatedAt || task.createdAt || null
+      }
+    }
+
+    return task
+  })
+
+  return sortTasks(tasks)
 }
 
 export async function getReviewerTaskById(reviewerId: number, taskId: number) {
@@ -1022,14 +1076,6 @@ export async function getReviewerTaskById(reviewerId: number, taskId: number) {
 
   const taskList = await fetchTaskListById(normalizedTaskId)
   if (!taskList) {
-    throw createError({
-      statusCode: 404,
-      statusMessage: 'Task not found.'
-    })
-  }
-
-  const reviewStatus = normalizeReviewStatus(taskList.review_status)
-  if (reviewStatus === 'none') {
     throw createError({
       statusCode: 404,
       statusMessage: 'Task not found.'
@@ -1062,7 +1108,24 @@ export async function getReviewerTaskById(reviewerId: number, taskId: number) {
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
   const items = taskItems.map(mapTaskItemRow)
 
-  return buildTaskRecord(taskList, items, objectById, customerById)
+  const task = buildTaskRecord(taskList, items, objectById, customerById)
+
+  if (task.reviewStatus === 'none') {
+    if (task.status !== 'completed') {
+      throw createError({
+        statusCode: 404,
+        statusMessage: 'Task not found.'
+      })
+    }
+
+    return {
+      ...task,
+      reviewStatus: 'pending',
+      reviewRequestedAt: task.reviewRequestedAt || task.updatedAt || task.createdAt || null
+    }
+  }
+
+  return task
 }
 
 async function fetchTaskListById(taskId: number) {
@@ -1144,7 +1207,7 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     })
   }
 
-  let proofPhotoPaths = [...existingPaths]
+  const proofPhotoPaths = [...existingPaths]
 
   if (input.photoFiles?.length) {
     const { taskPhotoBucket } = getSupabaseServerConfig()
@@ -1312,7 +1375,7 @@ export async function reviewObjectTaskList(input: {
   }
 
   const reviewStatus = normalizeReviewStatus(taskList.review_status)
-  if (reviewStatus !== 'pending') {
+  if (reviewStatus !== 'pending' && reviewStatus !== 'none') {
     throw createError({
       statusCode: 409,
       statusMessage: 'Task is not pending review.'
@@ -1370,6 +1433,10 @@ export async function reviewObjectTaskList(input: {
     updated_at: now
   }
 
+  if (reviewStatus === 'none' && !taskList.review_requested_at) {
+    patchBody.review_requested_at = now
+  }
+
   if (input.decision === 'rejected') {
     patchBody.status = 'open'
   }
@@ -1404,4 +1471,3 @@ export async function reviewObjectTaskList(input: {
 
   return buildTaskRecord(updatedTaskList || taskList, refreshedItems, objectById, customerById)
 }
-

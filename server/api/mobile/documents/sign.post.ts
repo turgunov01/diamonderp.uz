@@ -87,7 +87,9 @@ async function parseMultipartBody(event: H3Event): Promise<MobileSignBody> {
     if (part.name && part.data && (part.type === 'file' || part.filename)) {
       if (!fileBuffer) {
         fileBuffer = part.data
-        fileType = (part.type && part.type !== 'file') ? part.type : (part as any).mimetype || 'application/octet-stream'
+        const partWithMime = part as { mimetype?: unknown }
+        const mimeType = typeof partWithMime.mimetype === 'string' ? partWithMime.mimetype : undefined
+        fileType = (part.type && part.type !== 'file') ? part.type : (mimeType || 'application/octet-stream')
       }
       continue
     }
@@ -219,16 +221,16 @@ export default eventHandler(async (event) => {
     })
   }
 
-  if (!dispatch.object_id || !access.objectIds.includes(dispatch.object_id)) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Dispatch object access denied.'
-    })
-  }
-
   const currentPhone = normalizePhone(access.user.phone)
   const assignedToCurrentUser = (dispatch.recipient_ids || []).includes(access.customer.id)
     || (dispatch.recipient_phones || []).some(phone => normalizePhone(phone) === currentPhone)
+
+  if (!dispatch.object_id) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Dispatch object is missing.'
+    })
+  }
 
   if (!assignedToCurrentUser) {
     throw createError({

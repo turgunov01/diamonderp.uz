@@ -45,29 +45,36 @@ export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
   const frontlineAccess = isFrontlineMobileAccess(access)
   const requestedObjectId = parseRequestedObjectId(getQuery(event).objectId)
-  const objectIds = resolveScopedObjectIds(access, requestedObjectId)
+  const objectIds = frontlineAccess
+    ? access.objectIds
+    : resolveScopedObjectIds(access, requestedObjectId)
 
-  if (!objectIds.length) {
+  if (!objectIds.length && !frontlineAccess) {
     return {
       role: access.role,
       frontend: access.frontend,
       objectIds: [],
       templates: [],
       dispatches: [],
-      signed: []
+      signed: [],
+      documents: []
     }
   }
 
   const { url, serviceRoleKey } = getSupabaseServerConfig()
   const headers = getSupabaseServerHeaders(serviceRoleKey)
-  const objectFilter = buildEqOrInFilter(objectIds)
+
+  const objectIdsForFilter = requestedObjectId ? [requestedObjectId] : objectIds
+  const objectFilter = objectIdsForFilter.length ? buildEqOrInFilter(objectIdsForFilter) : undefined
 
   const customerId = access.customer?.id
   const rawPhone = (access.user.phone || '').trim()
   const currentPhone = normalizePhone(access.user.phone)
-  const objectFilterForOr = objectIds.length === 1
-    ? `object_id.eq.${objectIds[0]}`
-    : `object_id.in.${encodeIn(objectIds)}`
+  const objectFilterForOr = objectIdsForFilter.length === 1
+    ? `object_id.eq.${objectIdsForFilter[0]}`
+    : objectIdsForFilter.length > 1
+      ? `object_id.in.${encodeIn(objectIdsForFilter)}`
+      : undefined
 
   const dispatchQuery: Record<string, string> = {
     select: 'id,object_id,template_id,title,recipient_ids,recipient_phones,recipient_count,signed_count,status,sent_at',
@@ -76,7 +83,7 @@ export default eventHandler(async (event) => {
 
   if (frontlineAccess) {
     const orFilters: string[] = []
-    if (objectIds.length) {
+    if (objectFilterForOr) {
       orFilters.push(objectFilterForOr)
     }
     if (typeof customerId === 'number') {
@@ -92,7 +99,9 @@ export default eventHandler(async (event) => {
       dispatchQuery.or = `(${orFilters.join(',')})`
     }
   } else {
-    dispatchQuery.object_id = objectFilter
+    if (objectFilter) {
+      dispatchQuery.object_id = objectFilter
+    }
   }
 
   const signedQuery: Record<string, string> = {
@@ -102,7 +111,7 @@ export default eventHandler(async (event) => {
 
   if (frontlineAccess) {
     const orFilters: string[] = []
-    if (objectIds.length) {
+    if (objectFilterForOr) {
       orFilters.push(objectFilterForOr)
     }
     if (currentPhone) {
@@ -115,7 +124,9 @@ export default eventHandler(async (event) => {
       signedQuery.or = `(${orFilters.join(',')})`
     }
   } else {
-    signedQuery.object_id = objectFilter
+    if (objectFilter) {
+      signedQuery.object_id = objectFilter
+    }
   }
 
   const [dispatchRows, signedRows] = await Promise.all([
@@ -130,12 +141,12 @@ export default eventHandler(async (event) => {
   ])
 
   const templateIdsFromRows = new Set<number>()
-  dispatchRows.forEach(row => {
+  dispatchRows.forEach((row) => {
     if (Number.isInteger(row.template_id) && (row.template_id ?? 0) > 0) {
       templateIdsFromRows.add(row.template_id as number)
     }
   })
-  signedRows.forEach(row => {
+  signedRows.forEach((row) => {
     if (Number.isInteger(row.template_id) && (row.template_id ?? 0) > 0) {
       templateIdsFromRows.add(row.template_id as number)
     }
@@ -148,7 +159,7 @@ export default eventHandler(async (event) => {
 
   if (frontlineAccess) {
     const orFilters: string[] = []
-    if (objectIds.length) {
+    if (objectFilterForOr) {
       orFilters.push(objectFilterForOr)
     }
     if (templateIdsFromRows.size) {
@@ -158,21 +169,28 @@ export default eventHandler(async (event) => {
       templateQuery.or = `(${orFilters.join(',')})`
     }
   } else {
-    templateQuery.object_id = objectFilter
+    if (objectFilter) {
+      templateQuery.object_id = objectFilter
+    }
   }
 
-  const templateRows = await fetchRowsOrEmpty<DocumentTemplateDbRow>(() => $fetch<DocumentTemplateDbRow[]>(`${url}/rest/v1/document_templates`, {
-    headers,
-    query: templateQuery
-  }))
+  const shouldFetchTemplates = Object.prototype.hasOwnProperty.call(templateQuery, 'or')
+    || Object.prototype.hasOwnProperty.call(templateQuery, 'object_id')
+  let templateRows: DocumentTemplateDbRow[] = []
+  if (shouldFetchTemplates) {
+    templateRows = await fetchRowsOrEmpty<DocumentTemplateDbRow>(() => $fetch<DocumentTemplateDbRow[]>(`${url}/rest/v1/document_templates`, {
+      headers,
+      query: templateQuery
+    }))
+  }
 
   const visibleDispatchRows = frontlineAccess
     ? dispatchRows.filter((row) => {
-      const recipientIds = Array.isArray(row.recipient_ids) ? row.recipient_ids : []
-      const recipientPhones = Array.isArray(row.recipient_phones) ? row.recipient_phones : []
-      return (typeof customerId === 'number' && recipientIds.includes(customerId))
-        || recipientPhones.some(phone => normalizePhone(phone) === currentPhone)
-    })
+        const recipientIds = Array.isArray(row.recipient_ids) ? row.recipient_ids : []
+        const recipientPhones = Array.isArray(row.recipient_phones) ? row.recipient_phones : []
+        return (typeof customerId === 'number' && recipientIds.includes(customerId))
+          || recipientPhones.some(phone => normalizePhone(phone) === currentPhone)
+      })
     : dispatchRows
 
   const visibleSignedRows = frontlineAccess
@@ -257,6 +275,9 @@ export default eventHandler(async (event) => {
       role: access.role,
       frontend: access.frontend,
       objectIds,
+      templates,
+      dispatches,
+      signed,
       documents
     }
   }

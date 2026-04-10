@@ -33,5 +33,3 @@ export default eventHandler(async (event) => {
     items
   }
 })
-
-

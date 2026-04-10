@@ -2,11 +2,6 @@ import type { AuthRole } from '../types/auth'
 
 type AccessMatcher = (path: string) => boolean
 
-type NavigationItemLike<T> = {
-  to?: string
-  children?: T[]
-}
-
 const WEB_ROLES: AuthRole[] = ['admin', 'hr', 'procurement']
 
 function normalizePath(path: string) {
@@ -52,7 +47,7 @@ const roleAccessMatchers: Partial<Record<AuthRole, AccessMatcher[]>> = {
     exact('/inbox'),
     exact('/chats'),
     exact('/objects'),
-    exact('/objects/tasks'),
+    prefix('/objects/tasks'),
     exact('/expenses'),
     exact('/reports/aroma')
   ]

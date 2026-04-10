@@ -48,4 +48,3 @@ export default eventHandler(async (event) => {
     task: updated
   }
 })
-

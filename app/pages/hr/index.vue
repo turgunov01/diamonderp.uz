@@ -9,6 +9,7 @@ interface Customer {
   id: number
   fullName?: string
   username: string
+  role: string
   avatar: {
     src: string
   }

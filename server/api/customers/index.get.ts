@@ -6,8 +6,8 @@ export default eventHandler(async (event) => {
   const buildingIdRaw = getQuery(event).buildingId
   const buildingId = typeof buildingIdRaw === 'string' ? Number(buildingIdRaw) : NaN
 
-const query: Record<string, string> = {
-    select: 'id,building_id,full_name,username,avatar,password,phone_number,passport_file,passport_front_path,passport_back_path,age,work_shift,object_pinned,object_positions,base_salary,position_bonus,salary_currency,status,must_change_password,activated_at,archived_at,deactivation_comment',
+  const query: Record<string, string> = {
+    select: 'id,building_id,full_name,username,avatar,password,role,phone_number,passport_file,passport_front_path,passport_back_path,age,work_shift,object_pinned,object_positions,base_salary,position_bonus,salary_currency,status,must_change_password,activated_at,archived_at,deactivation_comment',
     order: 'id.asc'
   }
 
@@ -27,7 +27,7 @@ const query: Record<string, string> = {
     // Fallback for old schema if salary columns are not added yet.
     const fallbackQuery: Record<string, string> = {
       // legacy schema without building_id / salary columns
-      select: 'id,username,avatar,password,phone_number,passport_file,age,work_shift,object_pinned,object_positions',
+      select: 'id,username,avatar,password,role,phone_number,passport_file,age,work_shift,object_pinned,object_positions',
       order: 'id.asc'
     }
 

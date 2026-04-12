@@ -119,23 +119,26 @@ export default eventHandler(async (event) => {
     query: {
       select: 'id,username,phone_number,building_id,object_pinned,object_positions',
       id: `in.${encodePostgrestIn(payload.recipientIds)}`,
-      ...(currentObject.building_id ? { building_id: `eq.${currentObject.building_id}` } : {}),
+      ...(currentObject.building_id
+        ? { or: `(building_id.eq.${currentObject.building_id},building_id.is.null)` }
+        : {}),
       order: 'id.asc'
     }
   })
 
-  const eligibleCustomers = customers.filter((customer) => {
-    const pinned = (customer.object_pinned || '').trim()
-    const positions = customer.object_positions || []
-
-    return pinned === currentObject.name || positions.includes(currentObject.name)
-  })
-
-  // Если привязки по объекту не нашли, используем всех получателей в рамках текущего здания.
-  const selectedCustomers = eligibleCustomers.length ? eligibleCustomers : customers
+  const selectedCustomers = customers
 
   if (!selectedCustomers.length) {
     throw createError({ statusCode: 404, statusMessage: 'Получатели для этого объекта не найдены.' })
+  }
+
+  const foundIds = new Set(selectedCustomers.map(customer => customer.id))
+  const missingIds = payload.recipientIds.filter(id => !foundIds.has(id))
+  if (missingIds.length) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: `Не удалось найти всех получателей: ${missingIds.join(', ')}.`
+    })
   }
 
   const recipientIds = selectedCustomers.map(customer => customer.id)

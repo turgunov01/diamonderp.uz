@@ -71,7 +71,7 @@ export default eventHandler(async (event): Promise<DocumentsResponse> => {
     fetchRowsOrEmpty<SignedDocumentDbRow>(() => $fetch<SignedDocumentDbRow[]>(`${url}/rest/v1/signed_documents`, {
       headers,
       query: {
-        select: 'id,object_id,dispatch_id,template_id,employee_name,phone_number,signed_at,signed_via,file_url',
+        select: 'id,object_id,dispatch_id,template_id,employee_name,phone_number,signed_at,signed_via,file_url,signature_path',
         object_id: `eq.${objectId}`,
         order: 'signed_at.desc'
       }

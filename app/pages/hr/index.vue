@@ -4,9 +4,11 @@ import { upperFirst } from 'scule'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
 import type { EmployeeActivityRecord } from '~/stores/employeeActivity'
+import { getRoleLabel } from '~~/shared/utils/access'
 
 interface Customer {
   id: number
+  buildingId?: number | null
   fullName?: string
   username: string
   role: string
@@ -99,6 +101,7 @@ const archiveComment = ref('')
 const archivingCustomer = ref<Customer | null>(null)
 const salaryMonthSeed = useState<string>('hr-salary-month-seed', () => new Date().toISOString())
 const salaryFormulaOpen = ref(false)
+const customerPasswordVisible = ref(false)
 
 const WORK_HOURS_PER_DAY = 12
 const MINUTES_PER_HOUR = 60
@@ -366,6 +369,20 @@ watch(salaryFormulaOpen, (value) => {
 function openCustomerInfo(customer: Customer) {
   selectedCustomer.value = customer
   customerInfoOpen.value = true
+}
+
+watch(customerInfoOpen, (open) => {
+  if (open) return
+  customerPasswordVisible.value = false
+})
+
+function copyText(value: string, description: string) {
+  if (!process.client) return
+  navigator.clipboard.writeText(value)
+  toast.add({
+    title: 'Скопировано',
+    description
+  })
 }
 
 function openCustomerEdit(customer: Customer) {
@@ -1499,17 +1516,77 @@ async function saveCustomerSalary(customer: Customer) {
           <div v-if="selectedCustomer" class="space-y-4">
             <div class="flex items-center gap-3">
               <UAvatar :src="selectedCustomer.avatar.src" size="xl" />
-              <div>
+              <div class="min-w-0">
                 <p class="font-semibold text-highlighted">
-                  @{{ selectedCustomer.username }}
+                  {{ selectedCustomer.fullName || `@${selectedCustomer.username}` }}
                 </p>
                 <p class="text-sm text-muted">
-                  {{ selectedCustomer.phoneNumber }}
+                  @{{ selectedCustomer.username }} · {{ selectedCustomer.phoneNumber }}
+                </p>
+                <p class="text-xs text-muted">
+                  {{ getRoleLabel(selectedCustomer.role) }}
                 </p>
               </div>
             </div>
 
             <div class="grid gap-3 sm:grid-cols-2">
+              <div class="rounded-md border border-default p-3">
+                <p class="text-xs text-muted">
+                  ID
+                </p>
+                <div class="flex items-center justify-between gap-2">
+                  <p class="font-medium">
+                    {{ selectedCustomer.id }}
+                  </p>
+                  <UButton
+                    icon="i-lucide-copy"
+                    size="xs"
+                    color="neutral"
+                    variant="subtle"
+                    @click="copyText(String(selectedCustomer.id), 'ID скопирован в буфер обмена')"
+                  />
+                </div>
+              </div>
+              <div class="rounded-md border border-default p-3">
+                <p class="text-xs text-muted">
+                  Роль
+                </p>
+                <p class="font-medium">
+                  {{ getRoleLabel(selectedCustomer.role) }} ({{ selectedCustomer.role }})
+                </p>
+              </div>
+              <div class="rounded-md border border-default p-3">
+                <p class="text-xs text-muted">
+                  Здание
+                </p>
+                <p class="font-medium">
+                  {{
+                    selectedCustomer.buildingId
+                      ? (activeBuilding?.id === selectedCustomer.buildingId && activeBuilding?.name
+                          ? activeBuilding.name
+                          : `Здание #${selectedCustomer.buildingId}`)
+                      : '—'
+                  }}
+                </p>
+              </div>
+              <div class="rounded-md border border-default p-3">
+                <p class="text-xs text-muted">
+                  Статус
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <UBadge
+                    :label="selectedCustomer.status || 'pending'"
+                    color="neutral"
+                    variant="subtle"
+                  />
+                  <UBadge
+                    v-if="selectedCustomer.mustChangePassword"
+                    label="Смена пароля при входе"
+                    color="warning"
+                    variant="subtle"
+                  />
+                </div>
+              </div>
               <div class="rounded-md border border-default p-3">
                 <p class="text-xs text-muted">
                   Возраст
@@ -1539,8 +1616,36 @@ async function saveCustomerSalary(customer: Customer) {
                   Зарплата
                 </p>
                 <p class="font-medium">
-                  {{ formatCurrency(selectedCustomer.baseSalary + selectedCustomer.positionBonus) }}
+                  {{ formatCurrency(selectedCustomer.baseSalary) }} + {{ formatCurrency(selectedCustomer.positionBonus) }}
                 </p>
+                <p class="text-xs text-muted mt-1">
+                  Итого: {{ formatCurrency(selectedCustomer.baseSalary + selectedCustomer.positionBonus) }}
+                </p>
+              </div>
+              <div class="rounded-md border border-default p-3 sm:col-span-2">
+                <p class="text-xs text-muted mb-2">
+                  Пароль
+                </p>
+                <div class="flex items-center gap-2">
+                  <UInput
+                    :model-value="selectedCustomer.password || ''"
+                    :type="customerPasswordVisible ? 'text' : 'password'"
+                    readonly
+                    class="flex-1"
+                  />
+                  <UButton
+                    :icon="customerPasswordVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                    color="neutral"
+                    variant="subtle"
+                    @click="customerPasswordVisible = !customerPasswordVisible"
+                  />
+                  <UButton
+                    icon="i-lucide-copy"
+                    color="neutral"
+                    variant="subtle"
+                    @click="copyText(selectedCustomer.password || '', 'Пароль скопирован в буфер обмена')"
+                  />
+                </div>
               </div>
               <div class="rounded-md border border-default p-3 sm:col-span-2">
                 <p class="text-xs text-muted">

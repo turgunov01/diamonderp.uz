@@ -47,6 +47,7 @@ interface SignedDocument {
   signedAt: string
   signedVia: string
   fileUrl?: string
+  signaturePath?: string
 }
 
 interface DocumentsResponse {
@@ -85,6 +86,10 @@ const miniContent = ref('<h1>Черновик договора</h1><p>Встав
 const miniEditor = ref<HTMLElement | null>(null)
 const detailsOpen = ref(false)
 const selectedDispatchId = ref<number | null>(null)
+const signatureOpen = ref(false)
+const signatureLoading = ref(false)
+const signatureUrl = ref<string | null>(null)
+const signatureDocument = ref<SignedDocument | null>(null)
 
 const objectId = computed(() => activeObject.value?.id ?? activeObjectIdCookie.value ?? null)
 const buildingId = computed(() => activeBuilding.value?.id ?? activeBuildingIdCookie.value ?? null)
@@ -231,6 +236,13 @@ watch(objectId, () => {
   sendModalOpen.value = false
   selectedTemplateId.value = undefined
   selectedRecipientIds.value = []
+})
+
+watch(signatureOpen, (open) => {
+  if (open) return
+  signatureUrl.value = null
+  signatureDocument.value = null
+  signatureLoading.value = false
 })
 
 const templateSelectItems = computed(() => {
@@ -437,6 +449,44 @@ async function deleteTemplate(templateId: number) {
     })
   } finally {
     deletingId.value = null
+  }
+}
+
+function openSignatureExternal() {
+  if (!process.client || !signatureUrl.value) return
+  window.open(signatureUrl.value, '_blank', 'noopener,noreferrer')
+}
+
+async function openSignature(item: SignedDocument) {
+  if (!objectId.value) {
+    toast.add({ title: 'Сначала выберите объект', color: 'warning' })
+    return
+  }
+
+  if (signatureLoading.value) return
+
+  signatureDocument.value = item
+  signatureUrl.value = null
+  signatureOpen.value = true
+  signatureLoading.value = true
+
+  try {
+    const response = await $fetch<{ url: string }>(`/api/documents/signed/${item.id}/signature`, {
+      query: {
+        objectId: objectId.value
+      }
+    })
+
+    signatureUrl.value = response.url
+  } catch (fetchError: unknown) {
+    toast.add({
+      title: 'Не удалось загрузить подпись',
+      description: getErrorMessage(fetchError) || 'Проверьте API подписей и подключение к Supabase.',
+      color: 'error'
+    })
+    signatureOpen.value = false
+  } finally {
+    signatureLoading.value = false
   }
 }
 
@@ -726,18 +776,11 @@ watch(miniOpen, (open) => {
                     {{ dispatch.templateName || '-' }}
                   </td>
                   <td class="px-3 py-2">
-                    <div class="flex flex-wrap gap-1">
-                      <UBadge
-                        v-for="rec in dispatch.recipients || []"
-                        :key="rec?.id || rec?.username"
-                        :label="rec ? `@${rec.username}` : '—'"
-                        variant="subtle"
-                        color="neutral"
-                      />
-                    </div>
-                    <p class="text-xs text-muted mt-1">
-                      {{ dispatch.recipientCount }} чел.
-                    </p>
+                    <UBadge
+                      :label="dispatch.recipientCount ? `${dispatch.recipientCount} чел.` : '—'"
+                      variant="subtle"
+                      color="neutral"
+                    />
                   </td>
                   <td class="px-3 py-2">
                     {{ dispatch.signedCount }}
@@ -791,10 +834,7 @@ watch(miniOpen, (open) => {
               <div class="flex items-center gap-3 text-sm">
                 <div>
                   <span class="font-medium">Сотрудники:</span>
-                  <span v-if="dispatch.recipients?.length" class="text-muted">
-                    {{ dispatch.recipients.map(r => `@${r.username}`).join(', ') }}
-                  </span>
-                  <span v-else class="text-muted">—</span>
+                  <span class="text-muted">{{ dispatch.recipientCount ? `${dispatch.recipientCount} чел.` : '—' }}</span>
                 </div>
               </div>
               <div class="text-xs text-muted">
@@ -874,14 +914,24 @@ watch(miniOpen, (open) => {
                     {{ formatDate(item.signedAt) }}
                   </td>
                   <td class="px-3 py-2">
-                    <UButton
-                      icon="i-lucide-trash"
-                      color="error"
-                      variant="ghost"
-                      size="xs"
-                      :loading="deletingSignedId === item.id"
-                      @click.stop="deleteSignedDoc(item.id)"
-                    />
+                    <div class="flex items-center gap-1">
+                      <UButton
+                        icon="i-lucide-eye"
+                        color="neutral"
+                        variant="ghost"
+                        size="xs"
+                        :disabled="!(item.signaturePath || item.fileUrl)"
+                        @click.stop="openSignature(item)"
+                      />
+                      <UButton
+                        icon="i-lucide-trash"
+                        color="error"
+                        variant="ghost"
+                        size="xs"
+                        :loading="deletingSignedId === item.id"
+                        @click.stop="deleteSignedDoc(item.id)"
+                      />
+                    </div>
                   </td>
                 </tr>
                 <tr v-if="!documentsData.signed.length">
@@ -914,7 +964,15 @@ watch(miniOpen, (open) => {
               <p class="text-sm text-muted">
                 Подписано через: {{ item.signedVia }}
               </p>
-              <div class="flex justify-end">
+              <div class="flex justify-end gap-1">
+                <UButton
+                  icon="i-lucide-eye"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  :disabled="!(item.signaturePath || item.fileUrl)"
+                  @click.stop="openSignature(item)"
+                />
                 <UButton
                   icon="i-lucide-trash"
                   color="error"
@@ -1045,7 +1103,7 @@ watch(miniOpen, (open) => {
         v-model:open="detailsOpen"
         title="Детали отправки"
         :description="selectedDispatch ? selectedDispatch.title : 'Сведения о получателях и ходе подписания.'"
-        size="xl"
+        class="!max-w-6xl !max-h-[calc(100dvh-1rem)] sm:!max-h-[calc(100dvh-2rem)]"
       >
         <template #body>
           <div v-if="selectedDispatch" class="space-y-4">
@@ -1081,6 +1139,7 @@ watch(miniOpen, (open) => {
                       <th class="px-3 py-2 text-left">Телефон</th>
                       <th class="px-3 py-2 text-left">Подписано</th>
                       <th class="px-3 py-2 text-left">Способ</th>
+                      <th class="px-3 py-2 text-left">Подпись</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1093,6 +1152,16 @@ watch(miniOpen, (open) => {
                       <td class="px-3 py-2">{{ item.phoneNumber }}</td>
                       <td class="px-3 py-2">{{ formatDate(item.signedAt) }}</td>
                       <td class="px-3 py-2">{{ item.signedVia }}</td>
+                      <td class="px-3 py-2">
+                        <UButton
+                          icon="i-lucide-eye"
+                          color="neutral"
+                          variant="ghost"
+                          size="xs"
+                          :disabled="!(item.signaturePath || item.fileUrl)"
+                          @click.stop="openSignature(item)"
+                        />
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -1101,6 +1170,50 @@ watch(miniOpen, (open) => {
             </div>
           </div>
           <div v-else class="text-sm text-muted">Выберите отправку, чтобы увидеть детали.</div>
+        </template>
+      </UModal>
+
+      <UModal
+        v-model:open="signatureOpen"
+        title="Подпись сотрудника"
+        :description="signatureDocument ? `${signatureDocument.employeeName} · ${formatDate(signatureDocument.signedAt)}` : 'Просмотр подписи.'"
+      >
+        <template #body>
+          <div class="space-y-4">
+            <p v-if="signatureLoading" class="text-sm text-muted">
+              Загрузка подписи...
+            </p>
+
+            <div v-else-if="signatureUrl" class="rounded-lg border border-default bg-white p-3">
+              <img
+                :src="signatureUrl"
+                alt="Подпись сотрудника"
+                class="max-h-[360px] w-full object-contain"
+                loading="lazy"
+              >
+            </div>
+
+            <p v-else class="text-sm text-muted">
+              Подпись не найдена.
+            </p>
+
+            <div class="flex items-center justify-end gap-2">
+              <UButton
+                label="Закрыть"
+                color="neutral"
+                variant="subtle"
+                @click="signatureOpen = false"
+              />
+              <UButton
+                v-if="signatureUrl"
+                label="Открыть"
+                icon="i-lucide-external-link"
+                color="neutral"
+                variant="ghost"
+                @click="openSignatureExternal"
+              />
+            </div>
+          </div>
         </template>
       </UModal>
     </template>

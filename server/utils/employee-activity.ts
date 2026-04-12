@@ -2,6 +2,8 @@
 
 export type EmployeeActivityStatus = 'on_time' | 'late' | 'absent'
 
+type EmployeeWorkShift = 'day' | 'night'
+
 interface EmployeeActivityDbRow {
   id: number
   employee_id: number | null
@@ -16,6 +18,7 @@ interface ActivityCustomerRow {
   id: number
   building_id?: number | null
   username: string
+  work_shift?: EmployeeWorkShift | null
   object_pinned?: string | null
 }
 
@@ -151,6 +154,12 @@ function parseRecordedAt(value?: string | Date | null) {
   return date
 }
 
+const TASHKENT_UTC_OFFSET_HOURS = 5
+const DAY_SHIFT_START_HOUR = 9
+const DAY_SHIFT_END_HOUR = 21
+const NIGHT_SHIFT_START_HOUR = 21
+const NIGHT_SHIFT_END_HOUR = 9
+
 function getTashkentParts(value: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Tashkent',
@@ -189,21 +198,113 @@ function formatDateInTashkent(value: Date) {
   return `${parts.year}-${parts.month}-${parts.day}`
 }
 
-function buildInitialActivityStatus(recordedAt: Date) {
-  const parts = getTashkentParts(recordedAt)
-  const totalMinutes = parts.hour * 60 + parts.minute
-  const workdayStartMinutes = 9 * 60
+function normalizeWorkShift(value: unknown): EmployeeWorkShift | null {
+  return value === 'day' || value === 'night' ? value : null
+}
 
-  if (totalMinutes <= workdayStartMinutes) {
+function shiftDate(year: number, month: number, day: number, hour: number, minute = 0) {
+  return new Date(Date.UTC(year, month - 1, day, hour - TASHKENT_UTC_OFFSET_HOURS, minute, 0))
+}
+
+function addTashkentDays(input: { year: number, month: number, day: number }, offsetDays: number) {
+  const date = new Date(Date.UTC(input.year, input.month - 1, input.day))
+  date.setUTCDate(date.getUTCDate() + offsetDays)
+
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate()
+  }
+}
+
+function parseActivityDate(value: string) {
+  const normalized = value.trim()
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized)
+  if (!match) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Invalid employee activity date format.'
+    })
+  }
+
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3])
+  }
+}
+
+function getShiftStartHour(workShift: EmployeeWorkShift | null) {
+  return workShift === 'night' ? NIGHT_SHIFT_START_HOUR : DAY_SHIFT_START_HOUR
+}
+
+function getShiftEndHour(workShift: EmployeeWorkShift | null) {
+  return workShift === 'night' ? NIGHT_SHIFT_END_HOUR : DAY_SHIFT_END_HOUR
+}
+
+function buildShiftRange(activityDate: string, workShift: EmployeeWorkShift | null) {
+  const { year, month, day } = parseActivityDate(activityDate)
+  const startHour = getShiftStartHour(workShift)
+  const endHour = getShiftEndHour(workShift)
+  const startAt = shiftDate(year, month, day, startHour)
+
+  if (workShift === 'night') {
+    const nextDate = addTashkentDays({ year, month, day }, 1)
     return {
+      startAt,
+      endAt: shiftDate(nextDate.year, nextDate.month, nextDate.day, endHour)
+    }
+  }
+
+  return {
+    startAt,
+    endAt: shiftDate(year, month, day, endHour)
+  }
+}
+
+function clampDate(value: Date, from: Date, to: Date) {
+  if (value <= from) return from
+  if (value >= to) return to
+  return value
+}
+
+function buildInitialActivityStatus(recordedAt: Date, workShiftRaw?: unknown) {
+  const parts = getTashkentParts(recordedAt)
+  const workShift = normalizeWorkShift(workShiftRaw)
+
+  const year = Number(parts.year)
+  const month = Number(parts.month)
+  const day = Number(parts.day)
+
+  if ([year, month, day].some(value => Number.isNaN(value))) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to resolve Asia/Tashkent shift date parts.'
+    })
+  }
+
+  let shiftDateParts = { year, month, day }
+
+  if (workShift === 'night' && parts.hour < NIGHT_SHIFT_END_HOUR) {
+    shiftDateParts = addTashkentDays(shiftDateParts, -1)
+  }
+
+  const activityDate = `${shiftDateParts.year.toString().padStart(4, '0')}-${shiftDateParts.month.toString().padStart(2, '0')}-${shiftDateParts.day.toString().padStart(2, '0')}`
+  const shiftStartAt = shiftDate(shiftDateParts.year, shiftDateParts.month, shiftDateParts.day, getShiftStartHour(workShift))
+  const lateMinutes = Math.max(0, Math.floor((recordedAt.getTime() - shiftStartAt.getTime()) / 60000))
+
+  if (lateMinutes <= 0) {
+    return {
+      activityDate,
       status: 'on_time' as const,
       lateMinutes: 0
     }
   }
 
   return {
+    activityDate,
     status: 'late' as const,
-    lateMinutes: totalMinutes - workdayStartMinutes
+    lateMinutes
   }
 }
 
@@ -212,7 +313,7 @@ async function fetchActivityCustomer(employeeId: number) {
   const rows = await $fetch<ActivityCustomerRow[]>(`${url}/rest/v1/customers`, {
     headers: getSupabaseServerHeaders(serviceRoleKey),
     query: {
-      select: 'id,building_id,username,object_pinned',
+      select: 'id,building_id,username,work_shift,object_pinned',
       id: `eq.${employeeId}`,
       limit: '1'
     }
@@ -252,9 +353,13 @@ async function fetchExistingActivity(employeeId: number, activityDate: string) {
   return rows[0]
 }
 
-async function createActivity(employeeId: number, employeeName: string, activityDate: string, recordedAt: Date) {
+async function createActivity(
+  employeeId: number,
+  employeeName: string,
+  activityDate: string,
+  initialStatus: { status: EmployeeActivityStatus, lateMinutes: number }
+) {
   const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const initialStatus = buildInitialActivityStatus(recordedAt)
   const rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
     method: 'POST',
     headers: {
@@ -280,6 +385,31 @@ async function createActivity(employeeId: number, employeeName: string, activity
   }
 
   return createdActivity
+}
+
+async function updateActivity(activityId: number, body: Record<string, unknown>) {
+  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
+    method: 'PATCH',
+    headers: {
+      ...getSupabaseServerHeaders(serviceRoleKey),
+      Prefer: 'return=representation'
+    },
+    query: {
+      id: `eq.${activityId}`
+    },
+    body
+  })
+
+  const updatedActivity = rows[0]
+  if (!updatedActivity) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Employee activity record not found.'
+    })
+  }
+
+  return updatedActivity
 }
 
 export async function listEmployeeActivities(options: ListEmployeeActivitiesOptions = {}) {
@@ -319,8 +449,9 @@ export async function recordEmployeeActivity(input: {
   assertEmployeeId(input.employeeId)
 
   const recordedAt = parseRecordedAt(input.recordedAt)
-  const activityDate = formatDateInTashkent(recordedAt)
   const customer = await fetchActivityCustomer(input.employeeId)
+  const initialStatus = buildInitialActivityStatus(recordedAt, customer.work_shift)
+  const activityDate = initialStatus.activityDate
   const existingActivity = await fetchExistingActivity(input.employeeId, activityDate)
 
   if (existingActivity) {
@@ -334,7 +465,7 @@ export async function recordEmployeeActivity(input: {
   let createdActivity: EmployeeActivityDbRow
 
   try {
-    createdActivity = await createActivity(input.employeeId, customer.username, activityDate, recordedAt)
+    createdActivity = await createActivity(input.employeeId, customer.username, activityDate, initialStatus)
   } catch (error) {
     const duplicateActivity = await fetchExistingActivity(input.employeeId, activityDate)
 
@@ -353,6 +484,99 @@ export async function recordEmployeeActivity(input: {
     created: true,
     recordedAt: recordedAt.toISOString(),
     activity: mapEmployeeActivityDbRowToRecord(createdActivity, customer)
+  }
+}
+
+export interface FinishEmployeeWorkResult {
+  finishedAt: string
+  activity: EmployeeActivityRecord
+}
+
+export async function finishEmployeeWork(input: {
+  employeeId: number
+  finishedAt?: string | Date | null
+  employeeName?: string
+  workShift?: EmployeeWorkShift | null
+  objectPinned?: string | null
+}): Promise<FinishEmployeeWorkResult> {
+  assertEmployeeId(input.employeeId)
+
+  const finishedAt = parseRecordedAt(input.finishedAt)
+
+  const workShift = normalizeWorkShift(input.workShift)
+  const employeeName = typeof input.employeeName === 'string' && input.employeeName.trim()
+    ? input.employeeName.trim()
+    : undefined
+  const objectPinned = input.objectPinned
+
+  if (objectPinned !== undefined && !objectPinned?.trim()) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Employee is disabled and cannot record activity.'
+    })
+  }
+
+  const customer = employeeName === undefined || objectPinned === undefined || input.workShift === undefined
+    ? await fetchActivityCustomer(input.employeeId)
+    : undefined
+
+  const effectiveEmployeeName = employeeName ?? customer?.username ?? `Employee #${input.employeeId}`
+  const effectiveWorkShift = workShift ?? normalizeWorkShift(customer?.work_shift) ?? null
+
+  const parts = getTashkentParts(finishedAt)
+  const today = formatDateInTashkent(finishedAt)
+  const yesterday = (() => {
+    const y = addTashkentDays({
+      year: Number(parts.year),
+      month: Number(parts.month),
+      day: Number(parts.day)
+    }, -1)
+
+    return `${y.year.toString().padStart(4, '0')}-${y.month.toString().padStart(2, '0')}-${y.day.toString().padStart(2, '0')}`
+  })()
+
+  const prefersToday = effectiveWorkShift !== 'night' || parts.hour >= NIGHT_SHIFT_START_HOUR
+  const primaryDate = prefersToday ? today : yesterday
+  const fallbackDate = prefersToday ? yesterday : today
+
+  let activity = await fetchExistingActivity(input.employeeId, primaryDate)
+
+  if (!activity && fallbackDate !== primaryDate) {
+    activity = await fetchExistingActivity(input.employeeId, fallbackDate)
+  }
+
+  if (!activity) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Employee activity record not found for the current shift.'
+    })
+  }
+
+  const { startAt, endAt } = buildShiftRange(activity.activity_date, effectiveWorkShift)
+  const finishedAtClamped = clampDate(finishedAt, startAt, endAt)
+  const durationMinutes = Math.floor((finishedAtClamped.getTime() - startAt.getTime()) / 60000)
+  const lateMinutes = activity.late_minutes ?? 0
+
+  const workMinutes = activity.status === 'absent'
+    ? 0
+    : Math.max(0, durationMinutes - lateMinutes)
+
+  const patchBody: Record<string, unknown> = {
+    work_minutes: workMinutes
+  }
+
+  if (activity.status === 'absent') {
+    patchBody.late_minutes = 0
+  }
+
+  const updatedActivity = await updateActivity(activity.id, patchBody)
+
+  return {
+    finishedAt: finishedAt.toISOString(),
+    activity: mapEmployeeActivityDbRowToRecord(updatedActivity, {
+      id: input.employeeId,
+      username: effectiveEmployeeName
+    })
   }
 }
 

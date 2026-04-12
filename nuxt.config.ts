@@ -7,6 +7,23 @@ export default defineNuxtConfig({
     '@vueuse/nuxt'
   ],
 
+  hooks: {
+    'imports:extend'(imports) {
+      for (let index = imports.length - 1; index >= 0; index--) {
+        const item: any = imports[index]
+        const importedName = item?.as || item?.name
+
+        if (importedName !== 'options' || typeof item?.from !== 'string') {
+          continue
+        }
+
+        if (item.from.includes('@nuxt/ui') && item.from.includes('useResizable')) {
+          imports.splice(index, 1)
+        }
+      }
+    }
+  },
+
   devtools: {
     // Keep Nuxt devtools for local dev; disable in production to save build memory.
     enabled: process.env.NODE_ENV !== 'production'

@@ -151,8 +151,8 @@ Authorization: Bearer <token>
 - если `shift.shouldLogoutNow=true`, мобильное приложение может сразу завершить сессию
 - если `shift.logoutAt` не `null`, это время рекомендованного logout по текущей смене
 - статус attendance считается по `Asia/Tashkent`
-- если вход до `09:00`, будет `on_time`
-- если после `09:00`, будет `late`
+- статус `on_time`/`late` считается относительно начала смены (`09:00` для `day`, `21:00` для `night`)
+- для `night` смены `activity.date` — это дата начала смены (может быть вчера)
 
 ### GET `/api/mobile/auth/me`
 
@@ -246,6 +246,50 @@ Authorization: Bearer <token>
 - `day` считается как `09:00-21:00` по `Asia/Tashkent`
 - `night` считается как `21:00-09:00` по `Asia/Tashkent`
 - `logoutAt` заполнен только если пользователь сейчас внутри своей смены
+
+### POST `/api/mobile/activity/finish`
+
+Отмечает окончание работы сотрудника и обновляет `workMinutes` в записи attendance текущей смены.
+
+Header:
+
+```http
+Authorization: Bearer <token>
+```
+
+Body (optional):
+
+```json
+{
+  "finishedAt": "2026-03-29T16:00:00.000Z"
+}
+```
+
+Если `finishedAt` не передан — используется текущее время сервера.
+
+Ответ:
+
+```json
+{
+  "role": "customer",
+  "frontend": "employee",
+  "finishedAt": "2026-03-29T16:00:00.000Z",
+  "activity": {
+    "id": 77,
+    "employeeId": 25,
+    "employeeName": "Ali Valiyev",
+    "date": "2026-03-29",
+    "status": "late",
+    "workMinutes": 250,
+    "lateMinutes": 470
+  }
+}
+```
+
+Правила:
+
+- endpoint ищет существующую запись attendance для текущей смены (как правило, она создается при логине)
+- `workMinutes` = `max(0, minutes(shiftStart → min(finishedAt, shiftEnd)) - lateMinutes)`
 
 ## 2. Objects
 

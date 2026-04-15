@@ -6,10 +6,6 @@ import type { Period, Range } from '~/types'
 const { isNotificationsSlideoverOpen } = useDashboard()
 
 const items = [[{
-  label: 'Новая заявка',
-  icon: 'i-lucide-send',
-  to: '/inbox'
-}, {
   label: 'Новый сотрудник',
   icon: 'i-lucide-user-plus',
   to: '/hr'

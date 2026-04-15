@@ -100,6 +100,7 @@ Authorization: Bearer <token>
   "role": "customer",
   "frontend": "employee",
   "source": "customer",
+  "mustChangePassword": true,
   "access": {
     "buildingId": 3,
     "objectIds": [8, 9],
@@ -178,6 +179,7 @@ Authorization: Bearer <token>
   "role": "customer",
   "frontend": "employee",
   "source": "customer",
+  "mustChangePassword": true,
   "access": {
     "buildingId": 3,
     "objectIds": [8, 9],
@@ -206,6 +208,34 @@ Authorization: Bearer <token>
       "isActive": true
     }
   ]
+}
+```
+
+### POST `/api/mobile/auth/change-password`
+
+Меняет пароль текущего пользователя (только `customer` аккаунты) и сбрасывает флаг `mustChangePassword=false`.
+
+Header:
+
+```http
+Authorization: Bearer <token>
+```
+
+Body:
+
+```json
+{
+  "currentPassword": "12345678",
+  "newPassword": "MyNewPassword123"
+}
+```
+
+Ответ:
+
+```json
+{
+  "ok": true,
+  "mustChangePassword": false
 }
 ```
 

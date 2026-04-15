@@ -38,6 +38,7 @@ interface ObjectTaskListDbRow {
   review_requested_at?: string | null
   reviewed_at?: string | null
   review_comment?: string | null
+  review_photo_path?: string | null
   created_by_id?: number | null
   created_by_name?: string | null
   created_by_role?: string | null
@@ -99,6 +100,9 @@ export interface ObjectTaskRecord {
   reviewRequestedAt: string | null
   reviewedAt: string | null
   reviewComment: string | null
+  reviewPhotoUrl: string | null
+  reviewPhotoUrls: string[]
+  reviewImages: string[]
   createdById: number | null
   createdByName: string | null
   createdByRole: string | null
@@ -554,7 +558,7 @@ async function fetchTaskLists(options: FetchTaskListOptions = {}) {
 
   const { url, serviceRoleKey } = getSupabaseServerConfig()
   const query: Record<string, string> = {
-    select: 'id,object_id,employee_id,title,note,due_date,status,review_status,reviewer_id,review_requested_at,reviewed_at,review_comment,created_by_id,created_by_name,created_by_role,created_at,updated_at',
+    select: 'id,object_id,employee_id,title,note,due_date,status,review_status,reviewer_id,review_requested_at,reviewed_at,review_comment,review_photo_path,created_by_id,created_by_name,created_by_role,created_at,updated_at',
     order: 'updated_at.desc'
   }
 
@@ -611,12 +615,31 @@ function buildTaskRecord(
   objectById: Map<number, ReturnType<typeof mapObjectRow>>,
   employeeById: Map<number, TaskCustomerRow>
 ): ObjectTaskRecord {
+  const { url, taskPhotoBucket } = getSupabaseServerConfig()
+  const base = url.replace(/\/+$/, '')
   const object = typeof row.object_id === 'number' ? objectById.get(row.object_id) : undefined
   const employee = typeof row.employee_id === 'number' ? employeeById.get(row.employee_id) : undefined
   const completedItems = items.filter(item => item.isDone).length
   const totalItems = items.length
   const status = deriveTaskStatus(items)
   const reviewStatus = normalizeReviewStatus(row.review_status)
+  const rawReviewPhoto = row.review_photo_path || null
+  let reviewPhotoPaths: string[] = []
+
+  if (rawReviewPhoto) {
+    try {
+      const parsed = JSON.parse(rawReviewPhoto)
+      if (Array.isArray(parsed)) {
+        reviewPhotoPaths = parsed.filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+      } else if (typeof parsed === 'string' && parsed.trim()) {
+        reviewPhotoPaths = [parsed.trim()]
+      }
+    } catch {
+      reviewPhotoPaths = [rawReviewPhoto]
+    }
+  }
+
+  const reviewPhotoUrls = reviewPhotoPaths.map(path => `${base}/storage/v1/object/public/${taskPhotoBucket}/${encodeStoragePath(path)}`)
 
   return {
     id: row.id,
@@ -636,6 +659,9 @@ function buildTaskRecord(
     reviewRequestedAt: row.review_requested_at || null,
     reviewedAt: row.reviewed_at || null,
     reviewComment: row.review_comment || null,
+    reviewPhotoUrl: reviewPhotoUrls[0] || null,
+    reviewPhotoUrls,
+    reviewImages: reviewPhotoUrls,
     createdById: row.created_by_id ?? null,
     createdByName: row.created_by_name || null,
     createdByRole: row.created_by_role || null,
@@ -980,7 +1006,7 @@ export async function listReviewerObjectTasks(
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
   const itemsByTaskId = buildItemsMap(taskItems)
 
-  const tasks = visibleTaskLists.map((row) => {
+  const tasks = visibleTaskLists.map<ObjectTaskRecord>((row) => {
     const task = buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)
 
     if (reviewStatus === 'pending' && task.status === 'completed' && task.reviewStatus === 'none') {
@@ -1053,7 +1079,7 @@ export async function listReviewerObjectTasksByObject(
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
   const itemsByTaskId = buildItemsMap(taskItems)
 
-  const tasks = visibleTaskLists.map((row) => {
+  const tasks = visibleTaskLists.map<ObjectTaskRecord>((row) => {
     const task = buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)
 
     if (reviewStatus === 'pending' && task.status === 'completed' && task.reviewStatus === 'none') {
@@ -1347,6 +1373,11 @@ export async function reviewObjectTaskList(input: {
   reviewerId: number
   decision: ObjectTaskReviewDecision
   comment?: string | null
+  photoFiles?: {
+    filename?: string
+    type?: string
+    data: Uint8Array
+  }[]
 }) {
   const taskId = parsePositiveInteger(input.taskId, 'taskId')
   const reviewerId = parsePositiveInteger(input.reviewerId, 'reviewerId')
@@ -1382,6 +1413,26 @@ export async function reviewObjectTaskList(input: {
     })
   }
 
+  const existingReviewPhotoPaths = (() => {
+    try {
+      const raw = taskList.review_photo_path
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed.filter((p: unknown) => typeof p === 'string' && p.trim().length > 0)
+      if (typeof parsed === 'string' && parsed.trim()) return [parsed.trim()]
+      return []
+    } catch {
+      return taskList.review_photo_path ? [taskList.review_photo_path] : []
+    }
+  })()
+
+  if (input.decision === 'approved' && (!input.photoFiles || !input.photoFiles.length) && !existingReviewPhotoPaths.length) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Photo is required to approve a task.'
+    })
+  }
+
   if (
     typeof taskList.reviewer_id === 'number'
     && Number.isInteger(taskList.reviewer_id)
@@ -1409,6 +1460,35 @@ export async function reviewObjectTaskList(input: {
   const headers = getSupabaseServerHeaders(serviceRoleKey)
   const now = new Date().toISOString()
 
+  const reviewPhotoPaths = [...existingReviewPhotoPaths]
+
+  if (input.decision === 'approved' && input.photoFiles?.length) {
+    const { taskPhotoBucket } = getSupabaseServerConfig()
+    await ensureStorageBucket({
+      url,
+      serviceRoleKey,
+      bucket: taskPhotoBucket,
+      isPublic: true
+    })
+
+    for (const file of input.photoFiles) {
+      const safeName = sanitizeFileName(file.filename || 'task-review')
+      const uniqueId = `${taskId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const proofPath = `${reviewerId}/task-reviews/${uniqueId}-${safeName}`
+
+      await uploadStorageObject({
+        url,
+        serviceRoleKey,
+        bucket: taskPhotoBucket,
+        path: proofPath,
+        data: file.data,
+        contentType: file.type || 'application/octet-stream'
+      })
+
+      reviewPhotoPaths.push(proofPath)
+    }
+  }
+
   if (input.decision === 'rejected') {
     await $fetch(`${url}/rest/v1/object_task_items`, {
       method: 'PATCH',
@@ -1430,6 +1510,7 @@ export async function reviewObjectTaskList(input: {
     reviewer_id: reviewerId,
     reviewed_at: now,
     review_comment: comment,
+    review_photo_path: reviewPhotoPaths.length ? JSON.stringify(reviewPhotoPaths) : null,
     updated_at: now
   }
 
@@ -1439,6 +1520,7 @@ export async function reviewObjectTaskList(input: {
 
   if (input.decision === 'rejected') {
     patchBody.status = 'open'
+    patchBody.review_photo_path = null
   }
 
   const [updatedTaskList] = await $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {

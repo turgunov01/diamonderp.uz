@@ -13,6 +13,7 @@ create table if not exists public.object_task_lists (
   review_requested_at timestamptz,
   reviewed_at timestamptz,
   review_comment text,
+  review_photo_path text,
   created_by_id bigint,
   created_by_name text,
   created_by_role text,
@@ -44,6 +45,7 @@ alter table public.object_task_lists
   add column if not exists review_requested_at timestamptz,
   add column if not exists reviewed_at timestamptz,
   add column if not exists review_comment text,
+  add column if not exists review_photo_path text,
   add column if not exists created_by_id bigint,
   add column if not exists created_by_name text,
   add column if not exists created_by_role text,
@@ -76,6 +78,7 @@ create index if not exists object_task_lists_due_date_idx on public.object_task_
 create index if not exists object_task_lists_review_status_idx on public.object_task_lists(review_status);
 create index if not exists object_task_lists_reviewer_id_idx on public.object_task_lists(reviewer_id);
 create index if not exists object_task_lists_review_requested_at_idx on public.object_task_lists(review_requested_at);
+create index if not exists object_task_lists_review_photo_path_idx on public.object_task_lists(review_photo_path);
 create index if not exists object_task_items_task_list_id_idx on public.object_task_items(task_list_id);
 create index if not exists object_task_items_is_done_idx on public.object_task_items(is_done);
 create index if not exists object_task_items_proof_photo_path_idx on public.object_task_items(proof_photo_path);

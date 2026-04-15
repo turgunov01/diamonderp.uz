@@ -8,6 +8,8 @@ import {
   type WorkShift
 } from './customers'
 
+const DEFAULT_PASSWORD = '12345678'
+
 interface ImportRowError {
   row: number
   message: string
@@ -22,6 +24,7 @@ interface MultipartPart {
 
 interface SourceRow {
   buildingId?: number | string
+  fullName?: string
   username?: string
   password?: string
   phoneNumber?: string
@@ -136,6 +139,9 @@ function toStringOrNumber(value: unknown): string | number | undefined {
 
 function toRowObject(raw: Record<string, unknown>): SourceRow {
   return {
+    fullName: typeof raw.fullName === 'string'
+      ? raw.fullName
+      : (typeof raw.full_name === 'string' ? raw.full_name : undefined),
     username: typeof raw.username === 'string' ? raw.username : undefined,
     buildingId: toStringOrNumber(raw.buildingId ?? raw.building_id),
     password: typeof raw.password === 'string' ? raw.password : undefined,
@@ -176,6 +182,56 @@ function sanitizeUsername(value: string) {
     .replace(/[^a-z0-9._-]+/g, '.')
     .replace(/\.{2,}/g, '.')
     .replace(/^\.|\.$/g, '')
+}
+
+function normalizeWhitespace(value: string) {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+function transliterateToLatin(value: string) {
+  const map: Record<string, string> = {
+    а: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y',
+    к: 'k', қ: 'q', л: 'l', м: 'm', н: 'n', ң: 'ng', о: 'o', ө: 'o', п: 'p', р: 'r', с: 's', т: 't',
+    у: 'u', ұ: 'u', ү: 'u', ф: 'f', х: 'h', ҳ: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ы: 'y', э: 'e',
+    ю: 'yu', я: 'ya', ь: '', ъ: '', ў: 'o'
+  }
+
+  return value
+    .toLowerCase()
+    .split('')
+    .map(char => map[char] ?? char)
+    .join('')
+}
+
+function generateUsernameFromFullName(fullName: string) {
+  const normalized = transliterateToLatin(fullName)
+    .replace(/[^a-z0-9\s.-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
+  if (!normalized) {
+    return ''
+  }
+
+  const parts = normalized.split(' ')
+  const rawUsername = parts.length >= 2
+    ? `${parts[0]}.${parts.slice(1).join('.')}`
+    : normalized.replace(/\s+/g, '.')
+
+  return sanitizeUsername(rawUsername)
+}
+
+function reserveUniqueUsername(base: string, existing: Set<string>, seen: Set<string>) {
+  let candidate = base
+  let counter = 2
+
+  while (existing.has(candidate) || seen.has(candidate)) {
+    candidate = sanitizeUsername(`${base}.${counter}`)
+    counter++
+  }
+
+  return candidate
 }
 
 function normalizeCellValue(value: unknown) {
@@ -334,21 +390,48 @@ export default eventHandler(async (event) => {
     const rowNumber = index + 2
     const row = toRowObject(rawRow)
 
-    const usernameSource = typeof row.username === 'string' ? row.username : ''
-    const username = sanitizeUsername(usernameSource)
-    if (!username || username.length < 3) {
-      errors.push({ row: rowNumber, message: 'username is required and must be at least 3 chars.' })
-      return
+    const usernameSourceRaw = typeof row.username === 'string' ? row.username : ''
+    const usernameSource = normalizeWhitespace(usernameSourceRaw)
+    const providedUsername = sanitizeUsername(usernameSource)
+    const fullNameSource = typeof row.fullName === 'string' ? normalizeWhitespace(row.fullName) : ''
+
+    const usernameLooksLikeFullName = Boolean(
+      !fullNameSource
+      && usernameSource
+      && (
+        usernameSource.includes(' ')
+        || /[\u0400-\u04FF]/.test(usernameSource)
+        || providedUsername.length < 3
+      )
+    )
+
+    const fullName = fullNameSource || usernameSource || providedUsername
+
+    let username = ''
+
+    if (providedUsername.length >= 3 && !usernameLooksLikeFullName) {
+      username = providedUsername
+
+      if (existingUsernameSet.has(username) || seenFileUsernames.has(username)) {
+        errors.push({ row: rowNumber, message: `username "${username}" already exists.` })
+        return
+      }
+    } else {
+      const generatedBase = generateUsernameFromFullName(fullName)
+
+      if (!generatedBase || generatedBase.length < 3) {
+        errors.push({ row: rowNumber, message: 'fullName (or username) is required and must produce a valid username.' })
+        return
+      }
+
+      username = reserveUniqueUsername(generatedBase, existingUsernameSet, seenFileUsernames)
     }
 
-    if (existingUsernameSet.has(username) || seenFileUsernames.has(username)) {
-      errors.push({ row: rowNumber, message: `username "${username}" already exists.` })
-      return
-    }
+    const passwordRaw = typeof row.password === 'string' ? row.password.trim() : ''
+    const password = passwordRaw || DEFAULT_PASSWORD
 
-    const password = typeof row.password === 'string' ? row.password.trim() : ''
-    if (password.length < 6) {
-      errors.push({ row: rowNumber, message: 'password is required and must be at least 6 chars.' })
+    if (passwordRaw && passwordRaw.length < 6) {
+      errors.push({ row: rowNumber, message: 'password must be at least 6 chars.' })
       return
     }
 
@@ -383,10 +466,6 @@ export default eventHandler(async (event) => {
     const objectPinned = typeof row.objectPinned === 'string' ? row.objectPinned.trim() : ''
 
     const objectPositions = parseObjectPositions(row.objectPositions)
-    if (!objectPositions.length) {
-      errors.push({ row: rowNumber, message: 'objectPositions must contain at least one item.' })
-      return
-    }
 
     const baseSalary = parseNonNegativeInt(row.baseSalary, 1000000)
     if (baseSalary === null) {
@@ -410,6 +489,7 @@ export default eventHandler(async (event) => {
 
     const body: CreateCustomerBody = {
       buildingId: parseOptionalBuildingId(row.buildingId) ?? selectedBuildingId,
+      fullName,
       username,
       avatar: { src: avatarSrc },
       password,

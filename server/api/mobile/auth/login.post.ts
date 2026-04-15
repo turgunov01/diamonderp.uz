@@ -9,6 +9,7 @@ export default eventHandler(async (event) => {
   const isProd = process.env.NODE_ENV === 'production'
   const result = await authenticateLogin(await readBody<Partial<LoginRequestBody>>(event))
   const access = await resolveMobileAccessFromPayload(result.payload)
+  const mustChangePassword = Boolean(access.customer ? (access.customer.must_change_password ?? true) : false)
   const activity = isFrontlineMobileAccess(access)
     ? await recordEmployeeActivity({ employeeId: access.user.id })
     : null
@@ -31,6 +32,7 @@ export default eventHandler(async (event) => {
     role: access.role,
     frontend: access.frontend,
     source: access.source,
+    mustChangePassword,
     access: {
       buildingId: access.buildingId ?? null,
       objectIds: access.objectIds,

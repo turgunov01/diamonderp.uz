@@ -149,13 +149,6 @@ const stats = computed<Stat[]>(() => [
     variation: 0
   },
   {
-    title: 'Заявки',
-    icon: 'i-lucide-shopping-cart',
-    value: 0,
-    variation: 0,
-    href: '/inbox'
-  },
-  {
     title: 'Чаты',
     icon: 'i-lucide-message-circle',
     value: 0,
@@ -166,10 +159,10 @@ const stats = computed<Stat[]>(() => [
 </script>
 
 <template>
-  <UPageGrid class="lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-px">
+  <UPageGrid class="lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-px">
     <template v-if="isLoading">
       <div
-        v-for="n in 4"
+        v-for="n in 3"
         :key="`home-stat-skeleton-${n}`"
         class="rounded-lg border border-default bg-elevated/30 p-5 space-y-3 animate-pulse"
       >

@@ -13,12 +13,6 @@ const links: SidebarLinks = [
       to: '/'
     },
     {
-      label: 'Заявки',
-      icon: 'i-lucide-inbox',
-      to: '/inbox',
-      badge: '4'
-    },
-    {
       label: 'Кадры',
       icon: 'i-lucide-users',
       to: '/hr',

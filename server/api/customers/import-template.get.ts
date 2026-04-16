@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs'
 
 type TemplateFormat = 'csv' | 'xlsx'
-type TemplateMode = 'minimal' | 'full'
+type TemplateMode = 'draft' | 'minimal' | 'full'
 
 function parseFormat(value: unknown): TemplateFormat {
   if (value === 'csv' || value === 'xlsx') {
@@ -14,6 +14,10 @@ function parseFormat(value: unknown): TemplateFormat {
 function parseMode(value: unknown): TemplateMode {
   if (value === 'full') {
     return 'full'
+  }
+
+  if (value === 'draft') {
+    return 'draft'
   }
 
   return 'minimal'
@@ -58,6 +62,13 @@ const minimalTemplateRows = [
   }
 ]
 
+const draftTemplateRows = [
+  {
+    fullName: 'John Smith',
+    phoneNumber: '+998901112233'
+  }
+]
+
 const fullTemplateRows = [
   {
     fullName: 'John Smith',
@@ -79,7 +90,9 @@ export default eventHandler(async (event) => {
   const query = getQuery(event)
   const format = parseFormat(query.format)
   const mode = parseMode(query.mode)
-  const templateRows = mode === 'full' ? fullTemplateRows : minimalTemplateRows
+  const templateRows = mode === 'full'
+    ? fullTemplateRows
+    : (mode === 'draft' ? draftTemplateRows : minimalTemplateRows)
 
   if (format === 'csv') {
     const csv = toCsv(templateRows)
@@ -92,7 +105,7 @@ export default eventHandler(async (event) => {
 
   const workbook = new ExcelJS.Workbook()
   const worksheet = workbook.addWorksheet('template')
-  const headers = Object.keys(templateRows[0])
+  const headers = Object.keys(templateRows[0] || {})
 
   worksheet.columns = headers.map(header => ({
     header,

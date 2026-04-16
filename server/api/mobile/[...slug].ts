@@ -1,10 +1,18 @@
 import { getRouterParams, setResponseStatus } from 'h3'
 import { requireMobileAccess, isFrontlineMobileAccess } from '../../utils/mobile-access'
 import { getEmployeeTaskById } from '../../utils/object-tasks'
+import reviewTaskHandler from './tasks/[taskId]/review.post'
 
 export default defineEventHandler(async (event) => {
-  const params = getRouterParams(event) as { slug?: string }
+  const params = getRouterParams(event) as Record<string, string | undefined>
   const slug = params.slug ? params.slug.split('/') : []
+
+  // Compatibility handler for deployments where nested method routes might be missing.
+  // Supports POST/PATCH /api/mobile/tasks/:taskId/review via the catch-all route.
+  if ((event.method === 'POST' || event.method === 'PATCH') && slug.length === 3 && slug[0] === 'tasks' && slug[2] === 'review') {
+    params.taskId = slug[1]
+    return await reviewTaskHandler(event)
+  }
 
   // Fallback handler for GET /api/mobile/tasks/:objectId/:taskId
   if (event.method === 'GET' && slug.length === 3 && slug[0] === 'tasks') {

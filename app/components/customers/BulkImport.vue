@@ -461,11 +461,12 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
 
     <UModal
       v-model:open="draftsOpen"
+      fullscreen
       title="Черновики массовой загрузки"
       description="Строки из Excel сохранены локально. Заполните объекты/смену и создайте пользователей по одному."
     >
       <template #body>
-        <div class="space-y-3">
+        <div class="flex h-full min-h-0 flex-col gap-3">
           <div class="flex items-center justify-between gap-2">
             <p class="text-sm text-muted">
               Здание: <span class="font-medium text-highlighted">{{ activeBuilding?.name || '—' }}</span>
@@ -483,7 +484,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
             Черновиков для этого здания пока нет.
           </div>
 
-          <div v-else class="max-h-[60vh] space-y-2 overflow-auto pr-1">
+          <div v-else class="min-h-0 flex-1 space-y-2 overflow-auto pr-1">
             <div
               v-for="draft in activeBuildingDrafts"
               :key="draft.id"
@@ -496,10 +497,15 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
                 <p class="truncate text-sm text-muted">
                   {{ draft.phoneNumber }} · @{{ draft.username }}
                 </p>
-                <div v-if="draft.issues?.length" class="mt-2 flex flex-wrap gap-1.5">
+                <div v-if="draft.issues?.length" class="mt-2">
                   <UBadge color="warning" variant="soft">
                     Есть замечания ({{ draft.issues.length }})
                   </UBadge>
+                  <ul class="mt-1 list-disc space-y-1 pl-5 text-xs text-warning-900 dark:text-warning-100">
+                    <li v-for="issue in draft.issues" :key="issue" class="break-words">
+                      {{ issue }}
+                    </li>
+                  </ul>
                 </div>
               </div>
 

@@ -78,7 +78,7 @@ function transliterateToLatin(value: string) {
     а: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y',
     к: 'k', қ: 'q', л: 'l', м: 'm', н: 'n', ң: 'ng', о: 'o', ө: 'o', п: 'p', р: 'r', с: 's', т: 't',
     у: 'u', ұ: 'u', ү: 'u', ф: 'f', х: 'h', ҳ: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ы: 'y', э: 'e',
-    ю: 'yu', я: 'ya', ь: '', ъ: '', ӯ: 'o'
+    ю: 'yu', я: 'ya', ь: '', ъ: '', ў: 'o', ӯ: 'o'
   }
 
   return value
@@ -334,7 +334,7 @@ export default eventHandler(async (event) => {
     const ageRaw = pickValue(rawRow, ['age', 'возраст'])
     const workShiftRaw = pickValue(rawRow, ['workshift', 'shift', 'смена'])
 
-    const fullName = normalizeWhitespace(String(fullNameRaw ?? ''))
+    const fullName = normalizeWhitespace(String(fullNameRaw ?? usernameRaw ?? ''))
     const phoneInput = String(phoneRaw ?? '').trim()
 
     if (!fullName) {
@@ -422,4 +422,3 @@ export default eventHandler(async (event) => {
     errors
   }
 })
-

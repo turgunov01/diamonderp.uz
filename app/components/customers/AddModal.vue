@@ -4,6 +4,7 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 
 type EditableCustomer = {
   id: number
+  buildingId?: number | null
   fullName?: string
   username: string
   phoneNumber: string
@@ -12,6 +13,13 @@ type EditableCustomer = {
   workShift: 'day' | 'night'
   objectPinned: string
   objectPositions: string[]
+}
+
+type BuildingItem = {
+  id: number
+  name: string
+  logo?: string | null
+  description?: string | null
 }
 
 type ObjectItem = {
@@ -80,6 +88,7 @@ const editSchema = z.object({
   objectPositions: z.array(z.string())
 })
 type FormState = {
+  buildingId: number | null
   fullName: string
   username: string
   password: string
@@ -111,6 +120,7 @@ const toast = useToast()
 const activeBuilding = useState<{ id: number, name: string } | null>('active-building')
 
 const state = reactive<FormState>({
+  buildingId: activeBuilding.value?.id ?? null,
   fullName: '',
   username: '',
   password: DEFAULT_PASSWORD,
@@ -125,19 +135,45 @@ const state = reactive<FormState>({
 const isEditMode = computed(() => Boolean(props.customer?.id))
 const schema = computed(() => (isEditMode.value ? editSchema : createSchema))
 
+const { data: buildings } = await useFetch<BuildingItem[]>('/api/buildings', {
+  default: () => []
+})
+
+const buildingOptions = computed(() =>
+  (buildings.value || []).map(building => ({
+    label: building.name,
+    value: building.id
+  }))
+)
+
+const selectedBuildingId = computed(() => {
+  const raw = state.buildingId
+  const parsed = typeof raw === 'number' ? raw : Number(raw)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
+})
+
+watch(activeBuilding, (building) => {
+  if (isEditMode.value) return
+  state.buildingId = building?.id ?? null
+}, { immediate: true })
+
 const { data: objects } = await useFetch<ObjectItem[]>('/api/objects', {
   default: () => [],
   query: {
-    buildingId: computed(() => activeBuilding.value?.id)
+    buildingId: selectedBuildingId
   }
 })
 
-const objectOptions = computed(() =>
-  (objects.value || []).map(item => ({
+const objectOptions = computed(() => {
+  if (!selectedBuildingId.value) {
+    return []
+  }
+
+  return (objects.value || []).map(item => ({
     label: item.name,
     value: item.name
   }))
-)
+})
 
 const pinnedObjectOptions = computed(() => [
   { label: 'Не закреплен', value: NOT_PINNED_VALUE },
@@ -181,6 +217,7 @@ watch(() => state.fullName, (value) => {
 })
 
 function fillStateFromCustomer(customer?: EditableCustomer | null) {
+  state.buildingId = customer?.buildingId ?? activeBuilding.value?.id ?? null
   state.fullName = customer?.fullName || ''
   state.username = customer?.username || ''
   state.password = customer ? '' : DEFAULT_PASSWORD
@@ -194,6 +231,20 @@ function fillStateFromCustomer(customer?: EditableCustomer | null) {
   passportFrontFile.value = null
   passportBackFile.value = null
 }
+
+watch(() => state.buildingId, (next, previous) => {
+  if (!isEditMode.value) return
+
+  const nextId = typeof next === 'number' ? next : Number(next)
+  const prevId = typeof previous === 'number' ? previous : Number(previous)
+
+  if (!Number.isInteger(nextId) || nextId <= 0) return
+  if (!Number.isInteger(prevId) || prevId <= 0) return
+  if (nextId === prevId) return
+
+  state.objectPinned = ''
+  state.objectPositions = []
+})
 
 function resetState() {
   fillStateFromCustomer(isEditMode.value ? props.customer : null)
@@ -267,7 +318,8 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
   loading.value = true
 
   try {
-    if (!activeBuilding.value?.id) {
+    const buildingId = selectedBuildingId.value
+    if (!buildingId) {
       throw new Error('Выберите здание перед сохранением сотрудника.')
     }
 
@@ -283,7 +335,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
       await $fetch(`/api/customers/${props.customer.id}`, {
         method: 'PATCH',
         body: {
-          buildingId: activeBuilding.value?.id ?? null,
+          buildingId,
           fullName,
           username: event.data.username.trim(),
           password: event.data.password.trim() || undefined,
@@ -315,7 +367,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
       const form = new FormData()
       form.append('fullName', fullName)
       form.append('username', event.data.username.trim())
-      form.append('buildingId', String(activeBuilding.value?.id || ''))
+      form.append('buildingId', String(buildingId))
       form.append('password', event.data.password || DEFAULT_PASSWORD)
       form.append('phoneNumber', event.data.phoneNumber.trim())
       form.append('role', event.data.role || 'customer')
@@ -384,6 +436,14 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
           <USelect
             v-model="state.role"
             :items="CUSTOMER_ROLE_OPTIONS"
+            class="w-full"
+          />
+        </UFormField>
+
+        <UFormField v-if="isEditMode" label="Здание" name="buildingId">
+          <USelect
+            v-model="state.buildingId"
+            :items="buildingOptions"
             class="w-full"
           />
         </UFormField>

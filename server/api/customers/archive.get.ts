@@ -7,7 +7,7 @@ export default eventHandler(async (event) => {
   const buildingId = typeof buildingIdRaw === 'string' ? Number(buildingIdRaw) : NaN
 
   const query: Record<string, string> = {
-    select: 'id,building_id,full_name,username,avatar,password,role,phone_number,passport_file,passport_front_path,passport_back_path,age,work_shift,object_pinned,object_positions,base_salary,position_bonus,salary_currency,status,must_change_password,activated_at,archived_at,deactivation_comment',
+    select: 'id,building_id,full_name,username,avatar,password,role,phone_number,passport_file,passport_front_path,passport_back_path,age,work_shift,object_pinned,object_positions,salary_type,hourly_rate,base_salary,position_bonus,salary_currency,status,must_change_password,activated_at,archived_at,deactivation_comment',
     status: 'eq.archived',
     order: 'archived_at.desc,id.asc'
   }

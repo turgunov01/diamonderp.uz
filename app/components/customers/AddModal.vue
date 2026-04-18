@@ -2,6 +2,9 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
+type SalaryType = 'fixed' | 'hourly'
+type ShiftKind = 'day' | 'night' | 'hourly'
+
 type EditableCustomer = {
   id: number
   buildingId?: number | null
@@ -11,6 +14,8 @@ type EditableCustomer = {
   role: 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
   age: number
   workShift: 'day' | 'night'
+  salaryType?: SalaryType
+  hourlyRate?: number
   objectPinned: string
   objectPositions: string[]
 }
@@ -66,6 +71,8 @@ const createSchema = z.object({
     .int('Возраст должен быть целым числом')
     .min(18, 'Возраст должен быть не менее 18'),
   workShift: z.enum(['day', 'night']),
+  salaryType: z.enum(['fixed', 'hourly']),
+  hourlyRate: z.coerce.number().int('Ставка должна быть целым числом').min(0, 'Ставка не может быть меньше 0'),
   objectPinned: z.string().optional(),
   objectPositions: z.array(z.string()).min(1, 'Выберите хотя бы один объект')
 })
@@ -84,6 +91,8 @@ const editSchema = z.object({
     .int('Возраст должен быть целым числом')
     .min(18, 'Возраст должен быть не менее 18'),
   workShift: z.enum(['day', 'night']),
+  salaryType: z.enum(['fixed', 'hourly']),
+  hourlyRate: z.coerce.number().int('Ставка должна быть целым числом').min(0, 'Ставка не может быть меньше 0'),
   objectPinned: z.string().optional(),
   objectPositions: z.array(z.string())
 })
@@ -96,6 +105,8 @@ type FormState = {
   role: 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
   age: number
   workShift: 'day' | 'night'
+  salaryType: SalaryType
+  hourlyRate: number
   objectPinned: string
   objectPositions: string[]
 }
@@ -108,6 +119,8 @@ type FormSubmitState = {
   role: 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
   age: number
   workShift: 'day' | 'night'
+  salaryType: SalaryType
+  hourlyRate: number
   objectPinned?: string
   objectPositions: string[]
 }
@@ -128,6 +141,8 @@ const state = reactive<FormState>({
   role: 'customer',
   age: 18,
   workShift: 'day',
+  salaryType: 'fixed',
+  hourlyRate: 0,
   objectPinned: '',
   objectPositions: []
 })
@@ -187,6 +202,19 @@ const pinnedObjectModel = computed({
   }
 })
 
+const shiftKindModel = computed<ShiftKind>({
+  get: () => (state.salaryType === 'hourly' ? 'hourly' : state.workShift),
+  set: (value) => {
+    if (value === 'hourly') {
+      state.salaryType = 'hourly'
+      return
+    }
+
+    state.salaryType = 'fixed'
+    state.workShift = value
+  }
+})
+
 function transliterate(value: string) {
   const map: Record<string, string> = {
     а: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y',
@@ -225,6 +253,8 @@ function fillStateFromCustomer(customer?: EditableCustomer | null) {
   state.role = customer?.role || 'customer'
   state.age = customer?.age ?? 18
   state.workShift = customer?.workShift || 'day'
+  state.salaryType = customer?.salaryType ?? 'fixed'
+  state.hourlyRate = customer?.hourlyRate ?? 0
   state.objectPinned = customer?.objectPinned || ''
   state.objectPositions = [...(customer?.objectPositions || [])]
   avatarFile.value = null
@@ -342,6 +372,8 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
           phoneNumber: event.data.phoneNumber.trim(),
           age: event.data.age,
           workShift: event.data.workShift,
+          salaryType: event.data.salaryType,
+          hourlyRate: event.data.salaryType === 'hourly' ? event.data.hourlyRate : undefined,
           role: event.data.role || 'customer',
           objectPinned,
           objectPositions
@@ -373,6 +405,8 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
       form.append('role', event.data.role || 'customer')
       form.append('age', String(event.data.age))
       form.append('workShift', event.data.workShift)
+      form.append('salaryType', event.data.salaryType)
+      form.append('hourlyRate', String(event.data.hourlyRate ?? 0))
       form.append('objectPinned', objectPinned)
       form.append('objectPositions', JSON.stringify(objectPositions))
       form.append('avatarFile', avatarFile.value)
@@ -510,12 +544,24 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
 
         <UFormField label="Смена" name="workShift">
           <USelect
-            v-model="state.workShift"
+            v-model="shiftKindModel"
             :items="[
               { label: 'День', value: 'day' },
-              { label: 'Ночь', value: 'night' }
+              { label: 'Ночь', value: 'night' },
+              { label: 'Почасовое', value: 'hourly' }
             ]"
             class="w-full"
+          />
+        </UFormField>
+
+        <UFormField v-if="state.salaryType === 'hourly'" label="Ставка (UZS/час)" name="hourlyRate">
+          <UInput
+            v-model="state.hourlyRate"
+            type="number"
+            min="0"
+            step="1000"
+            class="w-full"
+            placeholder="Например: 20000"
           />
         </UFormField>
 
@@ -571,10 +617,3 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
     </template>
   </UModal>
 </template>
-
-
-
-
-
-
-

@@ -4,6 +4,8 @@ import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
 type WorkShift = 'day' | 'night'
+type SalaryType = 'fixed' | 'hourly'
+type ShiftKind = 'day' | 'night' | 'hourly'
 type CustomerRole = 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
 
 interface BulkImportPreviewResponse {
@@ -35,6 +37,7 @@ type DraftCustomer = {
   role: CustomerRole
   age: number | null
   workShift: WorkShift | null
+  salaryType?: SalaryType
   objectPinned: string
   objectPositions: string[]
 }
@@ -66,6 +69,7 @@ const createSchema = z.object({
     .int('Возраст должен быть целым числом')
     .min(18, 'Возраст должен быть не менее 18'),
   workShift: z.enum(['day', 'night']),
+  salaryType: z.enum(['fixed', 'hourly']),
   objectPinned: z.string().optional(),
   objectPositions: z.array(z.string()).min(1, 'Выберите хотя бы один объект')
 })
@@ -77,6 +81,7 @@ type FormState = {
   role: CustomerRole
   age: number
   workShift: WorkShift
+  salaryType: SalaryType
   objectPinned: string
   objectPositions: string[]
 }
@@ -117,6 +122,7 @@ const state = reactive<FormState>({
   role: 'customer',
   age: 18,
   workShift: 'day',
+  salaryType: 'fixed',
   objectPinned: '',
   objectPositions: []
 })
@@ -125,6 +131,19 @@ const pinnedObjectModel = computed({
   get: () => state.objectPinned || NOT_PINNED_VALUE,
   set: (value: string) => {
     state.objectPinned = value === NOT_PINNED_VALUE ? '' : value
+  }
+})
+
+const shiftKindModel = computed<ShiftKind>({
+  get: () => (state.salaryType === 'hourly' ? 'hourly' : state.workShift),
+  set: (value) => {
+    if (value === 'hourly') {
+      state.salaryType = 'hourly'
+      return
+    }
+
+    state.salaryType = 'fixed'
+    state.workShift = value
   }
 })
 
@@ -208,6 +227,7 @@ function fillStateFromDraft(draft: DraftCustomer) {
   state.role = draft.role || 'customer'
   state.age = draft.age ?? 18
   state.workShift = draft.workShift ?? 'day'
+  state.salaryType = draft.salaryType ?? 'fixed'
   state.objectPinned = draft.objectPinned || ''
   state.objectPositions = [...(draft.objectPositions || [])]
 }
@@ -311,6 +331,7 @@ async function onFileSelected(event: Event) {
         role: 'customer',
         age: item.age ?? null,
         workShift: item.workShift ?? null,
+        salaryType: 'fixed',
         objectPinned: '',
         objectPositions: []
       }
@@ -378,6 +399,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
       role: event.data.role,
       age: event.data.age,
       workShift: event.data.workShift,
+      salaryType: event.data.salaryType,
       objectPinned,
       objectPositions
     }
@@ -396,6 +418,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
         passportFile: `bulk-import/${username}.pdf`,
         age: event.data.age,
         workShift: event.data.workShift,
+        salaryType: event.data.salaryType,
         objectPinned,
         objectPositions
       }
@@ -564,10 +587,11 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
 
           <UFormField label="Смена" name="workShift">
             <USelect
-              v-model="state.workShift"
+              v-model="shiftKindModel"
               :items="[
                 { label: 'День', value: 'day' },
-                { label: 'Ночь', value: 'night' }
+                { label: 'Ночь', value: 'night' },
+                { label: 'Почасовое', value: 'hourly' }
               ]"
               class="w-full"
             />

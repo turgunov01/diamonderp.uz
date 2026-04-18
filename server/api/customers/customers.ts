@@ -1,5 +1,6 @@
 export type WorkShift = 'day' | 'night'
 export type CustomerLifecycleStatus = 'pending' | 'active' | 'inactive' | 'archived'
+export type SalaryType = 'fixed' | 'hourly'
 
 export interface CustomerRecord {
   id: number
@@ -19,6 +20,8 @@ export interface CustomerRecord {
   workShift: WorkShift
   objectPinned: string
   objectPositions: string[]
+  salaryType: SalaryType
+  hourlyRate: number
   baseSalary: number
   positionBonus: number
   salaryCurrency: 'UZS'
@@ -46,6 +49,8 @@ export interface CreateCustomerBody {
   workShift: WorkShift
   objectPinned: string
   objectPositions: string[]
+  salaryType?: SalaryType
+  hourlyRate?: number
   baseSalary?: number
   positionBonus?: number
   salaryCurrency?: 'UZS'
@@ -64,6 +69,8 @@ export interface UpdateCustomerBody {
   objectPinned?: string
   objectPositions?: string[]
   role?: string
+  salaryType?: SalaryType
+  hourlyRate?: number
   baseSalary?: number
   positionBonus?: number
   status?: CustomerLifecycleStatus
@@ -88,6 +95,8 @@ export interface CustomerDbRow {
   work_shift: WorkShift
   object_pinned: string
   object_positions: string[]
+  salary_type?: SalaryType
+  hourly_rate?: number
   base_salary?: number
   position_bonus?: number
   salary_currency?: 'UZS'
@@ -115,6 +124,8 @@ export function mapCustomerDbRowToRecord(row: CustomerDbRow): CustomerRecord {
     workShift: row.work_shift,
     objectPinned: row.object_pinned,
     objectPositions: row.object_positions,
+    salaryType: row.salary_type ?? 'fixed',
+    hourlyRate: row.hourly_rate ?? 0,
     baseSalary: row.base_salary ?? 1000000,
     positionBonus: row.position_bonus ?? 0,
     salaryCurrency: row.salary_currency ?? 'UZS',
@@ -142,6 +153,8 @@ export function mapCreateBodyToDbInsert(body: CreateCustomerBody) {
     work_shift: body.workShift,
     object_pinned: body.objectPinned,
     object_positions: body.objectPositions,
+    salary_type: body.salaryType ?? 'fixed',
+    hourly_rate: body.hourlyRate ?? 0,
     base_salary: body.baseSalary ?? 1000000,
     position_bonus: body.positionBonus ?? 0,
     salary_currency: body.salaryCurrency ?? 'UZS',
@@ -162,6 +175,8 @@ export function mapUpdateBodyToDbUpdate(body: UpdateCustomerBody) {
     work_shift?: WorkShift
     object_pinned?: string
     object_positions?: string[]
+    salary_type?: SalaryType
+    hourly_rate?: number
     base_salary?: number
     position_bonus?: number
     status?: CustomerLifecycleStatus
@@ -199,6 +214,12 @@ export function mapUpdateBodyToDbUpdate(body: UpdateCustomerBody) {
   }
   if (body.objectPositions) {
     update.object_positions = body.objectPositions
+  }
+  if (body.salaryType) {
+    update.salary_type = body.salaryType
+  }
+  if (typeof body.hourlyRate === 'number') {
+    update.hourly_rate = body.hourlyRate
   }
   if (typeof body.baseSalary === 'number') {
     update.base_salary = body.baseSalary

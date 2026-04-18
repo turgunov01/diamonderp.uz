@@ -24,6 +24,8 @@ interface Customer {
   workShift: 'day' | 'night'
   objectPinned: string
   objectPositions: string[]
+  salaryType: 'fixed' | 'hourly'
+  hourlyRate: number
   baseSalary: number
   positionBonus: number
   salaryCurrency: 'UZS'
@@ -43,11 +45,13 @@ interface PassportFileEntry {
 }
 
 interface ShiftDraft {
-  workShift: 'day' | 'night'
+  shiftKind: ShiftCardId
   saving: boolean
 }
 
 interface SalaryDraft {
+  salaryType: 'fixed' | 'hourly'
+  hourlyRate: string
   baseSalary: string
   positionBonus: string
   saving: boolean
@@ -99,6 +103,10 @@ const editingCustomer = ref<Customer | null>(null)
 const archiveModalOpen = ref(false)
 const archiveComment = ref('')
 const archivingCustomer = ref<Customer | null>(null)
+const permanentDeleteArmed = ref(false)
+const permanentlyDeletingCustomerId = ref<number | null>(null)
+const deletingSelectedArchived = ref(false)
+const archivedRowSelection = ref<Record<number, boolean>>({})
 const salaryMonthSeed = useState<string>('hr-salary-month-seed', () => new Date().toISOString())
 const salaryFormulaOpen = ref(false)
 const customerPasswordVisible = ref(false)
@@ -106,6 +114,10 @@ const customerPasswordVisible = ref(false)
 const WORK_HOURS_PER_DAY = 12
 const MINUTES_PER_HOUR = 60
 const LATE_PENALTY_MULTIPLIER = 4
+const SALARY_TYPE_OPTIONS = [
+  { label: 'Оклад', value: 'fixed' },
+  { label: 'Почасовая', value: 'hourly' }
+] as const
 
 const hrTabs = [{
   label: 'Пользователи',
@@ -174,14 +186,22 @@ const { data: advancesData, status: advancesStatus, refresh: refreshAdvances } =
     buildingId: computed(() => activeBuilding.value?.id)
   }
 })
+
+function formatLocalYmd(value: Date) {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const salaryMonthDate = computed(() => new Date(salaryMonthSeed.value))
 const salaryMonthStart = computed(() => {
   const date = salaryMonthDate.value
-  return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10)
+  return formatLocalYmd(new Date(date.getFullYear(), date.getMonth(), 1))
 })
 const salaryMonthEnd = computed(() => {
   const date = salaryMonthDate.value
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().slice(0, 10)
+  return formatLocalYmd(new Date(date.getFullYear(), date.getMonth() + 1, 0))
 })
 const salaryMonthDays = computed(() => {
   const date = salaryMonthDate.value
@@ -244,6 +264,57 @@ const isSalaryActivityLoading = computed(() =>
   monthlyActivityStatus.value === 'pending' || monthlyActivityStatus.value === 'idle'
 )
 
+const selectedArchiveCustomers = computed(() =>
+  safeArchiveCustomers.value.filter(user => archivedRowSelection.value[user.id])
+)
+const selectedArchiveCount = computed(() => selectedArchiveCustomers.value.length)
+const archiveSelectAllModel = computed<boolean | 'indeterminate'>(() => {
+  const total = safeArchiveCustomers.value.length
+  if (!total) {
+    return false
+  }
+
+  const selected = selectedArchiveCount.value
+  if (!selected) {
+    return false
+  }
+
+  if (selected === total) {
+    return true
+  }
+
+  return 'indeterminate'
+})
+
+function toggleAllArchivedSelection(checked: boolean) {
+  if (!checked) {
+    archivedRowSelection.value = {}
+    return
+  }
+
+  const next: Record<number, boolean> = {}
+  for (const user of safeArchiveCustomers.value) {
+    next[user.id] = true
+  }
+  archivedRowSelection.value = next
+}
+
+function setArchivedSelected(userId: number, checked: boolean) {
+  archivedRowSelection.value[userId] = checked
+}
+
+function clearArchivedSelection() {
+  archivedRowSelection.value = {}
+}
+
+function getCustomerShiftKind(customer: Customer): ShiftCardId {
+  if (customer.salaryType === 'hourly') {
+    return 'hourly'
+  }
+
+  return customer.workShift
+}
+
 watch(error, (newError) => {
   if (!newError) {
     return
@@ -280,11 +351,13 @@ watch(data, (customers) => {
 
   for (const customer of customers) {
     nextShiftDrafts[customer.id] = {
-      workShift: customer.workShift,
+      shiftKind: getCustomerShiftKind(customer),
       saving: false
     }
 
     nextSalaryDrafts[customer.id] = {
+      salaryType: customer.salaryType || 'fixed',
+      hourlyRate: String(customer.hourlyRate ?? 0),
       baseSalary: String(customer.baseSalary),
       positionBonus: String(customer.positionBonus),
       saving: false
@@ -294,6 +367,44 @@ watch(data, (customers) => {
   shiftDrafts.value = nextShiftDrafts
   salaryDrafts.value = nextSalaryDrafts
 }, { immediate: true })
+
+watch(safeArchiveCustomers, (archivedCustomers) => {
+  if (!archivedCustomers.length) {
+    archivedRowSelection.value = {}
+    return
+  }
+
+  const existing = archivedRowSelection.value
+  const allowedIds = new Set(archivedCustomers.map(user => user.id))
+  let changed = false
+  const next: Record<number, boolean> = {}
+
+  for (const [idRaw, checked] of Object.entries(existing)) {
+    const id = Number(idRaw)
+    if (!checked) {
+      continue
+    }
+
+    if (!allowedIds.has(id)) {
+      changed = true
+      continue
+    }
+
+    next[id] = true
+  }
+
+  if (changed) {
+    archivedRowSelection.value = next
+  }
+})
+
+watch(permanentDeleteArmed, (armed) => {
+  if (armed) {
+    return
+  }
+
+  archivedRowSelection.value = {}
+})
 
 function normalizeFormulaValue(value: string, fallback: number) {
   const parsed = Number(value)
@@ -339,6 +450,8 @@ async function exportSalaryExcel() {
   try {
     const params = new URLSearchParams()
     if (activeBuilding.value?.id) params.set('buildingId', String(activeBuilding.value.id))
+    params.set('from', salaryMonthStart.value)
+    params.set('to', salaryMonthEnd.value)
     const response = await fetch(`/api/customers/salary-export?${params.toString()}`)
     if (!response.ok) throw new Error('Не удалось сформировать файл')
     const blob = await response.blob()
@@ -592,22 +705,66 @@ function getColumnLabel(columnId: string) {
   return columnLabelMap[columnId] || upperFirst(columnId)
 }
 
-const shiftStats = computed(() => {
+type ShiftCardId = 'day' | 'night' | 'hourly'
+type ShiftCardColor = 'success' | 'warning' | 'primary'
+interface ShiftCard {
+  id: ShiftCardId
+  label: string
+  modalTitle: string
+  description: string
+  color: ShiftCardColor
+  users: Customer[]
+}
+
+const shiftStats = computed<ShiftCard[]>(() => {
   const customers = safeCustomers.value
-  const dayUsers = customers.filter(customer => customer.workShift === 'day')
-  const nightUsers = customers.filter(customer => customer.workShift === 'night')
+  const fixedUsers = customers.filter(customer => customer.salaryType !== 'hourly')
+  const hourlyUsers = customers.filter(customer => customer.salaryType === 'hourly')
+  const dayUsers = fixedUsers.filter(customer => customer.workShift === 'day')
+  const nightUsers = fixedUsers.filter(customer => customer.workShift === 'night')
 
   return [{
     id: 'day',
-    label: 'Дневная смена',
+    label: 'День',
+    modalTitle: 'Дневная смена',
+    description: 'Фиксированная оплата, смена День.',
     color: 'success' as const,
     users: dayUsers
   }, {
     id: 'night',
-    label: 'Ночная смена',
+    label: 'Ночь',
+    modalTitle: 'Ночная смена',
+    description: 'Фиксированная оплата, смена Ночь.',
     color: 'warning' as const,
     users: nightUsers
+  }, {
+    id: 'hourly',
+    label: 'Почасовое',
+    modalTitle: 'Почасовая оплата',
+    description: 'Сотрудники с почасовой оплатой (ставка за час).',
+    color: 'primary' as const,
+    users: hourlyUsers
   }]
+})
+
+const shiftModalOpen = ref(false)
+const selectedShiftCardId = ref<ShiftCardId | null>(null)
+const activeShiftCard = computed(() =>
+  shiftStats.value.find(shift => shift.id === selectedShiftCardId.value) || null
+)
+const activeShiftUsers = computed(() => activeShiftCard.value?.users || [])
+
+function openShiftModal(shiftId: ShiftCardId) {
+  selectedShiftCardId.value = shiftId
+  shiftModalOpen.value = true
+}
+
+watch(shiftModalOpen, (isOpen) => {
+  if (isOpen) {
+    return
+  }
+
+  selectedShiftCardId.value = null
 })
 
 function formatCurrency(value: number) {
@@ -645,6 +802,20 @@ const lateMinutesByEmployee = computed(() => {
   return totals
 })
 
+const workMinutesByEmployee = computed(() => {
+  const totals: Record<number, number> = {}
+
+  for (const activity of safeMonthlyActivities.value) {
+    if (!activity.employeeId) {
+      continue
+    }
+
+    totals[activity.employeeId] = (totals[activity.employeeId] || 0) + (activity.workMinutes || 0)
+  }
+
+  return totals
+})
+
 const advanceFilterCustomerId = ref<number | null>(null)
 const advanceForm = reactive({
   customerId: null as number | null,
@@ -669,6 +840,20 @@ function getBaseSalary(customerId: number) {
   return Number(draft.baseSalary) || 0
 }
 
+function getSalaryType(customerId: number) {
+  const draft = salaryDrafts.value[customerId]
+  return draft?.salaryType === 'hourly' ? 'hourly' : 'fixed'
+}
+
+function getHourlyRate(customerId: number) {
+  const draft = salaryDrafts.value[customerId]
+  if (!draft) {
+    return 0
+  }
+
+  return Number(draft.hourlyRate) || 0
+}
+
 function getPositionBonus(customerId: number) {
   const draft = salaryDrafts.value[customerId]
   if (!draft) {
@@ -682,7 +867,38 @@ function getEmployeeLateMinutes(customerId: number) {
   return lateMinutesByEmployee.value[customerId] || 0
 }
 
+function getEmployeeWorkMinutes(customerId: number) {
+  return workMinutesByEmployee.value[customerId] || 0
+}
+
+function formatWorkMinutes(totalMinutes: number) {
+  const minutes = Number.isFinite(totalMinutes) ? Math.max(0, Math.floor(totalMinutes)) : 0
+  const hoursPart = Math.floor(minutes / 60)
+  const minutesPart = minutes % 60
+
+  if (!minutesPart) {
+    return `${hoursPart} ч`
+  }
+
+  return `${hoursPart} ч ${minutesPart} мин`
+}
+
+function getHourlySalary(customerId: number) {
+  const hourlyRate = getHourlyRate(customerId)
+  const workMinutes = getEmployeeWorkMinutes(customerId)
+
+  if (!hourlyRate || !workMinutes) {
+    return 0
+  }
+
+  return Math.round((hourlyRate / 60) * workMinutes)
+}
+
 function getLatePenalty(customerId: number) {
+  if (getSalaryType(customerId) === 'hourly') {
+    return 0
+  }
+
   const baseSalary = getBaseSalary(customerId)
   const lateMinutes = getEmployeeLateMinutes(customerId)
 
@@ -744,7 +960,72 @@ async function restoreCustomer(user: Customer) {
   }
 }
 
+async function permanentlyDeleteCustomer(user: Customer) {
+  if (permanentlyDeletingCustomerId.value) {
+    return
+  }
+
+  permanentlyDeletingCustomerId.value = user.id
+
+  try {
+    await $fetch(`/api/customers/${user.id}/permanent`, {
+      method: 'DELETE'
+    })
+
+    toast.add({ title: 'Пользователь удален', color: 'success' })
+    await Promise.all([refresh(), refreshArchive()])
+  } catch (error: unknown) {
+    toast.add({
+      title: 'Не удалось удалить пользователя',
+      description: getErrorMessage(error),
+      color: 'error'
+    })
+  } finally {
+    permanentlyDeletingCustomerId.value = null
+  }
+}
+
+async function permanentlyDeleteSelectedArchivedCustomers() {
+  if (!selectedArchiveCount.value || deletingSelectedArchived.value) {
+    return
+  }
+
+  deletingSelectedArchived.value = true
+
+  const toDelete = selectedArchiveCustomers.value.map(user => user.id)
+  const results = await Promise.allSettled(toDelete.map(async (id) =>
+    $fetch(`/api/customers/${id}/permanent`, { method: 'DELETE' })
+  ))
+
+  const successCount = results.filter(r => r.status === 'fulfilled').length
+  const failedCount = results.length - successCount
+  const firstError = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
+
+  if (failedCount) {
+    const errorMessage = firstError?.reason ? getErrorMessage(firstError.reason) : undefined
+    toast.add({
+      title: 'Удаление завершено с ошибками',
+      description: `Удалено: ${successCount}, ошибок: ${failedCount}${errorMessage ? `. ${errorMessage}` : ''}`,
+      color: 'warning'
+    })
+  } else {
+    toast.add({
+      title: 'Удалено',
+      description: `Удалено пользователей: ${successCount}`,
+      color: 'success'
+    })
+  }
+
+  archivedRowSelection.value = {}
+  deletingSelectedArchived.value = false
+  await Promise.all([refresh(), refreshArchive()])
+}
+
 function getGrossSalary(customerId: number) {
+  if (getSalaryType(customerId) === 'hourly') {
+    return getHourlySalary(customerId) + getPositionBonus(customerId)
+  }
+
   return getBaseSalary(customerId) + getPositionBonus(customerId)
 }
 
@@ -752,7 +1033,7 @@ function getSalaryTotal(customerId: number) {
   return Math.max(getGrossSalary(customerId) - getLatePenalty(customerId), 0)
 }
 
-function updateSalaryDraft(customerId: number, field: 'baseSalary' | 'positionBonus', value: string | number) {
+function updateSalaryDraft(customerId: number, field: 'baseSalary' | 'positionBonus' | 'hourlyRate', value: string | number) {
   const draft = salaryDrafts.value[customerId]
   if (!draft) {
     return
@@ -976,11 +1257,19 @@ async function saveCustomerShift(customer: Customer) {
   draft.saving = true
 
   try {
+    const nextShiftKind = draft.shiftKind
+    const payload: Record<string, unknown> = {}
+
+    if (nextShiftKind === 'hourly') {
+      payload.salaryType = 'hourly'
+    } else {
+      payload.salaryType = 'fixed'
+      payload.workShift = nextShiftKind
+    }
+
     await $fetch(`/api/customers/${customer.id}`, {
       method: 'PATCH',
-      body: {
-        workShift: draft.workShift
-      }
+      body: payload
     })
 
     toast.add({
@@ -1009,15 +1298,28 @@ async function saveCustomerSalary(customer: Customer) {
   draft.saving = true
 
   try {
-    const baseSalary = parseNonNegativeInteger(draft.baseSalary, 'базовая зарплата')
     const positionBonus = parseNonNegativeInteger(draft.positionBonus, 'надбавка')
+
+    const salaryType = draft.salaryType === 'hourly' ? 'hourly' : 'fixed'
+    const payload: Record<string, unknown> = {
+      salaryType,
+      positionBonus
+    }
+
+    if (salaryType === 'hourly') {
+      const hourlyRate = parseNonNegativeInteger(draft.hourlyRate, 'ставка в час')
+      if (!hourlyRate) {
+        throw new Error('Ставка в час должна быть больше 0.')
+      }
+      payload.hourlyRate = hourlyRate
+    } else {
+      const baseSalary = parseNonNegativeInteger(draft.baseSalary, 'базовая зарплата')
+      payload.baseSalary = baseSalary
+    }
 
     await $fetch(`/api/customers/${customer.id}`, {
       method: 'PATCH',
-      body: {
-        baseSalary,
-        positionBonus
-      }
+      body: payload
     })
 
     toast.add({
@@ -1165,11 +1467,13 @@ async function saveCustomerSalary(customer: Customer) {
         </div>
 
         <div v-else-if="selectedHrTab === 'shifts'" class="space-y-4">
-          <div class="grid gap-4 md:grid-cols-2">
-            <div
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <button
               v-for="shift in shiftStats"
               :key="shift.id"
-              class="rounded-lg border border-default bg-elevated/30 p-4 space-y-3"
+              type="button"
+              class="rounded-lg border border-default bg-elevated/30 p-4 space-y-3 text-left hover:bg-elevated/40 transition-colors"
+              @click="openShiftModal(shift.id)"
             >
               <div class="flex items-center justify-between">
                 <p class="font-semibold text-highlighted">
@@ -1177,41 +1481,80 @@ async function saveCustomerSalary(customer: Customer) {
                 </p>
                 <UBadge :label="String(shift.users.length)" :color="shift.color" variant="subtle" />
               </div>
+              <p class="text-xs text-muted">
+                {{ shift.description }}
+              </p>
+            </button>
+          </div>
 
-              <div v-if="shift.users.length" class="space-y-2">
-                <div
-                  v-for="user in shift.users"
-                  :key="user.id"
-                  class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-default bg-default/50 p-2"
-                >
-                  <button class="font-medium hover:underline" @click="openCustomerInfo(user)">
-                    @{{ user.username }}
-                  </button>
-
-                  <div class="flex items-center gap-2">
-                    <USelect
-                      v-model="shiftDrafts[user.id]!.workShift"
-                      :items="[
-                        { label: 'День', value: 'day' },
-                        { label: 'Ночь', value: 'night' }
-                      ]"
-                      class="w-28"
-                    />
-                    <UButton
-                      label="Сохранить"
-                      size="sm"
-                      color="primary"
-                      :loading="shiftDrafts[user.id]!.saving"
-                      @click="saveCustomerShift(user)"
-                    />
-                  </div>
-                </div>
+          <UModal
+            v-model:open="shiftModalOpen"
+            fullscreen
+            :title="activeShiftCard?.modalTitle || 'Смена'"
+            :description="activeShiftCard?.description"
+          >
+            <template #body>
+              <div v-if="activeShiftUsers.length" class="rounded-lg border border-default overflow-x-auto">
+                <table class="min-w-full text-sm">
+                  <thead>
+                    <tr class="bg-elevated/50">
+                      <th class="px-3 py-2 text-left">ID</th>
+                      <th class="px-3 py-2 text-left">Пользователь</th>
+                      <th class="px-3 py-2 text-left">Смена</th>
+                      <th class="px-3 py-2 text-right">Действие</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="user in activeShiftUsers"
+                      :key="user.id"
+                      class="border-t border-default"
+                      :class="shiftDrafts[user.id]?.shiftKind !== getCustomerShiftKind(user) ? 'bg-elevated/20' : undefined"
+                    >
+                      <td class="px-3 py-2">
+                        #{{ user.id }}
+                      </td>
+                      <td class="px-3 py-2">
+                        <button class="font-medium hover:underline" @click="openCustomerInfo(user)">
+                          @{{ user.username }}
+                        </button>
+                      </td>
+                      <td class="px-3 py-2">
+                        <USelect
+                          v-model="shiftDrafts[user.id]!.shiftKind"
+                          :items="[
+                            { label: 'День', value: 'day' },
+                            { label: 'Ночь', value: 'night' },
+                            { label: 'Почасовое', value: 'hourly' }
+                          ]"
+                          class="w-32"
+                        />
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                        <UButton
+                          label="Сохранить"
+                          size="sm"
+                          color="primary"
+                          :disabled="shiftDrafts[user.id]!.shiftKind === getCustomerShiftKind(user)"
+                          :loading="shiftDrafts[user.id]!.saving"
+                          @click="saveCustomerShift(user)"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
               <p v-else class="text-sm text-muted">
-                Нет пользователей в этой смене.
+                Нет пользователей в этой категории.
               </p>
-            </div>
-          </div>
+            </template>
+
+            <template #footer>
+              <div class="flex justify-end">
+                <UButton label="Закрыть" color="neutral" variant="subtle" @click="shiftModalOpen = false" />
+              </div>
+            </template>
+          </UModal>
         </div>
 
         <div v-else-if="selectedHrTab === 'advances'" class="space-y-4">
@@ -1275,10 +1618,67 @@ async function saveCustomerSalary(customer: Customer) {
       <div class="text-sm text-muted">
         Архивированные пользователи. При необходимости их можно восстановить.
       </div>
+      <div class="rounded-lg border border-default bg-elevated/30 p-3 space-y-2">
+        <div class="flex flex-wrap items-center gap-3">
+          <UCheckbox v-model="permanentDeleteArmed" label="Разрешить полное удаление" />
+
+          <div v-if="permanentDeleteArmed" class="flex flex-wrap items-center gap-3">
+            <UCheckbox
+              :model-value="archiveSelectAllModel"
+              aria-label="Выбрать всех"
+              label="Выбрать всех"
+              :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+              @update:modelValue="(value: boolean | 'indeterminate') => toggleAllArchivedSelection(!!value)"
+            />
+
+            <CustomersDeleteModal
+              v-if="selectedArchiveCount"
+              :count="selectedArchiveCount"
+              :loading="deletingSelectedArchived"
+              @confirm="permanentlyDeleteSelectedArchivedCustomers"
+            >
+              <UButton
+                label="Удалить выбранных"
+                color="error"
+                variant="outline"
+                icon="i-lucide-trash"
+                :loading="deletingSelectedArchived"
+                :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+              >
+                <template #trailing>
+                  <UKbd>
+                    {{ selectedArchiveCount }}
+                  </UKbd>
+                </template>
+              </UButton>
+            </CustomersDeleteModal>
+
+            <UButton
+              v-if="selectedArchiveCount"
+              label="Снять выделение"
+              color="neutral"
+              variant="subtle"
+              :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+              @click="clearArchivedSelection"
+            />
+          </div>
+        </div>
+        <p class="text-xs text-muted">
+          Удаляет сотрудника и связанные данные (например, задачи и авансы). Действие необратимо.
+        </p>
+      </div>
       <div class="rounded-lg border border-default bg-elevated/30 overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead>
             <tr class="bg-elevated/50">
+              <th v-if="permanentDeleteArmed" class="px-3 py-2 text-left">
+                <UCheckbox
+                  :model-value="archiveSelectAllModel"
+                  aria-label="Выбрать все"
+                  :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+                  @update:modelValue="(value: boolean | 'indeterminate') => toggleAllArchivedSelection(!!value)"
+                />
+              </th>
               <th class="px-3 py-2 text-left">ID</th>
               <th class="px-3 py-2 text-left">Пользователь</th>
               <th class="px-3 py-2 text-left">Комментарий</th>
@@ -1288,29 +1688,60 @@ async function saveCustomerSalary(customer: Customer) {
           </thead>
           <tbody>
             <tr v-if="isArchiveLoading">
-              <td class="px-3 py-3 text-muted" colspan="5">Загрузка...</td>
+              <td class="px-3 py-3 text-muted" :colspan="permanentDeleteArmed ? 6 : 5">
+                Загрузка...
+              </td>
             </tr>
             <tr
               v-for="user in safeArchiveCustomers"
               :key="user.id"
               class="border-t border-default"
             >
+              <td v-if="permanentDeleteArmed" class="px-3 py-2">
+                <UCheckbox
+                  :model-value="!!archivedRowSelection[user.id]"
+                  aria-label="Выбрать сотрудника"
+                  :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+                  @update:modelValue="(value: boolean | 'indeterminate') => setArchivedSelected(user.id, !!value)"
+                />
+              </td>
               <td class="px-3 py-2">#{{ user.id }}</td>
               <td class="px-3 py-2">@{{ user.username }}</td>
               <td class="px-3 py-2">{{ user.deactivationComment || '—' }}</td>
               <td class="px-3 py-2">{{ user.archivedAt ? formatDate(user.archivedAt) : '—' }}</td>
               <td class="px-3 py-2">
-                <UButton
-                  size="xs"
-                  color="primary"
-                  variant="outline"
-                  label="Активировать"
-                  @click="restoreCustomer(user)"
-                />
+                <div class="flex items-center justify-end gap-2">
+                  <UButton
+                    size="xs"
+                    color="primary"
+                    variant="outline"
+                    label="Активировать"
+                    :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+                    @click="restoreCustomer(user)"
+                  />
+
+                  <CustomersDeleteModal
+                    v-if="permanentDeleteArmed"
+                    :count="1"
+                    :loading="permanentlyDeletingCustomerId === user.id"
+                    @confirm="permanentlyDeleteCustomer(user)"
+                  >
+                    <UButton
+                      size="xs"
+                      color="error"
+                      variant="outline"
+                      label="Удалить"
+                      :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+                      :loading="permanentlyDeletingCustomerId === user.id"
+                    />
+                  </CustomersDeleteModal>
+                </div>
               </td>
             </tr>
             <tr v-if="!isArchiveLoading && !safeArchiveCustomers.length">
-              <td class="px-3 py-3 text-muted" colspan="5">Архив пуст.</td>
+              <td class="px-3 py-3 text-muted" :colspan="permanentDeleteArmed ? 6 : 5">
+                Архив пуст.
+              </td>
             </tr>
           </tbody>
         </table>
@@ -1325,7 +1756,10 @@ async function saveCustomerSalary(customer: Customer) {
                   Расчет за {{ salaryMonthLabel }}
                 </p>
                 <p class="mt-1">
-                  Формула штрафа: (индивидуальная базовая зарплата / {{ effectiveSalaryMonthDays }} / {{ effectiveWorkHoursPerDay }} / {{ effectiveMinutesPerHour }}) * {{ effectivePenaltyMultiplier }} * минуты опоздания за месяц.
+                  Для оклада: (базовая / {{ effectiveSalaryMonthDays }} / {{ effectiveWorkHoursPerDay }} / {{ effectiveMinutesPerHour }}) * {{ effectivePenaltyMultiplier }} * минуты опоздания за месяц.
+                </p>
+                <p class="mt-1">
+                  Для почасовой: (ставка/час / 60) * отработанные минуты + надбавка.
                 </p>
               </div>
 
@@ -1351,7 +1785,10 @@ async function saveCustomerSalary(customer: Customer) {
                     Пользователь
                   </th>
                   <th class="px-3 py-2 text-left">
-                    Базовая зарплата
+                    Тип
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    Оклад / ставка
                   </th>
                   <th class="px-3 py-2 text-left">
                     Надбавка
@@ -1376,8 +1813,25 @@ async function saveCustomerSalary(customer: Customer) {
                   <td class="px-3 py-2">
                     @{{ customer.username }}
                   </td>
+                  <td class="px-3 py-2 min-w-40">
+                    <USelect
+                      v-model="salaryDrafts[customer.id]!.salaryType"
+                      :items="SALARY_TYPE_OPTIONS"
+                      class="w-full"
+                    />
+                  </td>
                   <td class="px-3 py-2 min-w-48">
                     <UInput
+                      v-if="salaryDrafts[customer.id]?.salaryType === 'hourly'"
+                      :model-value="salaryDrafts[customer.id]?.hourlyRate ?? ''"
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputmode="numeric"
+                      @update:model-value="updateSalaryDraft(customer.id, 'hourlyRate', $event)"
+                    />
+                    <UInput
+                      v-else
                       :model-value="salaryDrafts[customer.id]?.baseSalary ?? ''"
                       type="number"
                       min="0"
@@ -1402,7 +1856,9 @@ async function saveCustomerSalary(customer: Customer) {
                       <p class="text-xs font-normal text-muted">
                         {{ isSalaryActivityLoading
                           ? 'Загрузка активности...'
-                          : `Опоздание: ${getEmployeeLateMinutes(customer.id)} мин, штраф: ${formatCurrency(getLatePenalty(customer.id))}` }}
+                          : (salaryDrafts[customer.id]?.salaryType === 'hourly'
+                              ? `Отработано: ${formatWorkMinutes(getEmployeeWorkMinutes(customer.id))}, ставка: ${formatCurrency(getHourlyRate(customer.id))}/час`
+                              : `Опоздание: ${getEmployeeLateMinutes(customer.id)} мин, штраф: ${formatCurrency(getLatePenalty(customer.id))}`) }}
                       </p>
                     </div>
                   </td>
@@ -1615,12 +2071,22 @@ async function saveCustomerSalary(customer: Customer) {
                 <p class="text-xs text-muted">
                   Зарплата
                 </p>
-                <p class="font-medium">
-                  {{ formatCurrency(selectedCustomer.baseSalary) }} + {{ formatCurrency(selectedCustomer.positionBonus) }}
-                </p>
-                <p class="text-xs text-muted mt-1">
-                  Итого: {{ formatCurrency(selectedCustomer.baseSalary + selectedCustomer.positionBonus) }}
-                </p>
+                <template v-if="selectedCustomer.salaryType === 'hourly'">
+                  <p class="font-medium">
+                    {{ formatCurrency(selectedCustomer.hourlyRate) }}/час
+                  </p>
+                  <p class="text-xs text-muted mt-1">
+                    Надбавка: {{ formatCurrency(selectedCustomer.positionBonus) }}
+                  </p>
+                </template>
+                <template v-else>
+                  <p class="font-medium">
+                    {{ formatCurrency(selectedCustomer.baseSalary) }} + {{ formatCurrency(selectedCustomer.positionBonus) }}
+                  </p>
+                  <p class="text-xs text-muted mt-1">
+                    Итого: {{ formatCurrency(selectedCustomer.baseSalary + selectedCustomer.positionBonus) }}
+                  </p>
+                </template>
               </div>
               <div class="rounded-md border border-default p-3 sm:col-span-2">
                 <p class="text-xs text-muted mb-2">
@@ -1743,5 +2209,3 @@ async function saveCustomerSalary(customer: Customer) {
     </template>
   </UDashboardPanel>
 </template>
-
-

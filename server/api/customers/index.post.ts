@@ -4,6 +4,7 @@ import {
   mapCustomerDbRowToRecord,
   type CreateCustomerBody,
   type CustomerDbRow,
+  type SalaryType,
   type WorkShift
 } from './customers'
 import type { H3Event } from 'h3'
@@ -25,6 +26,10 @@ const DEFAULT_PASSWORD = '12345678'
 
 function isWorkShift(value: unknown): value is WorkShift {
   return value === 'day' || value === 'night'
+}
+
+function isSalaryType(value: unknown): value is SalaryType {
+  return value === 'fixed' || value === 'hourly'
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -163,6 +168,19 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   const buildingId = parseOptionalBuildingId(input.buildingId)
   const baseSalary = parseOptionalMoney(input.baseSalary, 'baseSalary')
   const positionBonus = parseOptionalMoney(input.positionBonus, 'positionBonus')
+  const salaryTypeValue = (input as Record<string, unknown>).salaryType ?? (input as Record<string, unknown>).salary_type
+  let salaryType: SalaryType | undefined
+  if (salaryTypeValue !== undefined) {
+    if (!isSalaryType(salaryTypeValue)) {
+      throw createError({ statusCode: 400, statusMessage: 'Поле salaryType должно быть fixed или hourly.' })
+    }
+    salaryType = salaryTypeValue
+  }
+
+  const hourlyRate = parseOptionalMoney(
+    (input as Record<string, unknown>).hourlyRate ?? (input as Record<string, unknown>).hourly_rate,
+    'hourlyRate'
+  )
   const role = getOptionalString((input as any).role) || 'customer'
 
   if (!isAuthRole(role)) {
@@ -188,6 +206,8 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
     objectPositions: input.objectPositions.map(position => position.trim()),
     baseSalary,
     positionBonus,
+    salaryType,
+    hourlyRate,
     salaryCurrency: 'UZS',
     status: 'pending',
     mustChangePassword: true
@@ -392,6 +412,15 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
   const objectPositions = parseObjectPositions(fields.get('objectPositions'))
   const baseSalary = parseOptionalMoney(fields.get('baseSalary'), 'baseSalary')
   const positionBonus = parseOptionalMoney(fields.get('positionBonus'), 'positionBonus')
+  const salaryTypeRaw = getOptionalString(fields.get('salaryType') || fields.get('salary_type'))
+  let salaryType: SalaryType | undefined
+  if (salaryTypeRaw) {
+    if (!isSalaryType(salaryTypeRaw)) {
+      throw createError({ statusCode: 400, statusMessage: 'Поле salaryType должно быть fixed или hourly.' })
+    }
+    salaryType = salaryTypeRaw
+  }
+  const hourlyRate = parseOptionalMoney(fields.get('hourlyRate') || fields.get('hourly_rate'), 'hourlyRate')
   const role = getOptionalString(fields.get('role')) || 'customer'
   ensurePasswordSafe(password, fullName, username)
 
@@ -513,6 +542,8 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
     objectPositions,
     baseSalary,
     positionBonus,
+    salaryType,
+    hourlyRate,
     salaryCurrency: 'UZS',
     status: 'pending',
     mustChangePassword: true

@@ -1,15 +1,142 @@
 import ExcelJS from 'exceljs'
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+import { listEmployeeActivities } from '../../utils/employee-activity'
 import type { EmployeeAdvanceDbRow } from './advances'
 import { mapCustomerDbRowToRecord, type CustomerDbRow } from './customers'
+import type { H3Event } from 'h3'
+
+type SalaryFormulaCookie = {
+  daysInMonth?: string
+  workHoursPerDay?: string
+  minutesPerHour?: string
+  penaltyMultiplier?: string
+}
+
+function parseDateFilter(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalized = value.trim()
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : undefined
+}
+
+function getTashkentMonthRange(reference = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit'
+  }).formatToParts(reference)
+
+  const year = Number(parts.find(part => part.type === 'year')?.value)
+  const month = Number(parts.find(part => part.type === 'month')?.value)
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    const fallbackYear = reference.getFullYear()
+    const fallbackMonth = reference.getMonth() + 1
+    const lastDay = new Date(Date.UTC(fallbackYear, fallbackMonth, 0)).getUTCDate()
+
+    return {
+      from: `${fallbackYear}-${String(fallbackMonth).padStart(2, '0')}-01`,
+      to: `${fallbackYear}-${String(fallbackMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    }
+  }
+
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+
+  return {
+    from: `${year}-${String(month).padStart(2, '0')}-01`,
+    to: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  }
+}
+
+function parseYmd(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+
+  if (!Number.isInteger(year) || year < 1970) return null
+  if (!Number.isInteger(month) || month < 1 || month > 12) return null
+  if (!Number.isInteger(day) || day < 1 || day > 31) return null
+
+  return { year, month, day }
+}
+
+function getInclusiveDays(from?: string, to?: string) {
+  if (!from || !to) {
+    return undefined
+  }
+
+  const fromParts = parseYmd(from)
+  const toParts = parseYmd(to)
+  if (!fromParts || !toParts) {
+    return undefined
+  }
+
+  const fromUtc = Date.UTC(fromParts.year, fromParts.month - 1, fromParts.day)
+  const toUtc = Date.UTC(toParts.year, toParts.month - 1, toParts.day)
+
+  if (!Number.isFinite(fromUtc) || !Number.isFinite(toUtc) || toUtc < fromUtc) {
+    return undefined
+  }
+
+  return Math.floor((toUtc - fromUtc) / 86400000) + 1
+}
+
+function parsePositiveInt(value: unknown) {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
+}
+
+function normalizeFormulaValue(raw: unknown, fallback: number) {
+  return parsePositiveInt(raw) ?? fallback
+}
+
+function readSalaryFormulaCookie(event: H3Event): SalaryFormulaCookie {
+  const raw = getCookie(event, 'hr-salary-formula-config')
+  if (!raw) {
+    return {}
+  }
+
+  try {
+    return JSON.parse(raw) as SalaryFormulaCookie
+  } catch {
+    try {
+      return JSON.parse(decodeURIComponent(raw)) as SalaryFormulaCookie
+    } catch {
+      return {}
+    }
+  }
+}
+
+function formatWorkMinutes(totalMinutes: number) {
+  const minutes = Number.isFinite(totalMinutes) ? Math.max(0, Math.floor(totalMinutes)) : 0
+  const hoursPart = Math.floor(minutes / 60)
+  const minutesPart = minutes % 60
+
+  if (!minutesPart) {
+    return `${hoursPart} ч`
+  }
+
+  return `${hoursPart} ч ${minutesPart} мин`
+}
 
 export default eventHandler(async (event) => {
   const { url, serviceRoleKey, passportBucket } = getSupabaseServerConfig()
-  const buildingIdRaw = getQuery(event).buildingId
+  const queryParams = getQuery(event)
+  const buildingIdRaw = queryParams.buildingId
   const buildingId = typeof buildingIdRaw === 'string' ? Number(buildingIdRaw) : NaN
+  const from = parseDateFilter(queryParams.from)
+  const to = parseDateFilter(queryParams.to)
+  const defaultRange = getTashkentMonthRange()
+  const rangeFrom = from ?? defaultRange.from
+  const rangeTo = to ?? defaultRange.to
 
   const query: Record<string, string> = {
-    select: 'id,full_name,username,avatar,password,phone_number,passport_file,passport_front_path,passport_back_path,age,work_shift,object_pinned,object_positions,base_salary,position_bonus,salary_currency,status,must_change_password,activated_at,archived_at,deactivation_comment',
+    select: 'id,building_id,full_name,username,avatar,password,phone_number,passport_file,passport_front_path,passport_back_path,age,work_shift,object_pinned,object_positions,salary_type,hourly_rate,base_salary,position_bonus,salary_currency,status,must_change_password,activated_at,archived_at,deactivation_comment',
     order: 'id.asc',
     status: 'neq.archived'
   }
@@ -23,6 +150,25 @@ export default eventHandler(async (event) => {
   })
 
   const customers = rows.map(mapCustomerDbRowToRecord)
+
+  const activities = await listEmployeeActivities({
+    from: rangeFrom,
+    to: rangeTo,
+    buildingId: Number.isInteger(buildingId) && buildingId > 0 ? buildingId : undefined,
+    employeeIds: customers.map(customer => customer.id)
+  })
+
+  const lateMinutesByEmployee = activities.reduce<Record<number, number>>((acc, row) => {
+    if (!row.employeeId) return acc
+    acc[row.employeeId] = (acc[row.employeeId] || 0) + (row.lateMinutes || 0)
+    return acc
+  }, {})
+
+  const workMinutesByEmployee = activities.reduce<Record<number, number>>((acc, row) => {
+    if (!row.employeeId) return acc
+    acc[row.employeeId] = (acc[row.employeeId] || 0) + (row.workMinutes || 0)
+    return acc
+  }, {})
 
   // Fetch advances for all customers in scope
   const advancesQuery: Record<string, string> = {
@@ -45,6 +191,13 @@ export default eventHandler(async (event) => {
   const workbook = new ExcelJS.Workbook()
   const sheet = workbook.addWorksheet('Зарплаты')
 
+  const cookieConfig = readSalaryFormulaCookie(event)
+  const defaultDaysInRange = getInclusiveDays(rangeFrom, rangeTo) ?? 30
+  const effectiveSalaryMonthDays = normalizeFormulaValue(cookieConfig.daysInMonth, defaultDaysInRange)
+  const effectiveWorkHoursPerDay = normalizeFormulaValue(cookieConfig.workHoursPerDay, 12)
+  const effectiveMinutesPerHour = normalizeFormulaValue(cookieConfig.minutesPerHour, 60)
+  const effectivePenaltyMultiplier = normalizeFormulaValue(cookieConfig.penaltyMultiplier, 4)
+
   sheet.columns = [
     { header: 'ID', key: 'id', width: 8 },
     { header: 'ФИО', key: 'fullName', width: 22 },
@@ -53,10 +206,16 @@ export default eventHandler(async (event) => {
     { header: 'Смена', key: 'workShift', width: 10 },
     { header: 'Объект', key: 'objectPinned', width: 18 },
     { header: 'Позиции', key: 'objectPositions', width: 28 },
+    { header: 'Тип', key: 'salaryType', width: 12 },
+    { header: 'Ставка/час', key: 'hourlyRate', width: 12 },
     { header: 'Базовая', key: 'baseSalary', width: 14 },
     { header: 'Надбавка', key: 'positionBonus', width: 12 },
+    { header: 'Отработано', key: 'worked', width: 14 },
+    { header: 'Опоздание (мин)', key: 'lateMinutes', width: 14 },
+    { header: 'Штраф', key: 'latePenalty', width: 12 },
+    { header: 'Начислено', key: 'totalSalary', width: 14 },
     { header: 'Авансы (выдано)', key: 'advances', width: 14 },
-    { header: 'Итого к выплате', key: 'netSalary', width: 16 },
+    { header: 'К выплате', key: 'netSalary', width: 16 },
     { header: 'Валюта', key: 'salaryCurrency', width: 8 },
     { header: 'Статус', key: 'status', width: 12 },
     { header: 'Паспорт (фронт)', key: 'passportFront', width: 30 },
@@ -93,10 +252,45 @@ export default eventHandler(async (event) => {
     return `${base}/storage/v1/object/public/${withBucket}`
   }
 
-  customers.forEach(c => {
+  const computeLatePenalty = (baseSalary: number, lateMinutes: number) => {
+    if (!baseSalary || !lateMinutes || !effectiveSalaryMonthDays) {
+      return 0
+    }
+
+    const perMinuteRate = baseSalary
+      / effectiveSalaryMonthDays
+      / effectiveWorkHoursPerDay
+      / effectiveMinutesPerHour
+
+    return Math.round(perMinuteRate * effectivePenaltyMultiplier * lateMinutes)
+  }
+
+  const computeHourlySalary = (hourlyRate: number, workMinutes: number) => {
+    if (!hourlyRate || !workMinutes) {
+      return 0
+    }
+
+    return Math.round((hourlyRate / 60) * workMinutes)
+  }
+
+  customers.forEach((c) => {
     const passport = parsePassport(c.passportFile)
     const advancesTotal = advanceByCustomer[c.id] || 0
-    const netSalary = (c.baseSalary || 0) + (c.positionBonus || 0) - advancesTotal
+    const workMinutes = workMinutesByEmployee[c.id] || 0
+    const lateMinutes = lateMinutesByEmployee[c.id] || 0
+
+    const salaryTypeLabel = c.salaryType === 'hourly' ? 'Почасовая' : 'Оклад'
+    const hourlySalary = c.salaryType === 'hourly'
+      ? computeHourlySalary(c.hourlyRate || 0, workMinutes)
+      : 0
+    const grossSalary = c.salaryType === 'hourly'
+      ? hourlySalary + (c.positionBonus || 0)
+      : (c.baseSalary || 0) + (c.positionBonus || 0)
+    const latePenalty = c.salaryType === 'hourly'
+      ? 0
+      : computeLatePenalty(c.baseSalary || 0, lateMinutes)
+    const totalSalary = Math.max(grossSalary - latePenalty, 0)
+    const netSalary = totalSalary - advancesTotal
     sheet.addRow({
       id: c.id,
       fullName: c.fullName || '',
@@ -105,8 +299,14 @@ export default eventHandler(async (event) => {
       workShift: c.workShift === 'day' ? 'День' : 'Ночь',
       objectPinned: c.objectPinned,
       objectPositions: (c.objectPositions || []).join(', '),
-      baseSalary: c.baseSalary,
+      salaryType: salaryTypeLabel,
+      hourlyRate: c.salaryType === 'hourly' ? c.hourlyRate : '',
+      baseSalary: c.salaryType === 'hourly' ? '' : c.baseSalary,
       positionBonus: c.positionBonus,
+      worked: formatWorkMinutes(workMinutes),
+      lateMinutes,
+      latePenalty,
+      totalSalary,
       advances: advancesTotal,
       netSalary,
       salaryCurrency: c.salaryCurrency || 'UZS',

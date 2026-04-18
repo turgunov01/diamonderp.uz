@@ -5,6 +5,7 @@ import {
   mapCustomerDbRowToRecord,
   mapUpdateBodyToDbUpdate,
   type CustomerDbRow,
+  type SalaryType,
   type UpdateCustomerBody,
   type WorkShift
 } from './customers'
@@ -16,6 +17,10 @@ function isWorkShift(value: unknown): value is WorkShift {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
+}
+
+function isSalaryType(value: unknown): value is SalaryType {
+  return value === 'fixed' || value === 'hourly'
 }
 
 function parseCustomerId(event: H3Event) {
@@ -198,6 +203,22 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
 
   if (input.positionBonus !== undefined) {
     update.positionBonus = parseMoney(input.positionBonus, 'positionBonus', true)
+  }
+
+  const salaryTypeValue = input.salaryType ?? input.salary_type
+  if (salaryTypeValue !== undefined) {
+    if (!isSalaryType(salaryTypeValue)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Поле salaryType должно быть fixed или hourly.'
+      })
+    }
+    update.salaryType = salaryTypeValue
+  }
+
+  const hourlyRateValue = input.hourlyRate ?? input.hourly_rate
+  if (hourlyRateValue !== undefined) {
+    update.hourlyRate = parseMoney(hourlyRateValue, 'hourlyRate', false)
   }
 
   let requestedStatus: UpdateCustomerBody['status'] | undefined

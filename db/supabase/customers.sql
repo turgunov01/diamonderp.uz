@@ -14,6 +14,13 @@ exception
   when duplicate_object then null;
 end $$;
 
+do $$
+begin
+  create type public.salary_type as enum ('fixed', 'hourly');
+exception
+  when duplicate_object then null;
+end $$;
+
 create table if not exists public.customers (
   id bigint generated always as identity primary key,
   building_id bigint references public.buildings(id) on delete set null,
@@ -29,6 +36,8 @@ create table if not exists public.customers (
   work_shift public.work_shift not null,
   object_pinned text not null,
   object_positions text[] not null default '{}',
+  salary_type public.salary_type not null default 'fixed',
+  hourly_rate bigint not null default 0,
   status public.customer_status not null default 'pending',
   must_change_password boolean not null default true,
   activated_at timestamptz,
@@ -46,6 +55,8 @@ alter table public.customers
   add column if not exists full_name text not null default '',
   add column if not exists passport_front_path text,
   add column if not exists passport_back_path text,
+  add column if not exists salary_type public.salary_type not null default 'fixed',
+  add column if not exists hourly_rate bigint not null default 0,
   add column if not exists status public.customer_status not null default 'pending',
   add column if not exists must_change_password boolean not null default true,
   add column if not exists activated_at timestamptz,

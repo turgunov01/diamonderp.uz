@@ -11,7 +11,7 @@ type EditableCustomer = {
   fullName?: string
   username: string
   phoneNumber: string
-  role: 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
+  role: string
   age: number
   workShift: 'day' | 'night'
   salaryType?: SalaryType
@@ -50,14 +50,14 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { default: false })
 const NOT_PINNED_VALUE = '__not_pinned__'
 const DEFAULT_PASSWORD = '12345678'
-const CUSTOMER_ROLE_OPTIONS = [
-  { label: 'Cleaner', value: 'cleaner' },
-  { label: 'Customer', value: 'customer' },
-  { label: 'Manager', value: 'manager' },
-  { label: 'Supervisor', value: 'supervisor' },
-  { label: 'Procurement', value: 'procurement' },
+const DEFAULT_ROLE_OPTIONS = [
+  { label: 'Сотрудник', value: 'customer' },
+  { label: 'Клинер', value: 'cleaner' },
+  { label: 'Менеджер', value: 'manager' },
+  { label: 'Супервайзер', value: 'supervisor' },
+  { label: 'Закупщик', value: 'procurement' },
   { label: 'HR', value: 'hr' },
-  { label: 'Admin', value: 'admin' }
+  { label: 'Админ', value: 'admin' }
 ] as const
 
 const createSchema = z.object({
@@ -65,7 +65,7 @@ const createSchema = z.object({
   username: z.string().min(3, 'Имя пользователя слишком короткое'),
   password: z.string().min(6, 'Пароль должен быть не менее 6 символов'),
   phoneNumber: z.string().min(7, 'Номер телефона слишком короткий'),
-  role: z.enum(['customer', 'cleaner', 'manager', 'supervisor', 'procurement', 'hr', 'admin']),
+  role: z.string().min(1, 'Роль обязательна').max(64, 'Роль слишком длинная'),
   age: z.coerce
     .number()
     .int('Возраст должен быть целым числом')
@@ -85,7 +85,7 @@ const editSchema = z.object({
     'Пароль должен быть не менее 6 символов'
   ),
   phoneNumber: z.string().min(7, 'Номер телефона слишком короткий'),
-  role: z.enum(['customer', 'cleaner', 'manager', 'supervisor', 'procurement', 'hr', 'admin']).optional(),
+  role: z.string().min(1, 'Роль обязательна').max(64, 'Роль слишком длинная').optional(),
   age: z.coerce
     .number()
     .int('Возраст должен быть целым числом')
@@ -102,7 +102,7 @@ type FormState = {
   username: string
   password: string
   phoneNumber: string
-  role: 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
+  role: string
   age: number
   workShift: 'day' | 'night'
   salaryType: SalaryType
@@ -116,7 +116,7 @@ type FormSubmitState = {
   username: string
   password: string
   phoneNumber: string
-  role: 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
+  role: string
   age: number
   workShift: 'day' | 'night'
   salaryType: SalaryType
@@ -165,6 +165,30 @@ const selectedBuildingId = computed(() => {
   const raw = state.buildingId
   const parsed = typeof raw === 'number' ? raw : Number(raw)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
+})
+
+type CustomerRoleItem = {
+  id: number
+  buildingId: number | null
+  code: string
+  label: string
+  isActive: boolean
+  createdAt: string | null
+}
+
+const { data: roles } = await useFetch<CustomerRoleItem[]>('/api/customer-roles', {
+  default: () => [],
+  query: {
+    buildingId: selectedBuildingId
+  }
+})
+
+const roleOptions = computed(() => {
+  const dynamic = (roles.value || [])
+    .filter(role => role.isActive)
+    .map(role => ({ label: role.label, value: role.code }))
+
+  return dynamic.length ? dynamic : DEFAULT_ROLE_OPTIONS
 })
 
 watch(activeBuilding, (building) => {
@@ -469,7 +493,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
         <UFormField label="Роль" name="role">
           <USelect
             v-model="state.role"
-            :items="CUSTOMER_ROLE_OPTIONS"
+            :items="roleOptions"
             class="w-full"
           />
         </UFormField>

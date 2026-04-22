@@ -6,7 +6,7 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 type WorkShift = 'day' | 'night'
 type SalaryType = 'fixed' | 'hourly'
 type ShiftKind = 'day' | 'night' | 'hourly'
-type CustomerRole = 'customer' | 'cleaner' | 'manager' | 'supervisor' | 'procurement' | 'hr' | 'admin'
+type CustomerRole = string
 
 interface BulkImportPreviewResponse {
   added: number
@@ -49,21 +49,21 @@ type ObjectItem = {
 
 const DEFAULT_PASSWORD = '12345678'
 const NOT_PINNED_VALUE = '__not_pinned__'
-const ROLE_OPTIONS = [
-  { label: 'Cleaner', value: 'cleaner' },
-  { label: 'Customer', value: 'customer' },
-  { label: 'Manager', value: 'manager' },
-  { label: 'Supervisor', value: 'supervisor' },
-  { label: 'Procurement', value: 'procurement' },
+const DEFAULT_ROLE_OPTIONS = [
+  { label: 'Сотрудник', value: 'customer' },
+  { label: 'Клинер', value: 'cleaner' },
+  { label: 'Менеджер', value: 'manager' },
+  { label: 'Супервайзер', value: 'supervisor' },
+  { label: 'Закупщик', value: 'procurement' },
   { label: 'HR', value: 'hr' },
-  { label: 'Admin', value: 'admin' }
+  { label: 'Админ', value: 'admin' }
 ] as const
 
 const createSchema = z.object({
   fullName: z.string().min(3, 'ФИО обязательно'),
   username: z.string().min(3, 'Имя пользователя слишком короткое'),
   phoneNumber: z.string().min(7, 'Номер телефона слишком короткий'),
-  role: z.enum(['customer', 'cleaner', 'manager', 'supervisor', 'procurement', 'hr', 'admin']),
+  role: z.string().min(1, 'Роль обязательна').max(64, 'Роль слишком длинная'),
   age: z.coerce
     .number()
     .int('Возраст должен быть целым числом')
@@ -94,6 +94,30 @@ const draftsOpen = ref(false)
 const editorOpen = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const activeBuilding = useState<{ id: number, name: string } | null>('active-building')
+
+type CustomerRoleItem = {
+  id: number
+  buildingId: number | null
+  code: string
+  label: string
+  isActive: boolean
+  createdAt: string | null
+}
+
+const { data: roles } = await useFetch<CustomerRoleItem[]>('/api/customer-roles', {
+  default: () => [],
+  query: {
+    buildingId: computed(() => activeBuilding.value?.id)
+  }
+})
+
+const roleOptions = computed(() => {
+  const dynamic = (roles.value || [])
+    .filter(role => role.isActive)
+    .map(role => ({ label: role.label, value: role.code }))
+
+  return dynamic.length ? dynamic : DEFAULT_ROLE_OPTIONS
+})
 
 const drafts = useLocalStorage<DraftCustomer[]>(
   'customers-import-drafts',
@@ -189,7 +213,7 @@ function getErrorMessage(error: unknown) {
 }
 
 function createLocalId() {
-  if (process.client && 'crypto' in window && typeof window.crypto?.randomUUID === 'function') {
+  if (import.meta.client && 'crypto' in window && typeof window.crypto?.randomUUID === 'function') {
     return window.crypto.randomUUID()
   }
 
@@ -447,7 +471,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
 </script>
 
 <template>
-  <div class="flex items-center gap-1.5">
+  <div class="flex items-center gap-2">
     <UButton
       label="Шаблон XLSX"
       icon="i-lucide-file-spreadsheet"
@@ -578,11 +602,17 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
           </UFormField>
 
           <UFormField label="Роль" name="role">
-            <USelect v-model="state.role" :items="ROLE_OPTIONS" class="w-full" />
+            <USelect v-model="state.role" :items="roleOptions" class="w-full" />
           </UFormField>
 
           <UFormField label="Возраст" name="age">
-            <UInput v-model="state.age" class="w-full" type="number" min="18" step="1" />
+            <UInput
+              v-model="state.age"
+              class="w-full"
+              type="number"
+              min="18"
+              step="1"
+            />
           </UFormField>
 
           <UFormField label="Смена" name="workShift">

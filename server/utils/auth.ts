@@ -12,7 +12,6 @@ export interface ErpUserAuthRow {
   avatar: string | null
   is_active: boolean | null
 }
-
 interface CustomerLoginRow {
   id: number
   full_name: string
@@ -62,13 +61,7 @@ function getAuthSecret() {
 }
 
 export function isAuthRole(value: unknown): value is AuthRole {
-  return value === 'admin'
-    || value === 'hr'
-    || value === 'procurement'
-    || value === 'manager'
-    || value === 'supervisor'
-    || value === 'customer'
-    || value === 'cleaner'
+  return typeof value === 'string' && value.trim().length > 0
 }
 
 export function isErpAuthRole(value: unknown): value is AuthRole {
@@ -86,12 +79,16 @@ export function mapUserToSession(user: ErpUserAuthRow): AuthSession {
 }
 
 export function mapCustomerToSession(row: CustomerProfileRow | CustomerLoginRow): AuthSession {
+  const role = typeof row.role === 'string' && row.role.trim().length
+    ? row.role.trim().toLowerCase()
+    : 'customer'
+
   return {
     id: row.id,
     email: undefined,
     phone: row.phone_number,
     name: row.full_name || row.username,
-    role: (row.role as AuthRole | undefined) || 'customer',
+    role,
     avatar: row.avatar
   }
 }
@@ -360,4 +357,3 @@ export async function authenticateLogin(body: Partial<LoginRequestBody> | null |
     statusMessage: 'Invalid login or password.'
   })
 }
-

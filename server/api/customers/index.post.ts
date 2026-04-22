@@ -181,9 +181,9 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
     (input as Record<string, unknown>).hourlyRate ?? (input as Record<string, unknown>).hourly_rate,
     'hourlyRate'
   )
-  const role = getOptionalString((input as any).role) || 'customer'
+  const role = (getOptionalString((input as any).role) || 'customer').toLowerCase()
 
-  if (!isAuthRole(role)) {
+  if (!isAuthRole(role) || role.length > 64) {
     throw createError({ statusCode: 400, statusMessage: 'Поле role содержит недопустимую роль.' })
   }
 
@@ -421,8 +421,12 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
     salaryType = salaryTypeRaw
   }
   const hourlyRate = parseOptionalMoney(fields.get('hourlyRate') || fields.get('hourly_rate'), 'hourlyRate')
-  const role = getOptionalString(fields.get('role')) || 'customer'
+  const role = (getOptionalString(fields.get('role')) || 'customer').toLowerCase()
   ensurePasswordSafe(password, fullName, username)
+
+  if (!isAuthRole(role) || role.length > 64) {
+    throw createError({ statusCode: 400, statusMessage: 'Поле role должно быть непустой строкой.' })
+  }
 
   if (!isWorkShift(workShiftRaw)) {
     throw createError({ statusCode: 400, statusMessage: 'Поле workShift должно быть \'day\' или \'night\'.' })
@@ -533,8 +537,8 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
     phoneNumber,
     role,
     passportFile,
-    passportFrontPath: passportFrontPath ?? null,
-    passportBackPath: passportBackPath ?? null,
+    passportFrontPath: passportFrontPath ?? undefined,
+    passportBackPath: passportBackPath ?? undefined,
     age,
     buildingId,
     workShift: workShiftRaw,

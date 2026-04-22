@@ -82,13 +82,17 @@ function getFrontend(role: AuthRole): MobileFrontend {
   return 'employee'
 }
 
-export function isFrontlineMobileRole(role: AuthRole): role is 'customer' | 'cleaner' {
-  return role === 'customer' || role === 'cleaner'
+export function isFrontlineMobileRole(role: AuthRole) {
+  return role !== 'admin'
+    && role !== 'hr'
+    && role !== 'procurement'
+    && role !== 'manager'
+    && role !== 'supervisor'
 }
 
 export function isFrontlineMobileAccess(
   context: MobileAccessContext
-): context is MobileAccessContext & { role: 'customer' | 'cleaner', customer: CustomerProfileRow } {
+): context is MobileAccessContext & { customer: CustomerProfileRow } {
   return Boolean(context.customer) && isFrontlineMobileRole(context.role)
 }
 

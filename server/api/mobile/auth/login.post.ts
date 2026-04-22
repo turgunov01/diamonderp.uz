@@ -10,9 +10,14 @@ export default eventHandler(async (event) => {
   const result = await authenticateLogin(await readBody<Partial<LoginRequestBody>>(event))
   const access = await resolveMobileAccessFromPayload(result.payload)
   const mustChangePassword = Boolean(access.customer ? (access.customer.must_change_password ?? true) : false)
-  const activity = isFrontlineMobileAccess(access)
-    ? await recordEmployeeActivity({ employeeId: access.user.id })
-    : null
+  let activity = null
+  let shiftStarted = false
+
+  if (isFrontlineMobileAccess(access)) {
+    activity = await recordEmployeeActivity({ employeeId: access.user.id })
+    shiftStarted = activity?.created === true
+  }
+
   const shift = access.customer
     ? resolveMobileShiftInfo(access.customer?.work_shift)
     : null
@@ -39,6 +44,7 @@ export default eventHandler(async (event) => {
       objectNames: access.objectNames
     },
     shift,
+    shiftStarted,
     objects: access.objects,
     activity
   }

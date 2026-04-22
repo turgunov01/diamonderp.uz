@@ -188,13 +188,13 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
   }
 
   if (input.role !== undefined) {
-    if (!isNonEmptyString(input.role) || !isAuthRole(input.role.trim())) {
+    if (!isNonEmptyString(input.role) || !isAuthRole(input.role.trim()) || input.role.trim().length > 64) {
       throw createError({
         statusCode: 400,
         statusMessage: 'Поле role содержит недопустимую роль.'
       })
     }
-    update.role = input.role.trim()
+    update.role = input.role.trim().toLowerCase()
   }
 
   if (input.baseSalary !== undefined) {

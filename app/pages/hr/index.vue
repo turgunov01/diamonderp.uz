@@ -4,7 +4,6 @@ import { upperFirst } from 'scule'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
 import type { EmployeeActivityRecord } from '~/stores/employeeActivity'
-import { getRoleLabel } from '~~/shared/utils/access'
 
 interface Customer {
   id: number
@@ -35,8 +34,6 @@ interface Customer {
   deactivationComment?: string | null
 }
 
-type CustomerStatus = 'active' | 'inactive'
-
 interface PassportFileEntry {
   label: string
   value: string
@@ -58,7 +55,6 @@ interface SalaryDraft {
 }
 
 interface SalaryFormulaConfig {
-  daysInMonth: string
   workHoursPerDay: string
   minutesPerHour: string
   penaltyMultiplier: string
@@ -76,9 +72,22 @@ interface Advance {
   settledAt?: string | null
 }
 
+interface CustomerRole {
+  id: number
+  buildingId: number | null
+  code: string
+  label: string
+  isActive: boolean
+  createdAt: string | null
+}
+
+interface ObjectItem {
+  id: number
+  name: string
+}
+
 function createDefaultSalaryFormulaConfig(): SalaryFormulaConfig {
   return {
-    daysInMonth: '',
     workHoursPerDay: String(WORK_HOURS_PER_DAY),
     minutesPerHour: String(MINUTES_PER_HOUR),
     penaltyMultiplier: String(LATE_PENALTY_MULTIPLIER)
@@ -132,6 +141,9 @@ const hrTabs = [{
   label: 'Авансы',
   value: 'advances'
 }, {
+  label: 'Роли',
+  value: 'roles'
+}, {
   label: 'Архив',
   value: 'archive'
 }]
@@ -156,12 +168,36 @@ const salaryFormulaConfig = useState<SalaryFormulaConfig>('hr-salary-formula-con
   ...salaryFormulaCookie.value
 }))
 const salaryFormulaDraft = reactive<SalaryFormulaConfig>({
-  daysInMonth: salaryFormulaConfig.value.daysInMonth,
   workHoursPerDay: salaryFormulaConfig.value.workHoursPerDay,
   minutesPerHour: salaryFormulaConfig.value.minutesPerHour,
   penaltyMultiplier: salaryFormulaConfig.value.penaltyMultiplier
 })
 const exportSalaryLoading = ref(false)
+
+const { data: rolesData } = await useAutoRefreshFetch<CustomerRole[]>('/api/customer-roles', {
+  default: () => [],
+  query: {
+    buildingId: computed(() => activeBuilding.value?.id)
+  }
+})
+
+const roleLabelByCode = computed(() => {
+  const map = new Map<string, string>()
+
+  for (const role of rolesData.value || []) {
+    if (!role.isActive) continue
+    const code = typeof role.code === 'string' ? role.code.trim().toLowerCase() : ''
+    if (!code) continue
+    map.set(code, role.label)
+  }
+
+  return map
+})
+
+function getCustomerRoleLabel(role?: string | null) {
+  const code = typeof role === 'string' ? role.trim().toLowerCase() : ''
+  return roleLabelByCode.value.get(code) || (code ? code : '—')
+}
 
 const { data, status, error, refresh } = await useAutoRefreshFetch<Customer[]>('/api/customers', {
   lazy: true,
@@ -213,9 +249,7 @@ const salaryMonthLabel = computed(() =>
     year: 'numeric'
   })
 )
-const effectiveSalaryMonthDays = computed(() =>
-  normalizeFormulaValue(salaryFormulaConfig.value.daysInMonth, salaryMonthDays.value)
-)
+const effectiveSalaryMonthDays = computed(() => salaryMonthDays.value)
 const effectiveWorkHoursPerDay = computed(() =>
   normalizeFormulaValue(salaryFormulaConfig.value.workHoursPerDay, WORK_HOURS_PER_DAY)
 )
@@ -238,11 +272,57 @@ const {
     buildingId: computed(() => activeBuilding.value?.id)
   }
 })
+
+const { data: objectsData } = await useFetch<ObjectItem[]>('/api/objects', {
+  default: () => [],
+  query: {
+    buildingId: computed(() => activeBuilding.value?.id)
+  }
+})
+
 const safeCustomers = computed(() =>
   (data.value || []).filter(customer => customer.status !== 'archived')
 )
 const safeArchiveCustomers = computed(() => archiveData.value || [])
 const safeAdvances = computed(() => advancesData.value || [])
+
+const objectFilter = ref<string | null>(null)
+const shiftFilter = ref<'day' | 'night' | 'hourly' | null>(null)
+
+const objectFilterOptions = computed(() => {
+  const seen = new Set<string>()
+  const items = (objectsData.value || [])
+    .map(item => item.name.trim())
+    .filter(Boolean)
+    .filter((name) => {
+      if (seen.has(name)) return false
+      seen.add(name)
+      return true
+    })
+    .map(name => ({ label: name, value: name }))
+
+  return [
+    { label: 'Все объекты', value: null },
+    ...items
+  ]
+})
+
+const shiftFilterOptions = [
+  { label: 'Все смены', value: null },
+  { label: 'День', value: 'day' },
+  { label: 'Ночь', value: 'night' },
+  { label: 'Почасовое', value: 'hourly' }
+] as const
+
+function resetUserFilters() {
+  objectFilter.value = null
+  shiftFilter.value = null
+}
+
+watch(() => activeBuilding.value?.id, () => {
+  resetUserFilters()
+})
+
 const customerOptions = computed(() =>
   safeCustomers.value.map(c => ({
     label: `${c.fullName || c.username} (@${c.username})`,
@@ -263,6 +343,37 @@ const isAdvancesLoading = computed(() => advancesStatus.value === 'pending' || a
 const isSalaryActivityLoading = computed(() =>
   monthlyActivityStatus.value === 'pending' || monthlyActivityStatus.value === 'idle'
 )
+
+const filteredCustomers = computed(() => {
+  const selectedObject = typeof objectFilter.value === 'string' ? objectFilter.value.trim() : ''
+  const selectedShift = shiftFilter.value
+
+  if (!selectedObject && !selectedShift) {
+    return safeCustomers.value
+  }
+
+  return safeCustomers.value.filter((customer) => {
+    if (selectedObject) {
+      const pinned = customer.objectPinned?.trim() || ''
+      const positions = Array.isArray(customer.objectPositions) ? customer.objectPositions : []
+      const matchesObject = pinned === selectedObject || positions.some(position => position.trim() === selectedObject)
+
+      if (!matchesObject) {
+        return false
+      }
+    }
+
+    if (selectedShift) {
+      const shiftKind = customer.salaryType === 'hourly' ? 'hourly' : customer.workShift
+
+      if (shiftKind !== selectedShift) {
+        return false
+      }
+    }
+
+    return true
+  })
+})
 
 const selectedArchiveCustomers = computed(() =>
   safeArchiveCustomers.value.filter(user => archivedRowSelection.value[user.id])
@@ -412,7 +523,6 @@ function normalizeFormulaValue(value: string, fallback: number) {
 }
 
 function resetSalaryFormulaDraft() {
-  salaryFormulaDraft.daysInMonth = salaryFormulaConfig.value.daysInMonth
   salaryFormulaDraft.workHoursPerDay = salaryFormulaConfig.value.workHoursPerDay
   salaryFormulaDraft.minutesPerHour = salaryFormulaConfig.value.minutesPerHour
   salaryFormulaDraft.penaltyMultiplier = salaryFormulaConfig.value.penaltyMultiplier
@@ -427,7 +537,6 @@ function updateSalaryFormulaDraft(
 
 function saveSalaryFormulaConfig() {
   const nextConfig: SalaryFormulaConfig = {
-    daysInMonth: salaryFormulaDraft.daysInMonth,
     workHoursPerDay: salaryFormulaDraft.workHoursPerDay,
     minutesPerHour: salaryFormulaDraft.minutesPerHour,
     penaltyMultiplier: salaryFormulaDraft.penaltyMultiplier
@@ -490,7 +599,7 @@ watch(customerInfoOpen, (open) => {
 })
 
 function copyText(value: string, description: string) {
-  if (!process.client) return
+  if (!import.meta.client) return
   navigator.clipboard.writeText(value)
   toast.add({
     title: 'Скопировано',
@@ -620,26 +729,21 @@ const userColumns: TableColumn<Customer>[] = [
     accessorKey: 'workShift',
     header: 'Смена',
     cell: ({ row }) => {
-      const color = row.original.workShift === 'day' ? 'success' : 'warning'
+      const shiftKind = row.original.salaryType === 'hourly' ? 'hourly' : row.original.workShift
+      const color = shiftKind === 'day'
+        ? 'success'
+        : shiftKind === 'night'
+          ? 'warning'
+          : 'primary'
       return h(UBadge, { class: 'capitalize', variant: 'subtle', color }, () =>
-        row.original.workShift === 'day' ? 'день' : 'ночь'
+        shiftKind === 'day'
+          ? 'день'
+          : shiftKind === 'night'
+            ? 'ночь'
+            : 'почасовое'
       )
     }
   },
-  /**{
-    id: 'status',
-    header: 'Статус',
-    cell: ({ row }) => {
-      return h('div', { class: 'space-y-1' }, [
-        h(UBadge, {
-          label: getCustomerStatusLabel(row.original),
-          color: getCustomerStatusColor(row.original),
-          variant: 'subtle'
-        }),
-        h('p', { class: 'text-xs text-muted' }, getCustomerStatusHint(row.original))
-      ])
-    }
-  },**/
   {
     accessorKey: 'objectPinned',
     header: 'Закрепленный объект'
@@ -993,7 +1097,7 @@ async function permanentlyDeleteSelectedArchivedCustomers() {
   deletingSelectedArchived.value = true
 
   const toDelete = selectedArchiveCustomers.value.map(user => user.id)
-  const results = await Promise.allSettled(toDelete.map(async (id) =>
+  const results = await Promise.allSettled(toDelete.map(async id =>
     $fetch(`/api/customers/${id}/permanent`, { method: 'DELETE' })
   ))
 
@@ -1171,45 +1275,6 @@ function getPassportEntries(customer: Customer): PassportFileEntry[] {
   return entries
 }
 
-function getCustomerStatus(customer: Customer): CustomerStatus {
-  return customer.objectPinned.trim() ? 'active' : 'inactive'
-}
-
-function getCustomerStatusLabel(customer: Customer) {
-  return getCustomerStatus(customer) === 'active' ? 'Активен' : 'Неактивен'
-}
-
-function getCustomerStatusColor(customer: Customer) {
-  return getCustomerStatus(customer) === 'active' ? 'success' : 'warning'
-}
-
-function getCustomerStatusHint(customer: Customer) {
-  return getCustomerStatus(customer) === 'active'
-    ? 'Закреплен за объектом'
-    : 'На проверке - ожидаются изменения'
-}
-
-async function deleteCustomer(customer: Customer) {
-  try {
-    await $fetch(`/api/customers/${customer.id}`, {
-      method: 'DELETE'
-    })
-
-    toast.add({
-      title: 'Удалено',
-      description: `Пользователь @${customer.username} удален.`,
-      color: 'success'
-    })
-    await refresh()
-  } catch (err: unknown) {
-    toast.add({
-      title: 'Не удалось удалить пользователя',
-      description: getErrorMessage(err) || 'Повторите попытку.',
-      color: 'error'
-    })
-  }
-}
-
 const selectedCustomers = computed(() => {
   return (table.value?.tableApi?.getFilteredSelectedRowModel().rows || [])
     .map(row => row.original as Customer)
@@ -1343,9 +1408,16 @@ async function saveCustomerSalary(customer: Customer) {
 <template>
   <UDashboardPanel id="hr">
     <template #header>
-      <UDashboardNavbar title="Кадры">
+      <UDashboardNavbar title="Кадры" :ui="{ right: 'gap-2' }">
         <template #leading>
           <UDashboardSidebarCollapse />
+        </template>
+
+        <template #right>
+          <div v-if="selectedHrTab === 'users'" class="flex flex-wrap items-center gap-2">
+            <CustomersAddModal @saved="refresh()" />
+            <CustomersBulkImport />
+          </div>
         </template>
       </UDashboardNavbar>
     </template>
@@ -1365,17 +1437,42 @@ async function saveCustomerSalary(customer: Customer) {
             {{ activeBuilding?.name ? `Здание: ${activeBuilding.name}` : 'Здание не выбрано' }}
           </div>
 
-          <div class="flex flex-wrap items-center justify-between gap-1.5">
-            <UInput
-              v-model="username"
-              class="max-w-sm"
-              icon="i-lucide-search"
-              placeholder="Фильтр по имени пользователя..."
-            />
+          <div class="grid grid-cols-[1fr_auto] items-end gap-2">
+            <div class="flex flex-wrap items-end gap-2">
+              <UInput
+                v-model="username"
+                class="max-w-sm"
+                icon="i-lucide-search"
+                placeholder="Фильтр по имени пользователя..."
+              />
 
-            <div class="flex flex-wrap items-center gap-1.5">
-              <CustomersAddModal @saved="refresh()" />
-              <CustomersBulkImport />
+              <UFormField label="Объект" class="min-w-60">
+                <USelect
+                  v-model="objectFilter"
+                  :items="objectFilterOptions"
+                  placeholder="Все объекты"
+                />
+              </UFormField>
+
+              <UFormField label="Смена" class="min-w-44">
+                <USelect
+                  v-model="shiftFilter"
+                  :items="shiftFilterOptions"
+                  placeholder="Все смены"
+                />
+              </UFormField>
+
+              <UButton
+                v-if="objectFilter || shiftFilter"
+                label="Сбросить"
+                icon="i-lucide-refresh-ccw"
+                color="neutral"
+                variant="outline"
+                @click="resetUserFilters"
+              />
+            </div>
+
+            <div class="flex flex-wrap items-center justify-end gap-2">
               <CustomersDeleteModal
                 :count="table?.tableApi?.getFilteredSelectedRowModel().rows.length"
                 :loading="deletingSelected"
@@ -1436,7 +1533,7 @@ async function saveCustomerSalary(customer: Customer) {
               getPaginationRowModel: getPaginationRowModel()
             }"
             class="shrink-0"
-            :data="safeCustomers"
+            :data="filteredCustomers"
             :columns="userColumns"
             :loading="isLoading"
             :ui="{
@@ -1455,7 +1552,7 @@ async function saveCustomerSalary(customer: Customer) {
               {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} строк.
             </div>
 
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-2">
               <UPagination
                 :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
                 :items-per-page="table?.tableApi?.getState().pagination.pageSize"
@@ -1498,10 +1595,18 @@ async function saveCustomerSalary(customer: Customer) {
                 <table class="min-w-full text-sm">
                   <thead>
                     <tr class="bg-elevated/50">
-                      <th class="px-3 py-2 text-left">ID</th>
-                      <th class="px-3 py-2 text-left">Пользователь</th>
-                      <th class="px-3 py-2 text-left">Смена</th>
-                      <th class="px-3 py-2 text-right">Действие</th>
+                      <th class="px-3 py-2 text-left">
+                        ID
+                      </th>
+                      <th class="px-3 py-2 text-left">
+                        Пользователь
+                      </th>
+                      <th class="px-3 py-2 text-left">
+                        Смена
+                      </th>
+                      <th class="px-3 py-2 text-right">
+                        Действие
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1551,201 +1656,263 @@ async function saveCustomerSalary(customer: Customer) {
 
             <template #footer>
               <div class="flex justify-end">
-                <UButton label="Закрыть" color="neutral" variant="subtle" @click="shiftModalOpen = false" />
+                <UButton
+                  label="Закрыть"
+                  color="neutral"
+                  variant="subtle"
+                  @click="shiftModalOpen = false"
+                />
               </div>
             </template>
           </UModal>
         </div>
 
         <div v-else-if="selectedHrTab === 'advances'" class="space-y-4">
-      <div class="flex flex-wrap items-center gap-3">
-        <UFormField label="Сотрудник" class="min-w-60">
-          <USelect
-            v-model="advanceFilterCustomerId"
-            :items="[{ label: 'Все', value: null }, ...customerOptions]"
-            placeholder="Фильтр по сотруднику"
-          />
-        </UFormField>
-        <UFormField label="Добавить аванс" class="flex-1">
-          <div class="grid gap-2 sm:grid-cols-4">
-            <USelect v-model="advanceForm.customerId" :items="customerOptions" placeholder="Сотрудник" />
-            <UInput v-model="advanceForm.amount" type="number" min="0" step="10000" placeholder="Сумма" />
-            <UInput v-model="advanceForm.comment" placeholder="Комментарий" />
-            <UButton label="Добавить" color="primary" icon="i-lucide-plus" @click="createAdvance" />
+          <div class="flex flex-wrap items-center gap-3">
+            <UFormField label="Сотрудник" class="min-w-60">
+              <USelect
+                v-model="advanceFilterCustomerId"
+                :items="[{ label: 'Все', value: null }, ...customerOptions]"
+                placeholder="Фильтр по сотруднику"
+              />
+            </UFormField>
+            <UFormField label="Добавить аванс" class="flex-1">
+              <div class="grid gap-2 sm:grid-cols-4">
+                <USelect v-model="advanceForm.customerId" :items="customerOptions" placeholder="Сотрудник" />
+                <UInput
+                  v-model="advanceForm.amount"
+                  type="number"
+                  min="0"
+                  step="10000"
+                  placeholder="Сумма"
+                />
+                <UInput v-model="advanceForm.comment" placeholder="Комментарий" />
+                <UButton
+                  label="Добавить"
+                  color="primary"
+                  icon="i-lucide-plus"
+                  @click="createAdvance"
+                />
+              </div>
+            </UFormField>
           </div>
-        </UFormField>
-      </div>
 
           <div class="rounded-lg border border-default bg-elevated/30 overflow-x-auto">
             <table class="min-w-full text-sm">
               <thead>
-            <tr class="bg-elevated/50">
-              <th class="px-3 py-2 text-left">ID</th>
-              <th class="px-3 py-2 text-left">Сотрудник</th>
-              <th class="px-3 py-2 text-left">Сумма</th>
-              <th class="px-3 py-2 text-left">Статус</th>
-              <th class="px-3 py-2 text-left">Комментарий</th>
-              <th class="px-3 py-2 text-left">Дата</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="isAdvancesLoading">
-              <td class="px-3 py-3 text-muted" colspan="6">Загрузка...</td>
-            </tr>
+                <tr class="bg-elevated/50">
+                  <th class="px-3 py-2 text-left">
+                    ID
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    Сотрудник
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    Сумма
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    Статус
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    Комментарий
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    Дата
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="isAdvancesLoading">
+                  <td class="px-3 py-3 text-muted" colspan="6">
+                    Загрузка...
+                  </td>
+                </tr>
                 <tr
                   v-for="adv in filteredAdvances"
                   :key="adv.id"
                   class="border-t border-default"
                 >
-                  <td class="px-3 py-2">#{{ adv.id }}</td>
-                  <td class="px-3 py-2">{{ customerNameById.get(adv.customerId) || adv.customerId }}</td>
-                  <td class="px-3 py-2">{{ new Intl.NumberFormat('ru-RU').format(adv.amount) }} {{ adv.currency }}</td>
+                  <td class="px-3 py-2">
+                    #{{ adv.id }}
+                  </td>
+                  <td class="px-3 py-2">
+                    {{ customerNameById.get(adv.customerId) || adv.customerId }}
+                  </td>
+                  <td class="px-3 py-2">
+                    {{ new Intl.NumberFormat('ru-RU').format(adv.amount) }} {{ adv.currency }}
+                  </td>
                   <td class="px-3 py-2">
                     <UBadge :label="adv.status" :color="adv.status === 'issued' ? 'warning' : 'success'" variant="subtle" />
                   </td>
-                  <td class="px-3 py-2">{{ adv.comment || '—' }}</td>
-                  <td class="px-3 py-2">{{ formatDate(adv.issuedAt || adv.createdAt) }}</td>
+                  <td class="px-3 py-2">
+                    {{ adv.comment || '—' }}
+                  </td>
+                  <td class="px-3 py-2">
+                    {{ formatDate(adv.issuedAt || adv.createdAt) }}
+                  </td>
                 </tr>
                 <tr v-if="!isAdvancesLoading && !filteredAdvances.length">
-                  <td class="px-3 py-3 text-muted" colspan="6">Авансов пока нет.</td>
+                  <td class="px-3 py-3 text-muted" colspan="6">
+                    Авансов пока нет.
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
 
-    <div v-else-if="selectedHrTab === 'archive'" class="space-y-4">
-      <div class="text-sm text-muted">
-        Архивированные пользователи. При необходимости их можно восстановить.
-      </div>
-      <div class="rounded-lg border border-default bg-elevated/30 p-3 space-y-2">
-        <div class="flex flex-wrap items-center gap-3">
-          <UCheckbox v-model="permanentDeleteArmed" label="Разрешить полное удаление" />
-
-          <div v-if="permanentDeleteArmed" class="flex flex-wrap items-center gap-3">
-            <UCheckbox
-              :model-value="archiveSelectAllModel"
-              aria-label="Выбрать всех"
-              label="Выбрать всех"
-              :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
-              @update:modelValue="(value: boolean | 'indeterminate') => toggleAllArchivedSelection(!!value)"
-            />
-
-            <CustomersDeleteModal
-              v-if="selectedArchiveCount"
-              :count="selectedArchiveCount"
-              :loading="deletingSelectedArchived"
-              @confirm="permanentlyDeleteSelectedArchivedCustomers"
-            >
-              <UButton
-                label="Удалить выбранных"
-                color="error"
-                variant="outline"
-                icon="i-lucide-trash"
-                :loading="deletingSelectedArchived"
-                :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
-              >
-                <template #trailing>
-                  <UKbd>
-                    {{ selectedArchiveCount }}
-                  </UKbd>
-                </template>
-              </UButton>
-            </CustomersDeleteModal>
-
-            <UButton
-              v-if="selectedArchiveCount"
-              label="Снять выделение"
-              color="neutral"
-              variant="subtle"
-              :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
-              @click="clearArchivedSelection"
-            />
-          </div>
+        <div v-else-if="selectedHrTab === 'roles'" class="space-y-4">
+          <HrRolesTab />
         </div>
-        <p class="text-xs text-muted">
-          Удаляет сотрудника и связанные данные (например, задачи и авансы). Действие необратимо.
-        </p>
-      </div>
-      <div class="rounded-lg border border-default bg-elevated/30 overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead>
-            <tr class="bg-elevated/50">
-              <th v-if="permanentDeleteArmed" class="px-3 py-2 text-left">
+
+        <div v-else-if="selectedHrTab === 'archive'" class="space-y-4">
+          <div class="text-sm text-muted">
+            Архивированные пользователи. При необходимости их можно восстановить.
+          </div>
+          <div class="rounded-lg border border-default bg-elevated/30 p-3 space-y-2">
+            <div class="flex flex-wrap items-center gap-3">
+              <UCheckbox v-model="permanentDeleteArmed" label="Разрешить полное удаление" />
+
+              <div v-if="permanentDeleteArmed" class="flex flex-wrap items-center gap-3">
                 <UCheckbox
                   :model-value="archiveSelectAllModel"
-                  aria-label="Выбрать все"
+                  aria-label="Выбрать всех"
+                  label="Выбрать всех"
                   :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
-                  @update:modelValue="(value: boolean | 'indeterminate') => toggleAllArchivedSelection(!!value)"
+                  @update:model-value="(value: boolean | 'indeterminate') => toggleAllArchivedSelection(!!value)"
                 />
-              </th>
-              <th class="px-3 py-2 text-left">ID</th>
-              <th class="px-3 py-2 text-left">Пользователь</th>
-              <th class="px-3 py-2 text-left">Комментарий</th>
-              <th class="px-3 py-2 text-left">Дата архивации</th>
-              <th class="px-3 py-2 text-left"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="isArchiveLoading">
-              <td class="px-3 py-3 text-muted" :colspan="permanentDeleteArmed ? 6 : 5">
-                Загрузка...
-              </td>
-            </tr>
-            <tr
-              v-for="user in safeArchiveCustomers"
-              :key="user.id"
-              class="border-t border-default"
-            >
-              <td v-if="permanentDeleteArmed" class="px-3 py-2">
-                <UCheckbox
-                  :model-value="!!archivedRowSelection[user.id]"
-                  aria-label="Выбрать сотрудника"
-                  :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
-                  @update:modelValue="(value: boolean | 'indeterminate') => setArchivedSelected(user.id, !!value)"
-                />
-              </td>
-              <td class="px-3 py-2">#{{ user.id }}</td>
-              <td class="px-3 py-2">@{{ user.username }}</td>
-              <td class="px-3 py-2">{{ user.deactivationComment || '—' }}</td>
-              <td class="px-3 py-2">{{ user.archivedAt ? formatDate(user.archivedAt) : '—' }}</td>
-              <td class="px-3 py-2">
-                <div class="flex items-center justify-end gap-2">
-                  <UButton
-                    size="xs"
-                    color="primary"
-                    variant="outline"
-                    label="Активировать"
-                    :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
-                    @click="restoreCustomer(user)"
-                  />
 
-                  <CustomersDeleteModal
-                    v-if="permanentDeleteArmed"
-                    :count="1"
-                    :loading="permanentlyDeletingCustomerId === user.id"
-                    @confirm="permanentlyDeleteCustomer(user)"
+                <CustomersDeleteModal
+                  v-if="selectedArchiveCount"
+                  :count="selectedArchiveCount"
+                  :loading="deletingSelectedArchived"
+                  @confirm="permanentlyDeleteSelectedArchivedCustomers"
+                >
+                  <UButton
+                    label="Удалить выбранных"
+                    color="error"
+                    variant="outline"
+                    icon="i-lucide-trash"
+                    :loading="deletingSelectedArchived"
+                    :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
                   >
-                    <UButton
-                      size="xs"
-                      color="error"
-                      variant="outline"
-                      label="Удалить"
+                    <template #trailing>
+                      <UKbd>
+                        {{ selectedArchiveCount }}
+                      </UKbd>
+                    </template>
+                  </UButton>
+                </CustomersDeleteModal>
+
+                <UButton
+                  v-if="selectedArchiveCount"
+                  label="Снять выделение"
+                  color="neutral"
+                  variant="subtle"
+                  :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+                  @click="clearArchivedSelection"
+                />
+              </div>
+            </div>
+            <p class="text-xs text-muted">
+              Удаляет сотрудника и связанные данные (например, задачи и авансы). Действие необратимо.
+            </p>
+          </div>
+          <div class="rounded-lg border border-default bg-elevated/30 overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead>
+                <tr class="bg-elevated/50">
+                  <th v-if="permanentDeleteArmed" class="px-3 py-2 text-left">
+                    <UCheckbox
+                      :model-value="archiveSelectAllModel"
+                      aria-label="Выбрать все"
                       :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
-                      :loading="permanentlyDeletingCustomerId === user.id"
+                      @update:model-value="(value: boolean | 'indeterminate') => toggleAllArchivedSelection(!!value)"
                     />
-                  </CustomersDeleteModal>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="!isArchiveLoading && !safeArchiveCustomers.length">
-              <td class="px-3 py-3 text-muted" :colspan="permanentDeleteArmed ? 6 : 5">
-                Архив пуст.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    ID
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    Пользователь
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    Комментарий
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    Дата архивации
+                  </th>
+                  <th class="px-3 py-2 text-left" />
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="isArchiveLoading">
+                  <td class="px-3 py-3 text-muted" :colspan="permanentDeleteArmed ? 6 : 5">
+                    Загрузка...
+                  </td>
+                </tr>
+                <tr
+                  v-for="user in safeArchiveCustomers"
+                  :key="user.id"
+                  class="border-t border-default"
+                >
+                  <td v-if="permanentDeleteArmed" class="px-3 py-2">
+                    <UCheckbox
+                      :model-value="!!archivedRowSelection[user.id]"
+                      aria-label="Выбрать сотрудника"
+                      :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+                      @update:model-value="(value: boolean | 'indeterminate') => setArchivedSelected(user.id, !!value)"
+                    />
+                  </td>
+                  <td class="px-3 py-2">
+                    #{{ user.id }}
+                  </td>
+                  <td class="px-3 py-2">
+                    @{{ user.username }}
+                  </td>
+                  <td class="px-3 py-2">
+                    {{ user.deactivationComment || '—' }}
+                  </td>
+                  <td class="px-3 py-2">
+                    {{ user.archivedAt ? formatDate(user.archivedAt) : '—' }}
+                  </td>
+                  <td class="px-3 py-2">
+                    <div class="flex items-center justify-end gap-2">
+                      <UButton
+                        size="xs"
+                        color="primary"
+                        variant="outline"
+                        label="Активировать"
+                        :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+                        @click="restoreCustomer(user)"
+                      />
+
+                      <CustomersDeleteModal
+                        v-if="permanentDeleteArmed"
+                        :count="1"
+                        :loading="permanentlyDeletingCustomerId === user.id"
+                        @confirm="permanentlyDeleteCustomer(user)"
+                      >
+                        <UButton
+                          size="xs"
+                          color="error"
+                          variant="outline"
+                          label="Удалить"
+                          :disabled="deletingSelectedArchived || permanentlyDeletingCustomerId !== null"
+                          :loading="permanentlyDeletingCustomerId === user.id"
+                        />
+                      </CustomersDeleteModal>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="!isArchiveLoading && !safeArchiveCustomers.length">
+                  <td class="px-3 py-3 text-muted" :colspan="permanentDeleteArmed ? 6 : 5">
+                    Архив пуст.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div v-else class="space-y-4">
@@ -1756,7 +1923,7 @@ async function saveCustomerSalary(customer: Customer) {
                   Расчет за {{ salaryMonthLabel }}
                 </p>
                 <p class="mt-1">
-                  Для оклада: (базовая / {{ effectiveSalaryMonthDays }} / {{ effectiveWorkHoursPerDay }} / {{ effectiveMinutesPerHour }}) * {{ effectivePenaltyMultiplier }} * минуты опоздания за месяц.
+                  Для оклада: (базовая / {{ effectiveSalaryMonthDays }} / {{ effectiveWorkHoursPerDay }} / {{ effectiveMinutesPerHour }}) * {{ effectivePenaltyMultiplier }} * минуты опоздания за месяц (дней в месяце определяется автоматически).
                 </p>
                 <p class="mt-1">
                   Для почасовой: (ставка/час / 60) * отработанные минуты + надбавка.
@@ -1857,8 +2024,8 @@ async function saveCustomerSalary(customer: Customer) {
                         {{ isSalaryActivityLoading
                           ? 'Загрузка активности...'
                           : (salaryDrafts[customer.id]?.salaryType === 'hourly'
-                              ? `Отработано: ${formatWorkMinutes(getEmployeeWorkMinutes(customer.id))}, ставка: ${formatCurrency(getHourlyRate(customer.id))}/час`
-                              : `Опоздание: ${getEmployeeLateMinutes(customer.id)} мин, штраф: ${formatCurrency(getLatePenalty(customer.id))}`) }}
+                            ? `Отработано: ${formatWorkMinutes(getEmployeeWorkMinutes(customer.id))}, ставка: ${formatCurrency(getHourlyRate(customer.id))}/час`
+                            : `Опоздание: ${getEmployeeLateMinutes(customer.id)} мин, штраф: ${formatCurrency(getLatePenalty(customer.id))}`) }}
                       </p>
                     </div>
                   </td>
@@ -1899,15 +2066,10 @@ async function saveCustomerSalary(customer: Customer) {
       >
         <template #body>
           <div class="space-y-4">
-            <UFormField label="Дней в расчете">
+            <UFormField label="Дней в месяце">
               <UInput
-                :model-value="salaryFormulaDraft.daysInMonth"
-                type="number"
-                min="1"
-                step="1"
-                inputmode="numeric"
-                placeholder="Авто по текущему месяцу"
-                @update:model-value="updateSalaryFormulaDraft('daysInMonth', $event)"
+                :model-value="String(salaryMonthDays)"
+                disabled
               />
             </UFormField>
 
@@ -1980,7 +2142,7 @@ async function saveCustomerSalary(customer: Customer) {
                   @{{ selectedCustomer.username }} · {{ selectedCustomer.phoneNumber }}
                 </p>
                 <p class="text-xs text-muted">
-                  {{ getRoleLabel(selectedCustomer.role) }}
+                  {{ getCustomerRoleLabel(selectedCustomer.role) }}
                 </p>
               </div>
             </div>
@@ -2008,7 +2170,7 @@ async function saveCustomerSalary(customer: Customer) {
                   Роль
                 </p>
                 <p class="font-medium">
-                  {{ getRoleLabel(selectedCustomer.role) }} ({{ selectedCustomer.role }})
+                  {{ getCustomerRoleLabel(selectedCustomer.role) }} ({{ selectedCustomer.role }})
                 </p>
               </div>
               <div class="rounded-md border border-default p-3">
@@ -2019,8 +2181,8 @@ async function saveCustomerSalary(customer: Customer) {
                   {{
                     selectedCustomer.buildingId
                       ? (activeBuilding?.id === selectedCustomer.buildingId && activeBuilding?.name
-                          ? activeBuilding.name
-                          : `Здание #${selectedCustomer.buildingId}`)
+                        ? activeBuilding.name
+                        : `Здание #${selectedCustomer.buildingId}`)
                       : '—'
                   }}
                 </p>
@@ -2137,7 +2299,7 @@ async function saveCustomerSalary(customer: Customer) {
                         :src="passport.url"
                         :alt="passport.label"
                         class="w-full rounded-md border border-default bg-default object-cover aspect-[4/3] transition group-hover:shadow-md"
-                      />
+                      >
                       <p
                         v-else
                         class="font-medium break-all text-highlighted underline group-hover:text-primary"
@@ -2193,8 +2355,18 @@ async function saveCustomerSalary(customer: Customer) {
         </template>
         <template #footer>
           <div class="flex justify-end gap-2">
-            <UButton label="Отмена" color="neutral" variant="subtle" @click="archiveModalOpen = false" />
-            <UButton label="Архивировать" color="primary" icon="i-lucide-archive" @click="archiveCustomer" />
+            <UButton
+              label="Отмена"
+              color="neutral"
+              variant="subtle"
+              @click="archiveModalOpen = false"
+            />
+            <UButton
+              label="Архивировать"
+              color="primary"
+              icon="i-lucide-archive"
+              @click="archiveCustomer"
+            />
           </div>
         </template>
       </UModal>

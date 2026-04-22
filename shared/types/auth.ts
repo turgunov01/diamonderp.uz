@@ -1,11 +1,16 @@
-export type AuthRole =
-  | 'admin'
-  | 'hr'
-  | 'procurement'
-  | 'manager'
-  | 'supervisor'
-  | 'customer'
-  | 'cleaner'
+export type KnownAuthRole
+  = 'admin'
+    | 'hr'
+    | 'procurement'
+    | 'manager'
+    | 'supervisor'
+    | 'customer'
+    | 'cleaner'
+
+// Allow custom employee roles stored in DB (e.g. "electrician", "security", etc.)
+// Keep `KnownAuthRole` for places that need strict checks.
+export type AuthRole
+  = KnownAuthRole | (string & { __auth_role?: never })
 
 export interface AuthSession {
   id: number

@@ -6,7 +6,6 @@ import { mapCustomerDbRowToRecord, type CustomerDbRow } from './customers'
 import type { H3Event } from 'h3'
 
 type SalaryFormulaCookie = {
-  daysInMonth?: string
   workHoursPerDay?: string
   minutesPerHour?: string
   penaltyMultiplier?: string
@@ -84,6 +83,15 @@ function getInclusiveDays(from?: string, to?: string) {
   }
 
   return Math.floor((toUtc - fromUtc) / 86400000) + 1
+}
+
+function getMonthDays(value: string) {
+  const parts = parseYmd(value)
+  if (!parts) {
+    return undefined
+  }
+
+  return new Date(Date.UTC(parts.year, parts.month, 0)).getUTCDate()
 }
 
 function parsePositiveInt(value: unknown) {
@@ -192,8 +200,7 @@ export default eventHandler(async (event) => {
   const sheet = workbook.addWorksheet('Зарплаты')
 
   const cookieConfig = readSalaryFormulaCookie(event)
-  const defaultDaysInRange = getInclusiveDays(rangeFrom, rangeTo) ?? 30
-  const effectiveSalaryMonthDays = normalizeFormulaValue(cookieConfig.daysInMonth, defaultDaysInRange)
+  const effectiveSalaryMonthDays = getMonthDays(rangeFrom) ?? getInclusiveDays(rangeFrom, rangeTo) ?? 0
   const effectiveWorkHoursPerDay = normalizeFormulaValue(cookieConfig.workHoursPerDay, 12)
   const effectiveMinutesPerHour = normalizeFormulaValue(cookieConfig.minutesPerHour, 60)
   const effectivePenaltyMultiplier = normalizeFormulaValue(cookieConfig.penaltyMultiplier, 4)

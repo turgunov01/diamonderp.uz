@@ -286,6 +286,54 @@ const safeCustomers = computed(() =>
 const safeArchiveCustomers = computed(() => archiveData.value || [])
 const safeAdvances = computed(() => advancesData.value || [])
 
+const salaryUserFilter = ref('')
+const salaryPagination = ref({
+  pageIndex: 0,
+  pageSize: 10
+})
+
+const filteredSalaryCustomers = computed(() => {
+  const query = salaryUserFilter.value.trim().toLowerCase().replace(/^@+/, '')
+  if (!query) {
+    return safeCustomers.value
+  }
+
+  return safeCustomers.value.filter((customer) => {
+    const username = (customer.username || '').toLowerCase()
+    const fullName = (customer.fullName || '').toLowerCase()
+    return username.includes(query) || fullName.includes(query)
+  })
+})
+
+const paginatedSalaryCustomers = computed(() => {
+  const start = salaryPagination.value.pageIndex * salaryPagination.value.pageSize
+  return filteredSalaryCustomers.value.slice(start, start + salaryPagination.value.pageSize)
+})
+
+const salaryPaginationInfo = computed(() => {
+  const total = filteredSalaryCustomers.value.length
+  if (!total) {
+    return { from: 0, to: 0, total: 0 }
+  }
+
+  const from = salaryPagination.value.pageIndex * salaryPagination.value.pageSize + 1
+  const to = Math.min(from + salaryPagination.value.pageSize - 1, total)
+  return { from, to, total }
+})
+
+watch([() => salaryUserFilter.value, safeCustomers], () => {
+  salaryPagination.value.pageIndex = 0
+})
+
+watch([() => filteredSalaryCustomers.value.length, () => salaryPagination.value.pageSize], () => {
+  const total = filteredSalaryCustomers.value.length
+  const maxPageIndex = Math.max(0, Math.ceil(total / salaryPagination.value.pageSize) - 1)
+
+  if (salaryPagination.value.pageIndex > maxPageIndex) {
+    salaryPagination.value.pageIndex = maxPageIndex
+  }
+})
+
 const objectFilter = ref<string | null>(null)
 const shiftFilter = ref<'day' | 'night' | 'hourly' | null>(null)
 
@@ -1941,6 +1989,24 @@ async function saveCustomerSalary(customer: Customer) {
             </div>
           </div>
 
+          <div class="flex flex-wrap items-end justify-between gap-2">
+            <UInput
+              v-model="salaryUserFilter"
+              class="max-w-sm"
+              icon="i-lucide-search"
+              placeholder="Фильтр по имени пользователя..."
+            />
+
+            <UButton
+              v-if="salaryUserFilter"
+              label="Сбросить"
+              icon="i-lucide-refresh-ccw"
+              color="neutral"
+              variant="outline"
+              @click="salaryUserFilter = ''"
+            />
+          </div>
+
           <div class="rounded-lg border border-default overflow-x-auto">
             <table class="min-w-full text-sm">
               <thead>
@@ -1969,8 +2035,13 @@ async function saveCustomerSalary(customer: Customer) {
                 </tr>
               </thead>
               <tbody>
+                <tr v-if="isLoading && !filteredSalaryCustomers.length">
+                  <td class="px-3 py-3 text-muted" colspan="7">
+                    Загрузка...
+                  </td>
+                </tr>
                 <tr
-                  v-for="customer in safeCustomers"
+                  v-for="customer in paginatedSalaryCustomers"
                   :key="customer.id"
                   class="border-t border-default"
                 >
@@ -2039,8 +2110,28 @@ async function saveCustomerSalary(customer: Customer) {
                     />
                   </td>
                 </tr>
+                <tr v-if="!isLoading && !filteredSalaryCustomers.length">
+                  <td class="px-3 py-3 text-muted" colspan="7">
+                    {{ salaryUserFilter ? 'Ничего не найдено.' : 'Сотрудников пока нет.' }}
+                  </td>
+                </tr>
               </tbody>
             </table>
+          </div>
+
+          <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
+            <div class="text-sm text-muted">
+              Показано с {{ salaryPaginationInfo.from }} по {{ salaryPaginationInfo.to }} из
+              {{ salaryPaginationInfo.total }} сотрудников.
+            </div>
+
+            <UPagination
+              v-if="salaryPaginationInfo.total > salaryPagination.pageSize"
+              :page="salaryPagination.pageIndex + 1"
+              :items-per-page="salaryPagination.pageSize"
+              :total="salaryPaginationInfo.total"
+              @update:page="(p: number) => { salaryPagination.pageIndex = p - 1 }"
+            />
           </div>
 
           <div class="flex items-center justify-between text-xs text-muted">

@@ -7,11 +7,15 @@ import {
 } from '../../../utils/mobile-access'
 import { buildEqOrInFilter, encodeIn } from '../../../utils/postgrest'
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+import type { AuthRole } from '~~/shared/types/auth'
+import { getRoleLabel } from '~~/shared/utils/access'
 import {
   getSupabaseErrorData,
   mapDispatchDbRowToRecord,
   mapSignedDbRowToRecord,
   mapTemplateDbRowToRecord,
+  renderDocumentTemplateCss,
+  renderDocumentTemplateHtml,
   type DispatchRecipient,
   type DocumentDispatchDbRow,
   type DocumentTemplateDbRow,
@@ -22,6 +26,16 @@ interface RecipientLiteRow {
   id: number
   username: string
   phone_number: string
+}
+
+interface ObjectLiteRow {
+  id: number
+  name: string
+}
+
+function resolvePositionToken(role: AuthRole) {
+  const label = getRoleLabel(role)
+  return label === 'Пользователь' ? role : label
 }
 
 function isMissingTableError(error: unknown) {
@@ -231,7 +245,54 @@ export default eventHandler(async (event) => {
     }]))
   }
 
-  const templates = visibleTemplateRows.map(mapTemplateDbRowToRecord)
+  const objectIdsFromTemplates = Array.from(new Set(
+    visibleTemplateRows
+      .map(row => row.object_id)
+      .filter((objectId): objectId is number => typeof objectId === 'number' && Number.isInteger(objectId) && objectId > 0)
+  ))
+
+  let objectNameById = new Map<number, string>()
+  if (frontlineAccess && objectIdsFromTemplates.length) {
+    const objects = await $fetch<ObjectLiteRow[]>(`${url}/rest/v1/objects`, {
+      headers,
+      query: {
+        select: 'id,name',
+        id: `in.${encodeIn(objectIdsFromTemplates)}`
+      }
+    })
+
+    objectNameById = new Map(objects.map(object => [object.id, object.name]))
+  }
+
+  const baseTemplateVariables = frontlineAccess
+    ? {
+        employee_name: access.user.name,
+        phone: access.user.phone || '',
+        position: resolvePositionToken(access.user.role),
+        date: new Date().toLocaleDateString('ru-RU', { timeZone: 'Asia/Tashkent' }),
+        amount: ''
+      }
+    : null
+
+  const templates = visibleTemplateRows.map((row) => {
+    const record = mapTemplateDbRowToRecord(row)
+
+    if (!frontlineAccess || !baseTemplateVariables) {
+      return record
+    }
+
+    const objectName = record.objectId ? objectNameById.get(record.objectId) : undefined
+    const variables = {
+      ...baseTemplateVariables,
+      object_name: objectName || ''
+    }
+
+    return {
+      ...record,
+      html: renderDocumentTemplateHtml(record.html, variables),
+      css: renderDocumentTemplateCss(record.css, variables)
+    }
+  })
   const templateNameById = new Map(templates.map(template => [template.id, template.name]))
   const signedByDispatchId = new Set(
     visibleSignedRows

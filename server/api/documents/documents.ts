@@ -276,3 +276,43 @@ export async function downloadStorageObject(options: {
     })
   }
 }
+
+export type DocumentTemplateVariables = Record<string, string | number | null | undefined>
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function renderTemplateText(
+  input: string,
+  variables: DocumentTemplateVariables,
+  options: { escape?: boolean } = {}
+) {
+  return input.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (match, rawKey: string) => {
+    const key = rawKey || ''
+    if (!Object.prototype.hasOwnProperty.call(variables, key)) {
+      return match
+    }
+
+    const value = variables[key]
+    if (value === null || value === undefined) {
+      return ''
+    }
+
+    const textValue = String(value)
+    return options.escape === false ? textValue : escapeHtml(textValue)
+  })
+}
+
+export function renderDocumentTemplateHtml(html: string, variables: DocumentTemplateVariables) {
+  return renderTemplateText(html, variables, { escape: true })
+}
+
+export function renderDocumentTemplateCss(css: string, variables: DocumentTemplateVariables) {
+  return renderTemplateText(css, variables, { escape: false })
+}

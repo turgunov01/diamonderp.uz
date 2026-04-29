@@ -218,9 +218,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <UDashboardPage>
-    <UDashboardPanel>
-      <template #header>
+  <UDashboardPanel id="documents-builder">
+    <template #header>
         <UDashboardNavbar :title="currentTemplateId ? 'Редактор шаблона' : 'Новый шаблон'">
           <template #leading>
             <UDashboardSidebarCollapse />
@@ -231,7 +230,7 @@ onBeforeUnmount(() => {
         </UDashboardNavbar>
       </template>
 
-      <template #body>
+    <template #body>
         <div class="grid gap-6 lg:grid-cols-[1.4fr_0.6fr] items-start">
           <section class="space-y-3">
             <div class="flex flex-wrap items-center gap-2 rounded-lg border border-default bg-elevated/50 p-3">
@@ -327,6 +326,5 @@ onBeforeUnmount(() => {
           </aside>
         </div>
       </template>
-    </UDashboardPanel>
-  </UDashboardPage>
+  </UDashboardPanel>
 </template>

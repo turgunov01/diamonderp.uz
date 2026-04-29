@@ -1037,7 +1037,7 @@ watch(miniOpen, (open) => {
 
             <div
               ref="miniEditor"
-              class="prose max-w-none min-h-[320px] rounded-lg border border-default bg-white text-black p-3 outline-none focus:ring-2 focus:ring-primary"
+              class="prose max-w-none min-h-[320px] max-h-[60vh] overflow-y-auto rounded-lg border border-default bg-white text-black p-3 outline-none focus:ring-2 focus:ring-primary"
               contenteditable="true"
               spellcheck="true"
               @input="onMiniInput"

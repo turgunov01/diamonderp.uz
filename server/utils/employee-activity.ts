@@ -155,10 +155,10 @@ function parseRecordedAt(value?: string | Date | null) {
 }
 
 const TASHKENT_UTC_OFFSET_HOURS = 5
-const DAY_SHIFT_START_HOUR = 9
-const DAY_SHIFT_END_HOUR = 21
-const NIGHT_SHIFT_START_HOUR = 21
-const NIGHT_SHIFT_END_HOUR = 9
+const DAY_SHIFT_START_HOUR = 8
+const DAY_SHIFT_END_HOUR = 20
+const NIGHT_SHIFT_START_HOUR = 20
+const NIGHT_SHIFT_END_HOUR = 8
 
 function getTashkentParts(value: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {

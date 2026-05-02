@@ -110,13 +110,13 @@ Authorization: Bearer <token>
     "workShift": "day",
     "label": "День",
     "timezone": "Asia/Tashkent",
-    "shiftStartHour": 9,
-    "shiftEndHour": 21,
+    "shiftStartHour": 8,
+    "shiftEndHour": 20,
     "isActiveNow": true,
     "shouldLogoutNow": false,
-    "startedAt": "2026-03-29T04:00:00.000Z",
-    "logoutAt": "2026-03-29T16:00:00.000Z",
-    "nextShiftStartsAt": "2026-03-30T04:00:00.000Z"
+    "startedAt": "2026-03-29T03:00:00.000Z",
+    "logoutAt": "2026-03-29T15:00:00.000Z",
+    "nextShiftStartsAt": "2026-03-30T03:00:00.000Z"
   },
   "objects": [
     {
@@ -152,7 +152,7 @@ Authorization: Bearer <token>
 - если `shift.shouldLogoutNow=true`, мобильное приложение может сразу завершить сессию
 - если `shift.logoutAt` не `null`, это время рекомендованного logout по текущей смене
 - статус attendance считается по `Asia/Tashkent`
-- статус `on_time`/`late` считается относительно начала смены (`09:00` для `day`, `21:00` для `night`)
+- статус `on_time`/`late` считается относительно начала смены (`08:00` для `day`, `20:00` для `night`)
 - для `night` смены `activity.date` — это дата начала смены (может быть вчера)
 
 ### GET `/api/mobile/auth/me`
@@ -189,13 +189,13 @@ Authorization: Bearer <token>
     "workShift": "day",
     "label": "День",
     "timezone": "Asia/Tashkent",
-    "shiftStartHour": 9,
-    "shiftEndHour": 21,
+    "shiftStartHour": 8,
+    "shiftEndHour": 20,
     "isActiveNow": true,
     "shouldLogoutNow": false,
-    "startedAt": "2026-03-29T04:00:00.000Z",
-    "logoutAt": "2026-03-29T16:00:00.000Z",
-    "nextShiftStartsAt": "2026-03-30T04:00:00.000Z"
+    "startedAt": "2026-03-29T03:00:00.000Z",
+    "logoutAt": "2026-03-29T15:00:00.000Z",
+    "nextShiftStartsAt": "2026-03-30T03:00:00.000Z"
   },
   "objects": [
     {
@@ -260,21 +260,21 @@ Authorization: Bearer <token>
     "workShift": "day",
     "label": "День",
     "timezone": "Asia/Tashkent",
-    "shiftStartHour": 9,
-    "shiftEndHour": 21,
+    "shiftStartHour": 8,
+    "shiftEndHour": 20,
     "isActiveNow": true,
     "shouldLogoutNow": false,
-    "startedAt": "2026-03-29T04:00:00.000Z",
-    "logoutAt": "2026-03-29T16:00:00.000Z",
-    "nextShiftStartsAt": "2026-03-30T04:00:00.000Z"
+    "startedAt": "2026-03-29T03:00:00.000Z",
+    "logoutAt": "2026-03-29T15:00:00.000Z",
+    "nextShiftStartsAt": "2026-03-30T03:00:00.000Z"
   }
 }
 ```
 
 Примечание:
 
-- `day` считается как `09:00-21:00` по `Asia/Tashkent`
-- `night` считается как `21:00-09:00` по `Asia/Tashkent`
+- `day` считается как `08:00-20:00` по `Asia/Tashkent`
+- `night` считается как `20:00-08:00` по `Asia/Tashkent`
 - `logoutAt` заполнен только если пользователь сейчас внутри своей смены
 
 ### POST `/api/mobile/activity/finish`
@@ -291,7 +291,7 @@ Body (optional):
 
 ```json
 {
-  "finishedAt": "2026-03-29T16:00:00.000Z"
+  "finishedAt": "2026-03-29T15:00:00.000Z"
 }
 ```
 
@@ -303,7 +303,7 @@ Body (optional):
 {
   "role": "customer",
   "frontend": "employee",
-  "finishedAt": "2026-03-29T16:00:00.000Z",
+  "finishedAt": "2026-03-29T15:00:00.000Z",
   "activity": {
     "id": 77,
     "employeeId": 25,

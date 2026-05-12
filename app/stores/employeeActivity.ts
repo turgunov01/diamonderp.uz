@@ -7,6 +7,8 @@ export interface EmployeeActivityRecord {
   employeeId: number | null
   employeeName: string
   date: string
+  startedAt: string | null
+  finishedAt: string | null
   status: EmployeeActivityStatus
   workMinutes: number
   lateMinutes: number

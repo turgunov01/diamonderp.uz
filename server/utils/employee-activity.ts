@@ -12,6 +12,8 @@ interface EmployeeActivityDbRow {
   status: EmployeeActivityStatus
   work_minutes: number | null
   late_minutes: number | null
+  started_at?: string | null
+  finished_at?: string | null
 }
 
 interface ActivityCustomerRow {
@@ -27,6 +29,8 @@ export interface EmployeeActivityRecord {
   employeeId: number | null
   employeeName: string
   date: string
+  startedAt: string | null
+  finishedAt: string | null
   status: EmployeeActivityStatus
   workMinutes: number
   lateMinutes: number
@@ -45,6 +49,29 @@ export interface RecordEmployeeActivityResult {
   activity: EmployeeActivityRecord
 }
 
+const EMPLOYEE_ACTIVITY_SELECT_LEGACY = 'id,employee_id,employee_name,activity_date,status,work_minutes,late_minutes'
+const EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES = `${EMPLOYEE_ACTIVITY_SELECT_LEGACY},started_at,finished_at`
+
+function isMissingEmployeeActivityTimeColumns(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+
+  const payload = error as { data?: { code?: string, message?: string }, code?: string, message?: string }
+  const code = payload.data?.code || payload.code
+  const message = payload.data?.message || payload.message
+
+  if (code !== 'PGRST204' && code !== '42703') {
+    return false
+  }
+
+  if (typeof message !== 'string') {
+    return false
+  }
+
+  return message.includes('started_at') || message.includes('finished_at')
+}
+
 function normalizeEmployeeIds(rows: EmployeeActivityDbRow[]) {
   return [...new Set(
     rows
@@ -53,10 +80,10 @@ function normalizeEmployeeIds(rows: EmployeeActivityDbRow[]) {
   )]
 }
 
-function buildEmployeeActivityUrl(baseUrl: string, options: ListEmployeeActivitiesOptions) {
+function buildEmployeeActivityUrl(baseUrl: string, options: ListEmployeeActivitiesOptions, select: string) {
   const params = new URLSearchParams()
 
-  params.set('select', 'id,employee_id,employee_name,activity_date,status,work_minutes,late_minutes')
+  params.set('select', select)
   params.set('order', 'activity_date.desc,id.desc')
 
   if (options.from) {
@@ -105,6 +132,8 @@ function mapEmployeeActivityDbRowToRecord(
     employeeId: row.employee_id,
     employeeName,
     date: row.activity_date,
+    startedAt: row.started_at ?? null,
+    finishedAt: row.finished_at ?? null,
     status: row.status,
     workMinutes: row.work_minutes ?? 0,
     lateMinutes: row.late_minutes ?? 0
@@ -340,15 +369,33 @@ async function fetchActivityCustomer(employeeId: number) {
 
 async function fetchExistingActivity(employeeId: number, activityDate: string) {
   const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
-    query: {
-      select: 'id,employee_id,employee_name,activity_date,status,work_minutes,late_minutes',
-      employee_id: `eq.${employeeId}`,
-      activity_date: `eq.${activityDate}`,
-      limit: '1'
+  let rows: EmployeeActivityDbRow[]
+
+  try {
+    rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
+      headers: getSupabaseServerHeaders(serviceRoleKey),
+      query: {
+        select: EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES,
+        employee_id: `eq.${employeeId}`,
+        activity_date: `eq.${activityDate}`,
+        limit: '1'
+      }
+    })
+  } catch (error) {
+    if (!isMissingEmployeeActivityTimeColumns(error)) {
+      throw error
     }
-  })
+
+    rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
+      headers: getSupabaseServerHeaders(serviceRoleKey),
+      query: {
+        select: EMPLOYEE_ACTIVITY_SELECT_LEGACY,
+        employee_id: `eq.${employeeId}`,
+        activity_date: `eq.${activityDate}`,
+        limit: '1'
+      }
+    })
+  }
 
   return rows[0]
 }
@@ -357,24 +404,50 @@ async function createActivity(
   employeeId: number,
   employeeName: string,
   activityDate: string,
+  startedAt: string,
   initialStatus: { status: EmployeeActivityStatus, lateMinutes: number }
 ) {
   const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
-    method: 'POST',
-    headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
-      Prefer: 'return=representation'
-    },
-    body: {
-      employee_id: employeeId,
-      employee_name: employeeName,
-      activity_date: activityDate,
-      status: initialStatus.status,
-      work_minutes: 0,
-      late_minutes: initialStatus.lateMinutes
+  let rows: EmployeeActivityDbRow[]
+
+  try {
+    rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
+      method: 'POST',
+      headers: {
+        ...getSupabaseServerHeaders(serviceRoleKey),
+        Prefer: 'return=representation'
+      },
+      body: {
+        employee_id: employeeId,
+        employee_name: employeeName,
+        activity_date: activityDate,
+        started_at: startedAt,
+        status: initialStatus.status,
+        work_minutes: 0,
+        late_minutes: initialStatus.lateMinutes
+      }
+    })
+  } catch (error) {
+    if (!isMissingEmployeeActivityTimeColumns(error)) {
+      throw error
     }
-  })
+
+    rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
+      method: 'POST',
+      headers: {
+        ...getSupabaseServerHeaders(serviceRoleKey),
+        Prefer: 'return=representation'
+      },
+      body: {
+        employee_id: employeeId,
+        employee_name: employeeName,
+        activity_date: activityDate,
+        status: initialStatus.status,
+        work_minutes: 0,
+        late_minutes: initialStatus.lateMinutes
+      }
+    })
+  }
 
   const createdActivity = rows[0]
   if (!createdActivity) {
@@ -414,9 +487,21 @@ async function updateActivity(activityId: number, body: Record<string, unknown>)
 
 export async function listEmployeeActivities(options: ListEmployeeActivitiesOptions = {}) {
   const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options), {
-    headers: getSupabaseServerHeaders(serviceRoleKey)
-  })
+  let rows: EmployeeActivityDbRow[]
+
+  try {
+    rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options, EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES), {
+      headers: getSupabaseServerHeaders(serviceRoleKey)
+    })
+  } catch (error) {
+    if (!isMissingEmployeeActivityTimeColumns(error)) {
+      throw error
+    }
+
+    rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options, EMPLOYEE_ACTIVITY_SELECT_LEGACY), {
+      headers: getSupabaseServerHeaders(serviceRoleKey)
+    })
+  }
 
   if (!rows.length) {
     return [] as EmployeeActivityRecord[]
@@ -455,17 +540,39 @@ export async function recordEmployeeActivity(input: {
   const existingActivity = await fetchExistingActivity(input.employeeId, activityDate)
 
   if (existingActivity) {
+    const recordedAtIso = recordedAt.toISOString()
+
+    let activity = existingActivity
+
+    if (!existingActivity.started_at) {
+      try {
+        activity = await updateActivity(existingActivity.id, {
+          started_at: recordedAtIso
+        })
+      } catch (error) {
+        if (!isMissingEmployeeActivityTimeColumns(error)) {
+          throw error
+        }
+      }
+    }
+
     return {
       created: false,
-      recordedAt: recordedAt.toISOString(),
-      activity: mapEmployeeActivityDbRowToRecord(existingActivity, customer)
+      recordedAt: recordedAtIso,
+      activity: mapEmployeeActivityDbRowToRecord(activity, customer)
     }
   }
 
   let createdActivity: EmployeeActivityDbRow
 
   try {
-    createdActivity = await createActivity(input.employeeId, customer.username, activityDate, initialStatus)
+    createdActivity = await createActivity(
+      input.employeeId,
+      customer.username,
+      activityDate,
+      recordedAt.toISOString(),
+      initialStatus
+    )
   } catch (error) {
     const duplicateActivity = await fetchExistingActivity(input.employeeId, activityDate)
 
@@ -569,10 +676,24 @@ export async function finishEmployeeWork(input: {
     patchBody.late_minutes = 0
   }
 
-  const updatedActivity = await updateActivity(activity.id, patchBody)
+  const finishedAtIso = finishedAt.toISOString()
+  let updatedActivity: EmployeeActivityDbRow
+
+  try {
+    updatedActivity = await updateActivity(activity.id, {
+      ...patchBody,
+      finished_at: finishedAtIso
+    })
+  } catch (error) {
+    if (!isMissingEmployeeActivityTimeColumns(error)) {
+      throw error
+    }
+
+    updatedActivity = await updateActivity(activity.id, patchBody)
+  }
 
   return {
-    finishedAt: finishedAt.toISOString(),
+    finishedAt: finishedAtIso,
     activity: mapEmployeeActivityDbRowToRecord(updatedActivity, {
       id: input.employeeId,
       username: effectiveEmployeeName

@@ -64,6 +64,19 @@ function formatDate(value: string) {
   })
 }
 
+function formatActivityTime(value?: string | null) {
+  if (!value) {
+    return '—'
+  }
+
+  return new Date(value).toLocaleTimeString('ru-RU', {
+    timeZone: 'Asia/Tashkent',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  })
+}
+
 function formatMinutes(value: number) {
   return `${value.toLocaleString()} мин`
 }
@@ -279,6 +292,16 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
     accessorKey: 'date',
     header: 'Дата',
     cell: ({ row }) => formatDate(row.getValue('date'))
+  },
+  {
+    accessorKey: 'startedAt',
+    header: 'Начал',
+    cell: ({ row }) => formatActivityTime(row.original.startedAt)
+  },
+  {
+    accessorKey: 'finishedAt',
+    header: 'Закончил',
+    cell: ({ row }) => formatActivityTime(row.original.finishedAt)
   },
   {
     accessorKey: 'status',

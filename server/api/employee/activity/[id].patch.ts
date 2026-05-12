@@ -10,6 +10,8 @@ interface EmployeeActivityDbRow {
   status: EmployeeActivityStatus
   work_minutes: number | null
   late_minutes: number | null
+  started_at?: string | null
+  finished_at?: string | null
 }
 
 interface ActivityCustomerRow {
@@ -155,6 +157,8 @@ function mapDbRowToRecord(row: EmployeeActivityDbRow, customer?: ActivityCustome
     employeeId: row.employee_id,
     employeeName: customer?.username?.trim() || row.employee_name?.trim() || `Сотрудник #${row.employee_id ?? row.id}`,
     date: row.activity_date,
+    startedAt: row.started_at ?? null,
+    finishedAt: row.finished_at ?? null,
     status: row.status,
     workMinutes: row.work_minutes ?? 0,
     lateMinutes: row.late_minutes ?? 0

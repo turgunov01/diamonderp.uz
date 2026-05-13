@@ -157,7 +157,7 @@ interface FetchTaskListOptions {
 
 interface CreateObjectTaskListInput {
   objectId: number | string
-  employeeId: number | string
+  employeeId?: number | string | null
   title: string
   note?: string | null
   dueDate?: string | null
@@ -646,10 +646,12 @@ function buildTaskRecord(
     objectId: row.object_id ?? null,
     objectName: object?.name || `Object #${row.object_id ?? row.id}`,
     employeeId: row.employee_id ?? null,
-    employeeName: normalizeDisplayName(employee) || `Employee #${row.employee_id ?? row.id}`,
-    employeeUsername: employee?.username || undefined,
-    employeePhone: employee?.phone_number || undefined,
-    employeeStatus: employee?.status || undefined,
+    employeeName: typeof row.employee_id === 'number'
+      ? (normalizeDisplayName(employee) || `Employee #${row.employee_id}`)
+      : 'Все сотрудники',
+    employeeUsername: typeof row.employee_id === 'number' ? (employee?.username || undefined) : undefined,
+    employeePhone: typeof row.employee_id === 'number' ? (employee?.phone_number || undefined) : undefined,
+    employeeStatus: typeof row.employee_id === 'number' ? (employee?.status || undefined) : undefined,
     title: row.title,
     note: row.note || null,
     dueDate: row.due_date || null,
@@ -774,7 +776,9 @@ async function deleteTaskList(taskListId: number) {
 
 export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   const objectId = parsePositiveInteger(input.objectId, 'objectId')
-  const employeeId = parsePositiveInteger(input.employeeId, 'employeeId')
+  const employeeId = input.employeeId === undefined || input.employeeId === null || input.employeeId === ''
+    ? null
+    : parsePositiveInteger(input.employeeId, 'employeeId')
   const title = typeof input.title === 'string' ? input.title.trim() : ''
   const note = typeof input.note === 'string' && input.note.trim() ? input.note.trim() : null
   const dueDate = parseDueDate(input.dueDate)
@@ -798,7 +802,7 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
 
   const [objects, customers] = await Promise.all([
     fetchObjects({ objectIds: [objectId] }),
-    fetchCustomers({ customerIds: [employeeId] })
+    employeeId ? fetchCustomers({ customerIds: [employeeId] }) : Promise.resolve([])
   ])
 
   const object = objects[0]
@@ -811,14 +815,14 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
     })
   }
 
-  if (!employee) {
+  if (employeeId && !employee) {
     throw createError({
       statusCode: 404,
       statusMessage: 'Employee not found.'
     })
   }
 
-  if (!isAssignableEmployee(employee, object.name)) {
+  if (employeeId && employee && !isAssignableEmployee(employee, object.name)) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Employee is not assigned to the selected object.'
@@ -892,27 +896,45 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   }
 
   const objectById = new Map([[object.id, object]])
-  const customerById = new Map([[employee.id, employee]])
+  const customerById = employee ? new Map([[employee.id, employee]]) : new Map()
   return buildTaskRecord(createdList, createdItems.map(mapTaskItemRow), objectById, customerById)
 }
 
-export async function listEmployeeObjectTasks(employeeId: number, status?: ObjectTaskStatus) {
+export async function listEmployeeObjectTasks(employeeId: number, objectIds: number[] = [], status?: ObjectTaskStatus) {
   const normalizedEmployeeId = parsePositiveInteger(employeeId, 'employeeId')
-  const [taskLists, customers] = await Promise.all([
+  const normalizedObjectIds = Array.from(new Set(objectIds
+    .map(value => typeof value === 'number' ? value : Number(value))
+    .filter((value): value is number => Number.isInteger(value) && value > 0)))
+
+  const [personalTaskLists, objectTaskLists, customers] = await Promise.all([
     fetchTaskLists({ employeeIds: [normalizedEmployeeId], status }),
+    normalizedObjectIds.length ? fetchTaskLists({ objectIds: normalizedObjectIds, status }) : Promise.resolve([]),
     fetchCustomers({ customerIds: [normalizedEmployeeId] })
   ])
-  const taskItems = await fetchTaskItems(taskLists.map(task => task.id))
-  const objectIds = Array.from(new Set(taskLists
+
+  const visibleListsMap = new Map<number, ObjectTaskListDbRow>()
+  for (const row of [...personalTaskLists, ...objectTaskLists]) {
+    if (row.employee_id === null || row.employee_id === normalizedEmployeeId) {
+      visibleListsMap.set(row.id, row)
+    }
+  }
+
+  const visibleLists = [...visibleListsMap.values()]
+  if (!visibleLists.length) {
+    return []
+  }
+
+  const taskItems = await fetchTaskItems(visibleLists.map(task => task.id))
+  const referencedObjectIds = Array.from(new Set(visibleLists
     .map(task => task.object_id)
     .filter((value): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0)))
-  const objects = objectIds.length ? await fetchObjects({ objectIds }) : []
+  const objects = referencedObjectIds.length ? await fetchObjects({ objectIds: referencedObjectIds }) : []
 
   const objectById = new Map(objects.map(object => [object.id, object]))
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
   const itemsByTaskId = buildItemsMap(taskItems)
 
-  return sortTasks(taskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+  return sortTasks(visibleLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
 }
 
 export async function listEmployeeObjectTasksByObject(
@@ -924,7 +946,7 @@ export async function listEmployeeObjectTasksByObject(
   const normalizedObjectId = parsePositiveInteger(objectId, 'objectId')
 
   const [taskLists, customers, objects] = await Promise.all([
-    fetchTaskLists({ employeeIds: [normalizedEmployeeId], objectIds: [normalizedObjectId], status }),
+    fetchTaskLists({ objectIds: [normalizedObjectId], status }),
     fetchCustomers({ customerIds: [normalizedEmployeeId] }),
     fetchObjects({ objectIds: [normalizedObjectId] })
   ])
@@ -936,12 +958,13 @@ export async function listEmployeeObjectTasksByObject(
     })
   }
 
-  const taskItems = await fetchTaskItems(taskLists.map(task => task.id))
+  const visibleLists = taskLists.filter(row => row.employee_id === null || row.employee_id === normalizedEmployeeId)
+  const taskItems = await fetchTaskItems(visibleLists.map(task => task.id))
   const objectById = new Map(objects.map(object => [object.id, object]))
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
   const itemsByTaskId = buildItemsMap(taskItems)
 
-  return sortTasks(taskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+  return sortTasks(visibleLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
 }
 
 export async function listReviewerObjectTasks(
@@ -1187,11 +1210,35 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     })
   }
 
-  if (taskList.employee_id !== employeeId) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Task item access denied.'
-    })
+  if (typeof taskList.employee_id === 'number') {
+    if (taskList.employee_id !== employeeId) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Task item access denied.'
+      })
+    }
+  } else {
+    if (typeof taskList.object_id !== 'number' || taskList.object_id <= 0) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Task item access denied.'
+      })
+    }
+
+    const [objects, customers] = await Promise.all([
+      fetchObjects({ objectIds: [taskList.object_id] }),
+      fetchCustomers({ customerIds: [employeeId] })
+    ])
+
+    const object = objects[0]
+    const customer = customers[0]
+
+    if (!object || !customer || !isAssignableEmployee(customer, object.name)) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Task item access denied.'
+      })
+    }
   }
 
   const reviewStatus = normalizeReviewStatus(taskList.review_status)
@@ -1340,13 +1387,6 @@ export async function getEmployeeTaskById(employeeId: number, taskId: number) {
     })
   }
 
-  if (taskList.employee_id !== normalizedEmployeeId) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Task access denied.'
-    })
-  }
-
   const [taskItems, objects, customers] = await Promise.all([
     fetchTaskItems([normalizedTaskId]),
     typeof taskList.object_id === 'number' && taskList.object_id > 0
@@ -1354,6 +1394,25 @@ export async function getEmployeeTaskById(employeeId: number, taskId: number) {
       : Promise.resolve([]),
     fetchCustomers({ customerIds: [normalizedEmployeeId] })
   ])
+
+  const object = objects[0]
+  const customer = customers[0]
+
+  if (typeof taskList.employee_id === 'number') {
+    if (taskList.employee_id !== normalizedEmployeeId) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Task access denied.'
+      })
+    }
+  } else {
+    if (!object || !customer || !isAssignableEmployee(customer, object.name)) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Task access denied.'
+      })
+    }
+  }
 
   const objectById = new Map(objects.map(object => [object.id, object]))
   const customerById = new Map(customers.map(customer => [customer.id, customer]))

@@ -16,7 +16,6 @@ const createModalOpen = ref(false)
 const creating = ref(false)
 const form = reactive({
   objectId: undefined as number | undefined,
-  employeeId: undefined as number | undefined,
   title: '',
   note: '',
   dueDate: '',
@@ -55,7 +54,6 @@ watch(createModalOpen, (isOpen) => {
   }
 
   form.objectId = undefined
-  form.employeeId = undefined
   form.title = ''
   form.note = ''
   form.dueDate = ''
@@ -109,24 +107,6 @@ const objectOptions = computed(() => {
 const selectedObject = computed(() => {
   return objects.value.find(object => object.id === form.objectId) || null
 })
-const employeeOptions = computed(() => {
-  return (selectedObject.value?.employees || []).map(employee => ({
-    label: `${employee.name} · @${employee.username}`,
-    value: employee.id
-  }))
-})
-
-watch(() => form.objectId, (objectId) => {
-  if (!objectId) {
-    form.employeeId = undefined
-    return
-  }
-
-  const availableEmployeeIds = new Set((selectedObject.value?.employees || []).map(employee => employee.id))
-  if (!form.employeeId || !availableEmployeeIds.has(form.employeeId)) {
-    form.employeeId = selectedObject.value?.employees[0]?.id
-  }
-})
 
 function openCreateModal(object?: ObjectTaskCard | null) {
   if (!canManageObjectTasks.value) {
@@ -143,7 +123,6 @@ function openCreateModal(object?: ObjectTaskCard | null) {
   }
 
   form.objectId = object?.id
-  form.employeeId = object?.employees[0]?.id
   form.title = object ? `${object.name}: новый чек-лист` : ''
   form.note = ''
   form.dueDate = ''
@@ -178,9 +157,9 @@ async function submitTaskList() {
     return
   }
 
-  if (!form.employeeId) {
+  if (!selectedObject.value.employees?.length) {
     toast.add({
-      title: 'Выберите сотрудника',
+      title: 'Нет доступных сотрудников',
       color: 'warning'
     })
     return
@@ -209,7 +188,6 @@ async function submitTaskList() {
       method: 'POST',
       body: {
         objectId: form.objectId,
-        employeeId: form.employeeId,
         title: form.title,
         note: form.note || null,
         dueDate: form.dueDate || null,
@@ -390,7 +368,7 @@ async function submitTaskList() {
       <UModal
         v-model:open="createModalOpen"
         :title="selectedObject ? `Новый to-do для ${selectedObject.name}` : 'Новый to-do'"
-        description="Список будет доступен сотруднику в мобильном приложении и обновляться по мере выполнения пунктов."
+        description="Список будет доступен сотрудникам объекта в мобильном приложении и обновляться по мере выполнения пунктов."
       >
         <template #body>
           <div class="space-y-4">
@@ -403,17 +381,7 @@ async function submitTaskList() {
               />
             </UFormField>
 
-            <UFormField label="Сотрудник" required>
-              <USelect
-                v-model="form.employeeId"
-                :items="employeeOptions"
-                class="w-full"
-                :disabled="!selectedObject"
-                placeholder="Сначала выберите объект"
-              />
-            </UFormField>
-
-            <p v-if="selectedObject && !employeeOptions.length" class="text-sm text-warning">
+            <p v-if="selectedObject && !selectedObject.employees?.length" class="text-sm text-warning">
               У выбранного объекта нет сотрудников с мобильным доступом. Назначить такой список сейчас нельзя.
             </p>
 

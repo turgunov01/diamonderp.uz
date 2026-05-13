@@ -25,7 +25,7 @@ export default eventHandler(async (event) => {
   }
 
   const status = parseOptionalObjectTaskStatus(query.status)
-  const items = await listEmployeeObjectTasks(access.customer.id, status)
+  const items = await listEmployeeObjectTasks(access.customer.id, access.objectIds, status)
 
   return {
     role: access.role,

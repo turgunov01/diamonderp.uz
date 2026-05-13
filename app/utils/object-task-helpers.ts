@@ -28,14 +28,14 @@ export function formatDateTime(value?: string | null) {
 
 export function getTaskStatusLabel(status: TaskStatus) {
   if (status === 'completed') {
-    return 'Завершен'
+    return 'Завершено'
   }
 
   if (status === 'in_progress') {
-    return 'В работе'
+    return 'Частично завершено'
   }
 
-  return 'Новый'
+  return 'В процессе'
 }
 
 export function getTaskStatusColor(status: TaskStatus) {
@@ -61,7 +61,7 @@ export function isTaskOverdue(task: Pick<ObjectTask, 'dueDate' | 'status'>) {
 }
 
 export function getEmployeeTaskSnapshot(employeeId: number, tasks: ObjectTask[]) {
-  const myTasks = tasks.filter(task => task.employeeId === employeeId)
+  const myTasks = tasks.filter(task => task.employeeId === employeeId || task.employeeId === null)
   const recentTimestamps: number[] = []
 
   myTasks.forEach((task) => {

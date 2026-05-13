@@ -3,7 +3,7 @@
 create table if not exists public.object_task_lists (
   id bigint generated always as identity primary key,
   object_id bigint not null references public.objects(id) on delete cascade,
-  employee_id bigint not null references public.customers(id) on delete cascade,
+  employee_id bigint references public.customers(id) on delete cascade,
   title text not null,
   note text,
   due_date date,
@@ -59,6 +59,14 @@ begin
     check (review_status in ('none', 'pending', 'approved', 'rejected'));
 exception
   when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table public.object_task_lists
+    alter column employee_id drop not null;
+exception
+  when undefined_column then null;
 end $$;
 
 alter table public.object_task_items

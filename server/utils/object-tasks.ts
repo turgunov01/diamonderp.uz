@@ -1,6 +1,7 @@
 ﻿import type { H3Event } from 'h3'
 import type { AuthRole, AuthSession } from '~~/shared/types/auth'
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from './supabase'
+import { randomUUID } from 'node:crypto'
 
 interface TaskObjectRow {
   id: number
@@ -29,6 +30,7 @@ interface ObjectTaskListDbRow {
   id: number
   object_id: number | null
   employee_id: number | null
+  group_id?: string | null
   title: string
   note?: string | null
   due_date?: string | null
@@ -260,6 +262,36 @@ function getErrorStatusCode(error: unknown) {
   return undefined
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (!error || typeof error !== 'object') {
+    return ''
+  }
+
+  const message = (error as { message?: unknown }).message
+  return typeof message === 'string' ? message : ''
+}
+
+function getErrorCause(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return undefined
+  }
+
+  return (error as { cause?: unknown }).cause
+}
+
+function getConnectionErrorCode(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return undefined
+  }
+
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' ? code : undefined
+}
+
 function isMissingTableError(error: unknown) {
   const code = getSupabaseErrorCode(error)
   const status = getErrorStatusCode(error)
@@ -267,6 +299,33 @@ function isMissingTableError(error: unknown) {
   return code === '42P01' // Postgres undefined_table
     || code === 'PGRST302' // PostgREST: relation not found
     || status === 404 // Fallback: Supabase may return plain 404 with message "Not Found"
+}
+
+function isSupabaseConnectionError(error: unknown) {
+  const message = getErrorMessage(error).toLowerCase()
+  const cause = getErrorCause(error)
+  const causeMessage = getErrorMessage(cause).toLowerCase()
+  const code = getConnectionErrorCode(error) || getConnectionErrorCode(cause)
+
+  return message.includes('fetch failed')
+    || message.includes('<no response>')
+    || causeMessage.includes('fetch failed')
+    || causeMessage.includes('enotfound')
+    || code === 'ENOTFOUND'
+    || code === 'EAI_AGAIN'
+    || code === 'ECONNREFUSED'
+    || code === 'ETIMEDOUT'
+}
+
+function throwSupabaseRequestError(error: unknown): never {
+  if (isSupabaseConnectionError(error)) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Supabase недоступен: не удалось выполнить сетевой запрос. Проверьте интернет/DNS и SUPABASE_URL.'
+    })
+  }
+
+  throw error
 }
 
 function throwMissingTaskTablesError() {
@@ -350,6 +409,14 @@ async function uploadStorageObject(options: {
   }
 }
 
+async function fetchRows<T>(request: () => Promise<T[]>) {
+  try {
+    return await request()
+  } catch (error: unknown) {
+    throwSupabaseRequestError(error)
+  }
+}
+
 async function fetchRowsOrEmpty<T>(request: () => Promise<T[]>) {
   try {
     return await request()
@@ -358,7 +425,7 @@ async function fetchRowsOrEmpty<T>(request: () => Promise<T[]>) {
       return []
     }
 
-    throw error
+    throwSupabaseRequestError(error)
   }
 }
 
@@ -512,10 +579,10 @@ async function fetchObjects(options: FetchObjectOptions = {}) {
     query.building_id = `eq.${options.buildingId}`
   }
 
-  const rows = await $fetch<TaskObjectRow[]>(`${url}/rest/v1/objects`, {
+  const rows = await fetchRows<TaskObjectRow>(() => $fetch<TaskObjectRow[]>(`${url}/rest/v1/objects`, {
     headers: getSupabaseServerHeaders(serviceRoleKey),
     query
-  })
+  }))
 
   return rows.map(mapObjectRow)
 }
@@ -533,10 +600,10 @@ async function fetchCustomers(options: FetchCustomerOptions = {}) {
     query.or = `(building_id.eq.${options.buildingId},building_id.is.null)`
   }
 
-  return await $fetch<TaskCustomerRow[]>(`${url}/rest/v1/customers`, {
+  return await fetchRows<TaskCustomerRow>(() => $fetch<TaskCustomerRow[]>(`${url}/rest/v1/customers`, {
     headers: getSupabaseServerHeaders(serviceRoleKey),
     query
-  })
+  }))
 }
 
 async function fetchTaskLists(options: FetchTaskListOptions = {}) {
@@ -558,7 +625,7 @@ async function fetchTaskLists(options: FetchTaskListOptions = {}) {
 
   const { url, serviceRoleKey } = getSupabaseServerConfig()
   const query: Record<string, string> = {
-    select: 'id,object_id,employee_id,title,note,due_date,status,review_status,reviewer_id,review_requested_at,reviewed_at,review_comment,review_photo_path,created_by_id,created_by_name,created_by_role,created_at,updated_at',
+    select: 'id,object_id,employee_id,group_id,title,note,due_date,status,review_status,reviewer_id,review_requested_at,reviewed_at,review_comment,review_photo_path,created_by_id,created_by_name,created_by_role,created_at,updated_at',
     order: 'updated_at.desc'
   }
 
@@ -726,7 +793,10 @@ export function parseOptionalObjectTaskReviewStatus(value: unknown) {
   })
 }
 
-export async function buildObjectTaskOverview(buildingId?: number): Promise<ObjectTaskOverview> {
+export async function buildObjectTaskOverview(
+  buildingId?: number,
+  options: { view?: 'raw' | 'grouped' } = {}
+): Promise<ObjectTaskOverview> {
   const objects = await fetchObjects({ buildingId })
   const objectIds = objects.map(object => object.id)
   const [customers, taskLists] = await Promise.all([
@@ -738,7 +808,18 @@ export async function buildObjectTaskOverview(buildingId?: number): Promise<Obje
   const objectById = new Map(objects.map(object => [object.id, object]))
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
   const itemsByTaskId = buildItemsMap(taskItems)
-  const taskRecords = sortTasks(taskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+
+  const pairs = taskLists.map((row) => {
+    return {
+      row,
+      record: buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)
+    }
+  })
+
+  const view = options.view === 'grouped' ? 'grouped' : 'raw'
+  const taskRecords = view === 'raw'
+    ? sortTasks(pairs.map(pair => pair.record))
+    : sortTasks(buildGroupedTaskRecords(pairs.map(pair => ({ row: pair.row, record: pair.record }))))
 
   return {
     buildingId: Number.isInteger(buildingId) ? buildingId ?? null : null,
@@ -762,6 +843,98 @@ export async function buildObjectTaskOverview(buildingId?: number): Promise<Obje
   }
 }
 
+function buildGroupedTaskRecords(pairs: { row: ObjectTaskListDbRow, record: ObjectTaskRecord }[]) {
+  type Group = {
+    representative: ObjectTaskRecord
+    records: ObjectTaskRecord[]
+  }
+
+  const groups = new Map<string, Group>()
+  const output: ObjectTaskRecord[] = []
+
+  for (const pair of pairs) {
+    const objectId = pair.record.objectId
+    if (typeof objectId !== 'number' || objectId <= 0) {
+      continue
+    }
+
+    if (!pair.row.group_id) {
+      output.push(pair.record)
+      continue
+    }
+
+    const groupKey = `${objectId}:${pair.row.group_id}`
+    const existing = groups.get(groupKey)
+
+    if (!existing) {
+      groups.set(groupKey, {
+        representative: pair.record,
+        records: [pair.record]
+      })
+      continue
+    }
+
+    existing.records.push(pair.record)
+  }
+
+  for (const group of groups.values()) {
+    const records = group.records
+    if (records.length <= 1) {
+      output.push(group.representative)
+      continue
+    }
+
+    const representativeSeed = records[0] ?? group.representative
+    const representative = records.reduce((best, current) => {
+      const statusRank = (status: ObjectTaskStatus) => status === 'completed' ? 2 : status === 'in_progress' ? 1 : 0
+      const bestRank = statusRank(best.status)
+      const currentRank = statusRank(current.status)
+
+      if (currentRank !== bestRank) {
+        return currentRank > bestRank ? current : best
+      }
+
+      const bestTime = new Date(best.updatedAt || best.createdAt || 0).getTime()
+      const currentTime = new Date(current.updatedAt || current.createdAt || 0).getTime()
+      return currentTime > bestTime ? current : best
+    }, representativeSeed)
+
+    const totalEmployees = records.length
+    const completedEmployees = records.filter(task => task.status === 'completed').length
+
+    const status: ObjectTaskStatus = completedEmployees === totalEmployees
+      ? 'completed'
+      : completedEmployees > 0
+        ? 'in_progress'
+        : 'open'
+
+    const latestTimestamp = records
+      .map(task => task.updatedAt || task.createdAt || null)
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      .map(value => new Date(value).getTime())
+      .filter(value => Number.isFinite(value))
+      .reduce((max, value) => Math.max(max, value), 0)
+
+    const updatedAt = latestTimestamp ? new Date(latestTimestamp).toISOString() : representative.updatedAt
+
+    output.push({
+      ...representative,
+      employeeId: null,
+      employeeName: 'Все сотрудники',
+      employeeUsername: undefined,
+      employeePhone: undefined,
+      employeeStatus: undefined,
+      status,
+      totalItems: totalEmployees,
+      completedItems: completedEmployees,
+      progressPercent: totalEmployees ? Math.round((completedEmployees / totalEmployees) * 100) : 0,
+      updatedAt
+    })
+  }
+
+  return output
+}
+
 async function deleteTaskList(taskListId: number) {
   const { url, serviceRoleKey } = getSupabaseServerConfig()
 
@@ -776,7 +949,7 @@ async function deleteTaskList(taskListId: number) {
 
 export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   const objectId = parsePositiveInteger(input.objectId, 'objectId')
-  const employeeId = input.employeeId === undefined || input.employeeId === null || input.employeeId === ''
+  const requestedEmployeeId = input.employeeId === undefined || input.employeeId === null || input.employeeId === ''
     ? null
     : parsePositiveInteger(input.employeeId, 'employeeId')
   const title = typeof input.title === 'string' ? input.title.trim() : ''
@@ -800,13 +973,8 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
     })
   }
 
-  const [objects, customers] = await Promise.all([
-    fetchObjects({ objectIds: [objectId] }),
-    employeeId ? fetchCustomers({ customerIds: [employeeId] }) : Promise.resolve([])
-  ])
-
+  const objects = await fetchObjects({ objectIds: [objectId] })
   const object = objects[0]
-  const employee = customers[0]
 
   if (!object) {
     throw createError({
@@ -815,36 +983,55 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
     })
   }
 
-  if (employeeId && !employee) {
-    throw createError({
-      statusCode: 404,
-      statusMessage: 'Employee not found.'
-    })
-  }
+  const customers = await fetchCustomers({ buildingId: object.buildingId ?? undefined })
+  const targetEmployees = (() => {
+    if (requestedEmployeeId) {
+      const employee = customers.find(customer => customer.id === requestedEmployeeId)
+      if (!employee) {
+        throw createError({
+          statusCode: 404,
+          statusMessage: 'Employee not found.'
+        })
+      }
 
-  if (employeeId && employee && !isAssignableEmployee(employee, object.name)) {
+      if (!isAssignableEmployee(employee, object.name)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Employee is not assigned to the selected object.'
+        })
+      }
+
+      return [employee]
+    }
+
+    return customers.filter(customer => isAssignableEmployee(customer, object.name))
+  })()
+
+  if (!targetEmployees.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Employee is not assigned to the selected object.'
+      statusMessage: 'No employees found for the selected object.'
     })
   }
 
   const { url, serviceRoleKey } = getSupabaseServerConfig()
   const headers = getSupabaseServerHeaders(serviceRoleKey)
   const now = new Date().toISOString()
+  const groupId = randomUUID()
 
-  let createdList: ObjectTaskListDbRow | undefined
+  let createdLists: ObjectTaskListDbRow[] = []
 
   try {
-    ;[createdList] = await $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
+    createdLists = await $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
       method: 'POST',
       headers: {
         ...headers,
         Prefer: 'return=representation'
       },
-      body: {
+      body: targetEmployees.map(employee => ({
         object_id: objectId,
-        employee_id: employeeId,
+        employee_id: employee.id,
+        group_id: groupId,
         title,
         note,
         due_date: dueDate,
@@ -853,7 +1040,7 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
         created_by_name: input.creator?.name ?? null,
         created_by_role: input.creator?.role ?? null,
         updated_at: now
-      }
+      }))
     })
   } catch (error: unknown) {
     if (isMissingTableError(error)) {
@@ -862,7 +1049,7 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
     throw error
   }
 
-  if (!createdList) {
+  if (!createdLists.length) {
     throw createError({
       statusCode: 500,
       statusMessage: 'Failed to create task list.'
@@ -878,17 +1065,17 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
         ...headers,
         Prefer: 'return=representation'
       },
-      body: itemTitles.map((itemTitle, index) => ({
-        task_list_id: createdList.id,
+      body: createdLists.flatMap(list => itemTitles.map((itemTitle, index) => ({
+        task_list_id: list.id,
         title: itemTitle,
         sort_order: index,
         is_done: false,
         completed_at: null,
         updated_at: now
-      }))
+      })))
     })
   } catch (error: unknown) {
-    await deleteTaskList(createdList.id).catch(() => undefined)
+    await Promise.all(createdLists.map(list => deleteTaskList(list.id).catch(() => undefined)))
     if (isMissingTableError(error)) {
       throwMissingTaskTablesError()
     }
@@ -896,8 +1083,31 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   }
 
   const objectById = new Map([[object.id, object]])
-  const customerById = employee ? new Map([[employee.id, employee]]) : new Map()
-  return buildTaskRecord(createdList, createdItems.map(mapTaskItemRow), objectById, customerById)
+  const customerById = new Map(targetEmployees.map(employee => [employee.id, employee]))
+  const itemsByTaskId = buildItemsMap(createdItems)
+
+  const representative = createdLists[0]
+  if (!representative) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to create task list.'
+    })
+  }
+  const representativeItems = itemsByTaskId.get(representative.id) || []
+  const task = buildTaskRecord(representative, representativeItems, objectById, customerById)
+
+  if (!requestedEmployeeId) {
+    return {
+      ...task,
+      employeeId: null,
+      employeeName: 'Все сотрудники',
+      employeeUsername: undefined,
+      employeePhone: undefined,
+      employeeStatus: undefined
+    }
+  }
+
+  return task
 }
 
 export async function listEmployeeObjectTasks(employeeId: number, objectIds: number[] = [], status?: ObjectTaskStatus) {
@@ -906,26 +1116,21 @@ export async function listEmployeeObjectTasks(employeeId: number, objectIds: num
     .map(value => typeof value === 'number' ? value : Number(value))
     .filter((value): value is number => Number.isInteger(value) && value > 0)))
 
-  const [personalTaskLists, objectTaskLists, customers] = await Promise.all([
-    fetchTaskLists({ employeeIds: [normalizedEmployeeId], status }),
-    normalizedObjectIds.length ? fetchTaskLists({ objectIds: normalizedObjectIds, status }) : Promise.resolve([]),
+  const [taskLists, customers] = await Promise.all([
+    fetchTaskLists({
+      employeeIds: [normalizedEmployeeId],
+      objectIds: normalizedObjectIds.length ? normalizedObjectIds : undefined,
+      status
+    }),
     fetchCustomers({ customerIds: [normalizedEmployeeId] })
   ])
 
-  const visibleListsMap = new Map<number, ObjectTaskListDbRow>()
-  for (const row of [...personalTaskLists, ...objectTaskLists]) {
-    if (row.employee_id === null || row.employee_id === normalizedEmployeeId) {
-      visibleListsMap.set(row.id, row)
-    }
-  }
-
-  const visibleLists = [...visibleListsMap.values()]
-  if (!visibleLists.length) {
+  if (!taskLists.length) {
     return []
   }
 
-  const taskItems = await fetchTaskItems(visibleLists.map(task => task.id))
-  const referencedObjectIds = Array.from(new Set(visibleLists
+  const taskItems = await fetchTaskItems(taskLists.map(task => task.id))
+  const referencedObjectIds = Array.from(new Set(taskLists
     .map(task => task.object_id)
     .filter((value): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0)))
   const objects = referencedObjectIds.length ? await fetchObjects({ objectIds: referencedObjectIds }) : []
@@ -934,7 +1139,7 @@ export async function listEmployeeObjectTasks(employeeId: number, objectIds: num
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
   const itemsByTaskId = buildItemsMap(taskItems)
 
-  return sortTasks(visibleLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+  return sortTasks(taskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
 }
 
 export async function listEmployeeObjectTasksByObject(
@@ -946,7 +1151,7 @@ export async function listEmployeeObjectTasksByObject(
   const normalizedObjectId = parsePositiveInteger(objectId, 'objectId')
 
   const [taskLists, customers, objects] = await Promise.all([
-    fetchTaskLists({ objectIds: [normalizedObjectId], status }),
+    fetchTaskLists({ objectIds: [normalizedObjectId], employeeIds: [normalizedEmployeeId], status }),
     fetchCustomers({ customerIds: [normalizedEmployeeId] }),
     fetchObjects({ objectIds: [normalizedObjectId] })
   ])
@@ -958,13 +1163,16 @@ export async function listEmployeeObjectTasksByObject(
     })
   }
 
-  const visibleLists = taskLists.filter(row => row.employee_id === null || row.employee_id === normalizedEmployeeId)
-  const taskItems = await fetchTaskItems(visibleLists.map(task => task.id))
+  if (!taskLists.length) {
+    return []
+  }
+
+  const taskItems = await fetchTaskItems(taskLists.map(task => task.id))
   const objectById = new Map(objects.map(object => [object.id, object]))
   const customerById = new Map(customers.map(customer => [customer.id, customer]))
   const itemsByTaskId = buildItemsMap(taskItems)
 
-  return sortTasks(visibleLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+  return sortTasks(taskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
 }
 
 export async function listReviewerObjectTasks(
@@ -1210,35 +1418,11 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     })
   }
 
-  if (typeof taskList.employee_id === 'number') {
-    if (taskList.employee_id !== employeeId) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Task item access denied.'
-      })
-    }
-  } else {
-    if (typeof taskList.object_id !== 'number' || taskList.object_id <= 0) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Task item access denied.'
-      })
-    }
-
-    const [objects, customers] = await Promise.all([
-      fetchObjects({ objectIds: [taskList.object_id] }),
-      fetchCustomers({ customerIds: [employeeId] })
-    ])
-
-    const object = objects[0]
-    const customer = customers[0]
-
-    if (!object || !customer || !isAssignableEmployee(customer, object.name)) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Task item access denied.'
-      })
-    }
+  if (taskList.employee_id !== employeeId) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Task item access denied.'
+    })
   }
 
   const reviewStatus = normalizeReviewStatus(taskList.review_status)
@@ -1395,23 +1579,11 @@ export async function getEmployeeTaskById(employeeId: number, taskId: number) {
     fetchCustomers({ customerIds: [normalizedEmployeeId] })
   ])
 
-  const object = objects[0]
-  const customer = customers[0]
-
-  if (typeof taskList.employee_id === 'number') {
-    if (taskList.employee_id !== normalizedEmployeeId) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Task access denied.'
-      })
-    }
-  } else {
-    if (!object || !customer || !isAssignableEmployee(customer, object.name)) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Task access denied.'
-      })
-    }
+  if (taskList.employee_id !== normalizedEmployeeId) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Task access denied.'
+    })
   }
 
   const objectById = new Map(objects.map(object => [object.id, object]))

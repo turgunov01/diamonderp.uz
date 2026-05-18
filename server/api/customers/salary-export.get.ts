@@ -1,8 +1,10 @@
 import ExcelJS from 'exceljs'
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
 import { listEmployeeActivities } from '../../utils/employee-activity'
+import { listObjectSchedules, resolveWorkScheduleTypeFromObjects } from '../../utils/object-schedules'
 import type { EmployeeAdvanceDbRow } from './advances'
 import { mapCustomerDbRowToRecord, type CustomerDbRow } from './customers'
+import { getWorkScheduleDefinition } from '~~/shared/utils/work-schedules'
 import type { H3Event } from 'h3'
 
 type SalaryFormulaCookie = {
@@ -213,6 +215,7 @@ export default eventHandler(async (event) => {
     { header: 'Смена', key: 'workShift', width: 10 },
     { header: 'Объект', key: 'objectPinned', width: 18 },
     { header: 'Позиции', key: 'objectPositions', width: 28 },
+    { header: 'График объекта', key: 'schedule', width: 24 },
     { header: 'Тип', key: 'salaryType', width: 12 },
     { header: 'Ставка/час', key: 'hourlyRate', width: 12 },
     { header: 'Базовая', key: 'baseSalary', width: 14 },
@@ -220,6 +223,8 @@ export default eventHandler(async (event) => {
     { header: 'Отработано', key: 'worked', width: 14 },
     { header: 'Опоздание (мин)', key: 'lateMinutes', width: 14 },
     { header: 'Штраф', key: 'latePenalty', width: 12 },
+    { header: 'На карту', key: 'cardPayout', width: 14 },
+    { header: 'Наличными', key: 'cashPayout', width: 14 },
     { header: 'Начислено', key: 'totalSalary', width: 14 },
     { header: 'Авансы (выдано)', key: 'advances', width: 14 },
     { header: 'К выплате', key: 'netSalary', width: 16 },
@@ -259,14 +264,14 @@ export default eventHandler(async (event) => {
     return `${base}/storage/v1/object/public/${withBucket}`
   }
 
-  const computeLatePenalty = (baseSalary: number, lateMinutes: number) => {
-    if (!baseSalary || !lateMinutes || !effectiveSalaryMonthDays) {
+  const computeLatePenalty = (baseSalary: number, lateMinutes: number, workHoursPerDay: number) => {
+    if (!baseSalary || !lateMinutes || !effectiveSalaryMonthDays || !workHoursPerDay) {
       return 0
     }
 
     const perMinuteRate = baseSalary
       / effectiveSalaryMonthDays
-      / effectiveWorkHoursPerDay
+      / workHoursPerDay
       / effectiveMinutesPerHour
 
     return Math.round(perMinuteRate * effectivePenaltyMultiplier * lateMinutes)
@@ -280,23 +285,29 @@ export default eventHandler(async (event) => {
     return Math.round((hourlyRate / 60) * workMinutes)
   }
 
+  const objectSchedules = await listObjectSchedules(Number.isInteger(buildingId) && buildingId > 0 ? buildingId : undefined)
+
   customers.forEach((c) => {
     const passport = parsePassport(c.passportFile)
     const advancesTotal = advanceByCustomer[c.id] || 0
     const workMinutes = workMinutesByEmployee[c.id] || 0
     const lateMinutes = lateMinutesByEmployee[c.id] || 0
+    const scheduleType = resolveWorkScheduleTypeFromObjects(c, objectSchedules)
+    const schedule = getWorkScheduleDefinition(scheduleType)
 
-    const salaryTypeLabel = c.salaryType === 'hourly' ? 'Почасовая' : 'Оклад'
-    const hourlySalary = c.salaryType === 'hourly'
+    const salaryTypeLabel = schedule.salaryType === 'hourly' ? 'Почасовая' : 'Оклад'
+    const hourlySalary = schedule.salaryType === 'hourly'
       ? computeHourlySalary(c.hourlyRate || 0, workMinutes)
       : 0
-    const grossSalary = c.salaryType === 'hourly'
-      ? hourlySalary + (c.positionBonus || 0)
-      : (c.baseSalary || 0) + (c.positionBonus || 0)
-    const latePenalty = c.salaryType === 'hourly'
+    const cardGross = schedule.salaryType === 'hourly'
+      ? hourlySalary
+      : (c.baseSalary || 0)
+    const latePenalty = schedule.salaryType === 'hourly'
       ? 0
-      : computeLatePenalty(c.baseSalary || 0, lateMinutes)
-    const totalSalary = Math.max(grossSalary - latePenalty, 0)
+      : computeLatePenalty(c.baseSalary || 0, lateMinutes, schedule.hoursPerDay || effectiveWorkHoursPerDay)
+    const cardPayout = Math.max(cardGross - latePenalty, 0)
+    const cashPayout = Math.max(c.positionBonus || 0, 0)
+    const totalSalary = cardPayout + cashPayout
     const netSalary = totalSalary - advancesTotal
     sheet.addRow({
       id: c.id,
@@ -306,13 +317,16 @@ export default eventHandler(async (event) => {
       workShift: c.workShift === 'day' ? 'День' : 'Ночь',
       objectPinned: c.objectPinned,
       objectPositions: (c.objectPositions || []).join(', '),
+      schedule: schedule.label,
       salaryType: salaryTypeLabel,
-      hourlyRate: c.salaryType === 'hourly' ? c.hourlyRate : '',
-      baseSalary: c.salaryType === 'hourly' ? '' : c.baseSalary,
+      hourlyRate: schedule.salaryType === 'hourly' ? c.hourlyRate : '',
+      baseSalary: schedule.salaryType === 'hourly' ? '' : c.baseSalary,
       positionBonus: c.positionBonus,
       worked: formatWorkMinutes(workMinutes),
       lateMinutes,
       latePenalty,
+      cardPayout,
+      cashPayout,
       totalSalary,
       advances: advancesTotal,
       netSalary,

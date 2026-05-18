@@ -39,7 +39,6 @@ const roleAccessMatchers: Partial<Record<AuthRole, AccessMatcher[]>> = {
     prefix('/hr'),
     prefix('/documents'),
     exact('/expenses'),
-    exact('/waste'),
     prefix('/reports')
   ],
   procurement: [
@@ -49,6 +48,7 @@ const roleAccessMatchers: Partial<Record<AuthRole, AccessMatcher[]>> = {
     exact('/objects'),
     prefix('/objects/tasks'),
     exact('/expenses'),
+    exact('/warehouse'),
     exact('/reports/aroma')
   ]
 }
@@ -69,7 +69,7 @@ export function canAccessPath(role: AuthRole | null | undefined, path: string) {
   return (roleAccessMatchers[role] || []).some(match => match(path))
 }
 
-export function filterNavigationItemsByRole<T extends { to?: string, children?: T[] }>(
+export function filterNavigationItemsByRole<T extends { to?: unknown, children?: T[] }>(
   items: T[],
   role: AuthRole | null | undefined
 ): T[] {
@@ -78,7 +78,7 @@ export function filterNavigationItemsByRole<T extends { to?: string, children?: 
       ? filterNavigationItemsByRole(item.children, role)
       : undefined
 
-    const canAccessItem = item.to ? canAccessPath(role, item.to) : false
+    const canAccessItem = typeof item.to === 'string' ? canAccessPath(role, item.to) : false
     const hasVisibleChildren = Boolean(nextChildren?.length)
 
     if (!canAccessItem && !hasVisibleChildren) {

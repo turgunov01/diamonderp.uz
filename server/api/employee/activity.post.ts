@@ -4,6 +4,7 @@ interface CreateEmployeeActivityBody {
   employeeId?: number
   customerId?: number
   recordedAt?: string
+  location?: unknown
 }
 
 function parseEmployeeId(body: CreateEmployeeActivityBody) {
@@ -25,6 +26,7 @@ export default eventHandler(async (event) => {
 
   return await recordEmployeeActivity({
     employeeId: parseEmployeeId(body || {}),
-    recordedAt: body?.recordedAt
+    recordedAt: body?.recordedAt,
+    location: body?.location
   })
 })

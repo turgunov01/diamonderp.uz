@@ -1,11 +1,21 @@
-﻿export type MobileWorkShift = 'day' | 'night'
+import {
+  getLegacyWorkScheduleType,
+  getWorkScheduleDefinition,
+  isWorkScheduleType,
+  type WorkScheduleType
+} from '~~/shared/utils/work-schedules'
+
+export type MobileWorkShift = 'day' | 'night'
 
 export interface MobileShiftInfo {
   workShift: MobileWorkShift
-  label: 'День' | 'Ночь'
+  scheduleType: WorkScheduleType
+  label: string
   timezone: 'Asia/Tashkent'
   shiftStartHour: number
   shiftEndHour: number
+  hoursPerDay: number
+  salaryType: 'fixed' | 'hourly'
   isActiveNow: boolean
   shouldLogoutNow: boolean
   startedAt: string | null
@@ -74,19 +84,39 @@ function addTashkentDays(parts: TashkentDateParts, offsetDays: number) {
   }
 }
 
-function buildDayShift(now: Date, parts: TashkentDateParts): MobileShiftInfo {
-  const start = shiftDate(parts.year, parts.month, parts.day, DAY_SHIFT_START_HOUR)
-  const end = shiftDate(parts.year, parts.month, parts.day, DAY_SHIFT_END_HOUR)
+function buildFixedScheduleShift(
+  scheduleType: WorkScheduleType,
+  now: Date,
+  parts: TashkentDateParts
+): MobileShiftInfo {
+  const schedule = getWorkScheduleDefinition(scheduleType)
+  const startHour = schedule.startHour ?? DAY_SHIFT_START_HOUR
+  const endHour = schedule.endHour ?? DAY_SHIFT_END_HOUR
+  let startDateParts = parts
+  let endDateParts = schedule.spansNextDay
+    ? addTashkentDays(parts, 1)
+    : parts
+
+  if (schedule.spansNextDay && parts.hour < endHour) {
+    startDateParts = { ...addTashkentDays(parts, -1), hour: parts.hour, minute: parts.minute, second: parts.second }
+    endDateParts = parts
+  }
+
+  const start = shiftDate(startDateParts.year, startDateParts.month, startDateParts.day, startHour)
+  const end = shiftDate(endDateParts.year, endDateParts.month, endDateParts.day, endHour)
   const isActiveNow = now >= start && now < end
   const nextDate = addTashkentDays(parts, now < start ? 0 : 1)
-  const nextShiftStartsAt = shiftDate(nextDate.year, nextDate.month, nextDate.day, DAY_SHIFT_START_HOUR)
+  const nextShiftStartsAt = shiftDate(nextDate.year, nextDate.month, nextDate.day, startHour)
 
   return {
-    workShift: 'day',
-    label: 'День',
+    workShift: schedule.workShift,
+    scheduleType,
+    label: schedule.shortLabel,
     timezone: TASHKENT_TIMEZONE,
-    shiftStartHour: DAY_SHIFT_START_HOUR,
-    shiftEndHour: DAY_SHIFT_END_HOUR,
+    shiftStartHour: startHour,
+    shiftEndHour: endHour,
+    hoursPerDay: schedule.hoursPerDay,
+    salaryType: schedule.salaryType,
     isActiveNow,
     shouldLogoutNow: !isActiveNow,
     startedAt: isActiveNow ? start.toISOString() : null,
@@ -95,7 +125,8 @@ function buildDayShift(now: Date, parts: TashkentDateParts): MobileShiftInfo {
   }
 }
 
-function buildNightShift(now: Date, parts: TashkentDateParts): MobileShiftInfo {
+function buildNightShift(scheduleType: WorkScheduleType, now: Date, parts: TashkentDateParts): MobileShiftInfo {
+  const schedule = getWorkScheduleDefinition(scheduleType)
   const todayStart = shiftDate(parts.year, parts.month, parts.day, NIGHT_SHIFT_START_HOUR)
   const tomorrowDate = addTashkentDays(parts, 1)
   const yesterdayDate = addTashkentDays(parts, -1)
@@ -121,10 +152,13 @@ function buildNightShift(now: Date, parts: TashkentDateParts): MobileShiftInfo {
 
   return {
     workShift: 'night',
-    label: 'Ночь',
+    scheduleType,
+    label: schedule.shortLabel,
     timezone: TASHKENT_TIMEZONE,
     shiftStartHour: NIGHT_SHIFT_START_HOUR,
     shiftEndHour: NIGHT_SHIFT_END_HOUR,
+    hoursPerDay: schedule.hoursPerDay,
+    salaryType: schedule.salaryType,
     isActiveNow,
     shouldLogoutNow: !isActiveNow,
     startedAt: startedAt ? startedAt.toISOString() : null,
@@ -133,13 +167,57 @@ function buildNightShift(now: Date, parts: TashkentDateParts): MobileShiftInfo {
   }
 }
 
-export function resolveMobileShiftInfo(workShift?: string | null, now = new Date()) {
-  if (workShift !== 'day' && workShift !== 'night') {
+function buildHourlyShift(parts: TashkentDateParts): MobileShiftInfo {
+  const schedule = getWorkScheduleDefinition('hourly')
+  const tomorrowDate = addTashkentDays(parts, 1)
+  const nextShiftStartsAt = shiftDate(tomorrowDate.year, tomorrowDate.month, tomorrowDate.day, 0)
+
+  return {
+    workShift: schedule.workShift,
+    scheduleType: 'hourly',
+    label: schedule.shortLabel,
+    timezone: TASHKENT_TIMEZONE,
+    shiftStartHour: 0,
+    shiftEndHour: 24,
+    hoursPerDay: 0,
+    salaryType: 'hourly',
+    isActiveNow: true,
+    shouldLogoutNow: false,
+    startedAt: null,
+    logoutAt: null,
+    nextShiftStartsAt: nextShiftStartsAt.toISOString()
+  }
+}
+
+function normalizeScheduleInput(value?: string | null): WorkScheduleType | null {
+  if (isWorkScheduleType(value)) {
+    return value
+  }
+
+  if (value === 'day' || value === 'night') {
+    return getLegacyWorkScheduleType({
+      workShift: value,
+      salaryType: 'fixed'
+    })
+  }
+
+  return null
+}
+
+export function resolveMobileShiftInfo(scheduleInput?: string | null, now = new Date()) {
+  const scheduleType = normalizeScheduleInput(scheduleInput)
+  if (!scheduleType) {
     return null
   }
 
   const parts = getTashkentDateParts(now)
-  return workShift === 'day'
-    ? buildDayShift(now, parts)
-    : buildNightShift(now, parts)
+  if (scheduleType === 'hourly') {
+    return buildHourlyShift(parts)
+  }
+
+  if (scheduleType === 'night_12h') {
+    return buildNightShift(scheduleType, now, parts)
+  }
+
+  return buildFixedScheduleShift(scheduleType, now, parts)
 }

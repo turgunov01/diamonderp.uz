@@ -4,6 +4,14 @@ import { upperFirst } from 'scule'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
 import type { EmployeeActivityRecord } from '~/stores/employeeActivity'
+import {
+  WORK_SCHEDULE_DEFINITIONS,
+  getLegacyWorkScheduleType,
+  getWorkScheduleDefinition,
+  getWorkScheduleOptions,
+  normalizeWorkScheduleType,
+  type WorkScheduleType
+} from '~~/shared/utils/work-schedules'
 
 interface Customer {
   id: number
@@ -39,11 +47,6 @@ interface PassportFileEntry {
   value: string
   url: string
   isImage: boolean
-}
-
-interface ShiftDraft {
-  shiftKind: ShiftCardId
-  saving: boolean
 }
 
 interface SalaryDraft {
@@ -83,7 +86,15 @@ interface CustomerRole {
 
 interface ObjectItem {
   id: number
+  building_id?: number | null
   name: string
+  schedule_type?: WorkScheduleType | string | null
+  scheduleType?: WorkScheduleType | string | null
+}
+
+interface ObjectScheduleDraft {
+  scheduleType: WorkScheduleType
+  saving: boolean
 }
 
 function createDefaultSalaryFormulaConfig(): SalaryFormulaConfig {
@@ -123,10 +134,7 @@ const customerPasswordVisible = ref(false)
 const WORK_HOURS_PER_DAY = 12
 const MINUTES_PER_HOUR = 60
 const LATE_PENALTY_MULTIPLIER = 4
-const SALARY_TYPE_OPTIONS = [
-  { label: 'Оклад', value: 'fixed' },
-  { label: 'Почасовая', value: 'hourly' }
-] as const
+const WORK_SCHEDULE_OPTIONS = getWorkScheduleOptions()
 
 const hrTabs = [{
   label: 'Пользователи',
@@ -156,7 +164,7 @@ const columnFilters = ref([{
 const columnVisibility = ref()
 const rowSelection = ref({})
 
-const shiftDrafts = ref<Record<number, ShiftDraft>>({})
+const objectScheduleDrafts = ref<Record<number, ObjectScheduleDraft>>({})
 const salaryDrafts = ref<Record<number, SalaryDraft>>({})
 const salaryFormulaCookie = useCookie<SalaryFormulaConfig>('hr-salary-formula-config', {
   default: () => createDefaultSalaryFormulaConfig(),
@@ -273,11 +281,27 @@ const {
   }
 })
 
-const { data: objectsData } = await useFetch<ObjectItem[]>('/api/objects', {
+const { data: objectsData, refresh: refreshObjects } = await useFetch<ObjectItem[]>('/api/objects', {
   default: () => [],
   query: {
     buildingId: computed(() => activeBuilding.value?.id)
   }
+})
+
+const objectScheduleByName = computed(() => {
+  const map = new Map<string, WorkScheduleType>()
+
+  for (const object of objectsData.value || []) {
+    const name = object.name?.trim()
+    if (!name) continue
+    const scheduleType = normalizeWorkScheduleType(object.scheduleType ?? object.schedule_type)
+    map.set(`${object.building_id ?? activeBuilding.value?.id ?? 'global'}:${name}`, scheduleType)
+    if (!map.has(`any:${name}`)) {
+      map.set(`any:${name}`, scheduleType)
+    }
+  }
+
+  return map
 })
 
 const safeCustomers = computed(() =>
@@ -335,7 +359,7 @@ watch([() => filteredSalaryCustomers.value.length, () => salaryPagination.value.
 })
 
 const objectFilter = ref<string | null>(null)
-const shiftFilter = ref<'day' | 'night' | 'hourly' | null>(null)
+const shiftFilter = ref<WorkScheduleType | null>(null)
 
 const objectFilterOptions = computed(() => {
   const seen = new Set<string>()
@@ -356,11 +380,9 @@ const objectFilterOptions = computed(() => {
 })
 
 const shiftFilterOptions = [
-  { label: 'Все смены', value: null },
-  { label: 'День', value: 'day' },
-  { label: 'Ночь', value: 'night' },
-  { label: 'Почасовое', value: 'hourly' }
-] as const
+  { label: 'Все графики', value: null },
+  ...WORK_SCHEDULE_OPTIONS
+]
 
 function resetUserFilters() {
   objectFilter.value = null
@@ -412,7 +434,7 @@ const filteredCustomers = computed(() => {
     }
 
     if (selectedShift) {
-      const shiftKind = customer.salaryType === 'hourly' ? 'hourly' : customer.workShift
+      const shiftKind = getCustomerWorkScheduleType(customer)
 
       if (shiftKind !== selectedShift) {
         return false
@@ -466,12 +488,39 @@ function clearArchivedSelection() {
   archivedRowSelection.value = {}
 }
 
-function getCustomerShiftKind(customer: Customer): ShiftCardId {
-  if (customer.salaryType === 'hourly') {
-    return 'hourly'
+function getCustomerObjectNames(customer: Customer) {
+  return Array.from(new Set([
+    customer.objectPinned?.trim(),
+    ...(Array.isArray(customer.objectPositions) ? customer.objectPositions : [])
+      .map(position => position.trim())
+  ].filter((value): value is string => Boolean(value))))
+}
+
+function getCustomerWorkScheduleType(customer: Customer): WorkScheduleType {
+  const fallback = getLegacyWorkScheduleType({
+    workShift: customer.workShift,
+    salaryType: customer.salaryType
+  })
+  const names = getCustomerObjectNames(customer)
+
+  for (const name of names) {
+    const exact = objectScheduleByName.value.get(`${customer.buildingId ?? activeBuilding.value?.id ?? 'global'}:${name}`)
+    const any = objectScheduleByName.value.get(`any:${name}`)
+    const scheduleType = exact || any
+    if (scheduleType) {
+      return scheduleType
+    }
   }
 
-  return customer.workShift
+  return fallback
+}
+
+function getCustomerWorkSchedule(customer: Customer) {
+  return getWorkScheduleDefinition(getCustomerWorkScheduleType(customer))
+}
+
+function getObjectScheduleType(object: ObjectItem): WorkScheduleType {
+  return normalizeWorkScheduleType(object.scheduleType ?? object.schedule_type)
 }
 
 watch(error, (newError) => {
@@ -500,20 +549,13 @@ watch(monthlyActivityError, (newError) => {
 
 watch(data, (customers) => {
   if (!customers?.length) {
-    shiftDrafts.value = {}
     salaryDrafts.value = {}
     return
   }
 
-  const nextShiftDrafts: Record<number, ShiftDraft> = {}
   const nextSalaryDrafts: Record<number, SalaryDraft> = {}
 
   for (const customer of customers) {
-    nextShiftDrafts[customer.id] = {
-      shiftKind: getCustomerShiftKind(customer),
-      saving: false
-    }
-
     nextSalaryDrafts[customer.id] = {
       salaryType: customer.salaryType || 'fixed',
       hourlyRate: String(customer.hourlyRate ?? 0),
@@ -523,8 +565,20 @@ watch(data, (customers) => {
     }
   }
 
-  shiftDrafts.value = nextShiftDrafts
   salaryDrafts.value = nextSalaryDrafts
+}, { immediate: true })
+
+watch(objectsData, (objects) => {
+  const nextDrafts: Record<number, ObjectScheduleDraft> = {}
+
+  for (const object of objects || []) {
+    nextDrafts[object.id] = {
+      scheduleType: getObjectScheduleType(object),
+      saving: false
+    }
+  }
+
+  objectScheduleDrafts.value = nextDrafts
 }, { immediate: true })
 
 watch(safeArchiveCustomers, (archivedCustomers) => {
@@ -775,21 +829,17 @@ const userColumns: TableColumn<Customer>[] = [
   },
   {
     accessorKey: 'workShift',
-    header: 'Смена',
+    header: 'График',
     cell: ({ row }) => {
-      const shiftKind = row.original.salaryType === 'hourly' ? 'hourly' : row.original.workShift
-      const color = shiftKind === 'day'
+      const schedule = getCustomerWorkSchedule(row.original)
+      const color = schedule.type === 'day_12h'
         ? 'success'
-        : shiftKind === 'night'
+        : schedule.type === 'night_12h'
           ? 'warning'
-          : 'primary'
-      return h(UBadge, { class: 'capitalize', variant: 'subtle', color }, () =>
-        shiftKind === 'day'
-          ? 'день'
-          : shiftKind === 'night'
-            ? 'ночь'
-            : 'почасовое'
-      )
+          : schedule.type === 'hourly'
+            ? 'primary'
+            : 'neutral'
+      return h(UBadge, { variant: 'subtle', color }, () => schedule.shortLabel)
     }
   },
   {
@@ -847,7 +897,7 @@ const columnLabelMap: Record<string, string> = {
   id: 'ID',
   username: 'Пользователь',
   age: 'Возраст',
-  workShift: 'Смена',
+  workShift: 'График',
   objectPinned: 'Закрепленный объект',
   objectPositions: 'Позиции',
   actions: 'Действия'
@@ -857,66 +907,50 @@ function getColumnLabel(columnId: string) {
   return columnLabelMap[columnId] || upperFirst(columnId)
 }
 
-type ShiftCardId = 'day' | 'night' | 'hourly'
-type ShiftCardColor = 'success' | 'warning' | 'primary'
-interface ShiftCard {
-  id: ShiftCardId
+type ObjectScheduleCardColor = 'success' | 'warning' | 'primary' | 'neutral'
+interface ObjectScheduleCard {
+  id: WorkScheduleType
   label: string
-  modalTitle: string
   description: string
-  color: ShiftCardColor
-  users: Customer[]
+  color: ObjectScheduleCardColor
+  objects: ObjectItem[]
 }
 
-const shiftStats = computed<ShiftCard[]>(() => {
-  const customers = safeCustomers.value
-  const fixedUsers = customers.filter(customer => customer.salaryType !== 'hourly')
-  const hourlyUsers = customers.filter(customer => customer.salaryType === 'hourly')
-  const dayUsers = fixedUsers.filter(customer => customer.workShift === 'day')
-  const nightUsers = fixedUsers.filter(customer => customer.workShift === 'night')
+function getScheduleCardColor(type: WorkScheduleType): ObjectScheduleCardColor {
+  if (type === 'day_12h') return 'success'
+  if (type === 'night_12h') return 'warning'
+  if (type === 'hourly') return 'primary'
+  return 'neutral'
+}
 
-  return [{
-    id: 'day',
-    label: 'День',
-    modalTitle: 'Дневная смена',
-    description: 'Фиксированная оплата, смена День.',
-    color: 'success' as const,
-    users: dayUsers
-  }, {
-    id: 'night',
-    label: 'Ночь',
-    modalTitle: 'Ночная смена',
-    description: 'Фиксированная оплата, смена Ночь.',
-    color: 'warning' as const,
-    users: nightUsers
-  }, {
-    id: 'hourly',
-    label: 'Почасовое',
-    modalTitle: 'Почасовая оплата',
-    description: 'Сотрудники с почасовой оплатой (ставка за час).',
-    color: 'primary' as const,
-    users: hourlyUsers
-  }]
-})
-
-const shiftModalOpen = ref(false)
-const selectedShiftCardId = ref<ShiftCardId | null>(null)
-const activeShiftCard = computed(() =>
-  shiftStats.value.find(shift => shift.id === selectedShiftCardId.value) || null
+const objectScheduleStats = computed<ObjectScheduleCard[]>(() =>
+  WORK_SCHEDULE_DEFINITIONS.map(schedule => ({
+    id: schedule.type,
+    label: schedule.label,
+    description: schedule.description,
+    color: getScheduleCardColor(schedule.type),
+    objects: (objectsData.value || []).filter(object => getObjectScheduleType(object) === schedule.type)
+  }))
 )
-const activeShiftUsers = computed(() => activeShiftCard.value?.users || [])
 
-function openShiftModal(shiftId: ShiftCardId) {
-  selectedShiftCardId.value = shiftId
-  shiftModalOpen.value = true
+const scheduleModalOpen = ref(false)
+const selectedScheduleType = ref<WorkScheduleType | null>(null)
+const activeScheduleCard = computed(() =>
+  objectScheduleStats.value.find(schedule => schedule.id === selectedScheduleType.value) || null
+)
+const activeScheduleObjects = computed(() => activeScheduleCard.value?.objects || [])
+
+function openScheduleModal(scheduleType: WorkScheduleType) {
+  selectedScheduleType.value = scheduleType
+  scheduleModalOpen.value = true
 }
 
-watch(shiftModalOpen, (isOpen) => {
+watch(scheduleModalOpen, (isOpen) => {
   if (isOpen) {
     return
   }
 
-  selectedShiftCardId.value = null
+  selectedScheduleType.value = null
 })
 
 function formatCurrency(value: number) {
@@ -969,12 +1003,24 @@ const workMinutesByEmployee = computed(() => {
 })
 
 const advanceFilterCustomerId = ref<number | null>(null)
+const advanceFilterCustomerModel = computed<number | undefined>({
+  get: () => advanceFilterCustomerId.value ?? undefined,
+  set: (value) => {
+    advanceFilterCustomerId.value = typeof value === 'number' ? value : null
+  }
+})
 const advanceForm = reactive({
   customerId: null as number | null,
   amount: 0,
   currency: 'UZS',
   comment: '',
   status: 'issued' as Advance['status']
+})
+const advanceFormCustomerModel = computed<number | undefined>({
+  get: () => advanceForm.customerId ?? undefined,
+  set: (value) => {
+    advanceForm.customerId = typeof value === 'number' ? value : null
+  }
 })
 
 const filteredAdvances = computed(() => {
@@ -993,8 +1039,23 @@ function getBaseSalary(customerId: number) {
 }
 
 function getSalaryType(customerId: number) {
+  const customer = safeCustomers.value.find(item => item.id === customerId)
+  if (customer) {
+    return getCustomerWorkSchedule(customer).salaryType
+  }
+
   const draft = salaryDrafts.value[customerId]
   return draft?.salaryType === 'hourly' ? 'hourly' : 'fixed'
+}
+
+function getSalaryWorkHoursPerDay(customerId: number) {
+  const customer = safeCustomers.value.find(item => item.id === customerId)
+  if (!customer) {
+    return effectiveWorkHoursPerDay.value
+  }
+
+  const hoursPerDay = getCustomerWorkSchedule(customer).hoursPerDay
+  return hoursPerDay || effectiveWorkHoursPerDay.value
 }
 
 function getHourlyRate(customerId: number) {
@@ -1060,7 +1121,7 @@ function getLatePenalty(customerId: number) {
 
   const perMinuteRate = baseSalary
     / effectiveSalaryMonthDays.value
-    / effectiveWorkHoursPerDay.value
+    / getSalaryWorkHoursPerDay(customerId)
     / effectiveMinutesPerHour.value
 
   return Math.round(perMinuteRate * effectivePenaltyMultiplier.value * lateMinutes)
@@ -1173,17 +1234,34 @@ async function permanentlyDeleteSelectedArchivedCustomers() {
   await Promise.all([refresh(), refreshArchive()])
 }
 
-function getGrossSalary(customerId: number) {
-  if (getSalaryType(customerId) === 'hourly') {
-    return getHourlySalary(customerId) + getPositionBonus(customerId)
-  }
+function getCardPayout(customerId: number) {
+  const cardGross = getSalaryType(customerId) === 'hourly'
+    ? getHourlySalary(customerId)
+    : getBaseSalary(customerId)
 
-  return getBaseSalary(customerId) + getPositionBonus(customerId)
+  return Math.max(cardGross - getLatePenalty(customerId), 0)
+}
+
+function getCashPayout(customerId: number) {
+  return Math.max(getPositionBonus(customerId), 0)
 }
 
 function getSalaryTotal(customerId: number) {
-  return Math.max(getGrossSalary(customerId) - getLatePenalty(customerId), 0)
+  return getCardPayout(customerId) + getCashPayout(customerId)
 }
+
+const salaryExpenseSummary = computed(() => {
+  return filteredSalaryCustomers.value.reduce((summary, customer) => {
+    summary.card += getCardPayout(customer.id)
+    summary.cash += getCashPayout(customer.id)
+    summary.total += getSalaryTotal(customer.id)
+    return summary
+  }, {
+    card: 0,
+    cash: 0,
+    total: 0
+  })
+})
 
 function updateSalaryDraft(customerId: number, field: 'baseSalary' | 'positionBonus' | 'hourlyRate', value: string | number) {
   const draft = salaryDrafts.value[customerId]
@@ -1361,8 +1439,8 @@ async function deleteSelectedCustomers() {
   }
 }
 
-async function saveCustomerShift(customer: Customer) {
-  const draft = shiftDrafts.value[customer.id]
+async function saveObjectSchedule(object: ObjectItem) {
+  const draft = objectScheduleDrafts.value[object.id]
   if (!draft || draft.saving) {
     return
   }
@@ -1370,30 +1448,22 @@ async function saveCustomerShift(customer: Customer) {
   draft.saving = true
 
   try {
-    const nextShiftKind = draft.shiftKind
-    const payload: Record<string, unknown> = {}
-
-    if (nextShiftKind === 'hourly') {
-      payload.salaryType = 'hourly'
-    } else {
-      payload.salaryType = 'fixed'
-      payload.workShift = nextShiftKind
-    }
-
-    await $fetch(`/api/customers/${customer.id}`, {
+    await $fetch(`/api/objects/${object.id}`, {
       method: 'PATCH',
-      body: payload
+      body: {
+        scheduleType: draft.scheduleType
+      }
     })
 
     toast.add({
-      title: 'Сохранено',
-      description: `Смена пользователя @${customer.username} обновлена.`,
+      title: 'График сохранен',
+      description: `Объект "${object.name}" обновлен.`,
       color: 'success'
     })
-    await refresh()
+    await refreshObjects()
   } catch (err: unknown) {
     toast.add({
-      title: 'Не удалось сохранить смену',
+      title: 'Не удалось сохранить график',
       description: getErrorMessage(err) || 'Повторите попытку.',
       color: 'error'
     })
@@ -1412,10 +1482,11 @@ async function saveCustomerSalary(customer: Customer) {
 
   try {
     const positionBonus = parseNonNegativeInteger(draft.positionBonus, 'надбавка')
-
-    const salaryType = draft.salaryType === 'hourly' ? 'hourly' : 'fixed'
+    const schedule = getCustomerWorkSchedule(customer)
+    const salaryType = schedule.salaryType
     const payload: Record<string, unknown> = {
       salaryType,
+      workShift: schedule.workShift,
       positionBonus
     }
 
@@ -1502,11 +1573,11 @@ async function saveCustomerSalary(customer: Customer) {
                 />
               </UFormField>
 
-              <UFormField label="Смена" class="min-w-44">
+              <UFormField label="График" class="min-w-44">
                 <USelect
                   v-model="shiftFilter"
                   :items="shiftFilterOptions"
-                  placeholder="Все смены"
+                  placeholder="Все графики"
                 />
               </UFormField>
 
@@ -1612,34 +1683,34 @@ async function saveCustomerSalary(customer: Customer) {
         </div>
 
         <div v-else-if="selectedHrTab === 'shifts'" class="space-y-4">
-          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <button
-              v-for="shift in shiftStats"
-              :key="shift.id"
+              v-for="schedule in objectScheduleStats"
+              :key="schedule.id"
               type="button"
               class="rounded-lg border border-default bg-elevated/30 p-4 space-y-3 text-left hover:bg-elevated/40 transition-colors"
-              @click="openShiftModal(shift.id)"
+              @click="openScheduleModal(schedule.id)"
             >
               <div class="flex items-center justify-between">
                 <p class="font-semibold text-highlighted">
-                  {{ shift.label }}
+                  {{ schedule.label }}
                 </p>
-                <UBadge :label="String(shift.users.length)" :color="shift.color" variant="subtle" />
+                <UBadge :label="String(schedule.objects.length)" :color="schedule.color" variant="subtle" />
               </div>
               <p class="text-xs text-muted">
-                {{ shift.description }}
+                {{ schedule.description }}
               </p>
             </button>
           </div>
 
           <UModal
-            v-model:open="shiftModalOpen"
+            v-model:open="scheduleModalOpen"
             fullscreen
-            :title="activeShiftCard?.modalTitle || 'Смена'"
-            :description="activeShiftCard?.description"
+            :title="activeScheduleCard?.label || 'График объекта'"
+            :description="activeScheduleCard?.description"
           >
             <template #body>
-              <div v-if="activeShiftUsers.length" class="rounded-lg border border-default overflow-x-auto">
+              <div v-if="activeScheduleObjects.length" class="rounded-lg border border-default overflow-x-auto">
                 <table class="min-w-full text-sm">
                   <thead>
                     <tr class="bg-elevated/50">
@@ -1647,10 +1718,10 @@ async function saveCustomerSalary(customer: Customer) {
                         ID
                       </th>
                       <th class="px-3 py-2 text-left">
-                        Пользователь
+                        Объект
                       </th>
                       <th class="px-3 py-2 text-left">
-                        Смена
+                        График
                       </th>
                       <th class="px-3 py-2 text-right">
                         Действие
@@ -1659,28 +1730,24 @@ async function saveCustomerSalary(customer: Customer) {
                   </thead>
                   <tbody>
                     <tr
-                      v-for="user in activeShiftUsers"
-                      :key="user.id"
+                      v-for="object in activeScheduleObjects"
+                      :key="object.id"
                       class="border-t border-default"
-                      :class="shiftDrafts[user.id]?.shiftKind !== getCustomerShiftKind(user) ? 'bg-elevated/20' : undefined"
+                      :class="objectScheduleDrafts[object.id]?.scheduleType !== getObjectScheduleType(object) ? 'bg-elevated/20' : undefined"
                     >
                       <td class="px-3 py-2">
-                        #{{ user.id }}
+                        #{{ object.id }}
                       </td>
                       <td class="px-3 py-2">
-                        <button class="font-medium hover:underline" @click="openCustomerInfo(user)">
-                          @{{ user.username }}
-                        </button>
+                        <p class="font-medium">
+                          {{ object.name }}
+                        </p>
                       </td>
                       <td class="px-3 py-2">
                         <USelect
-                          v-model="shiftDrafts[user.id]!.shiftKind"
-                          :items="[
-                            { label: 'День', value: 'day' },
-                            { label: 'Ночь', value: 'night' },
-                            { label: 'Почасовое', value: 'hourly' }
-                          ]"
-                          class="w-32"
+                          v-model="objectScheduleDrafts[object.id]!.scheduleType"
+                          :items="WORK_SCHEDULE_OPTIONS"
+                          class="w-56"
                         />
                       </td>
                       <td class="px-3 py-2 text-right">
@@ -1688,9 +1755,9 @@ async function saveCustomerSalary(customer: Customer) {
                           label="Сохранить"
                           size="sm"
                           color="primary"
-                          :disabled="shiftDrafts[user.id]!.shiftKind === getCustomerShiftKind(user)"
-                          :loading="shiftDrafts[user.id]!.saving"
-                          @click="saveCustomerShift(user)"
+                          :disabled="objectScheduleDrafts[object.id]!.scheduleType === getObjectScheduleType(object)"
+                          :loading="objectScheduleDrafts[object.id]!.saving"
+                          @click="saveObjectSchedule(object)"
                         />
                       </td>
                     </tr>
@@ -1698,7 +1765,7 @@ async function saveCustomerSalary(customer: Customer) {
                 </table>
               </div>
               <p v-else class="text-sm text-muted">
-                Нет пользователей в этой категории.
+                Нет объектов с этим графиком.
               </p>
             </template>
 
@@ -1708,7 +1775,7 @@ async function saveCustomerSalary(customer: Customer) {
                   label="Закрыть"
                   color="neutral"
                   variant="subtle"
-                  @click="shiftModalOpen = false"
+                  @click="scheduleModalOpen = false"
                 />
               </div>
             </template>
@@ -1719,14 +1786,14 @@ async function saveCustomerSalary(customer: Customer) {
           <div class="flex flex-wrap items-center gap-3">
             <UFormField label="Сотрудник" class="min-w-60">
               <USelect
-                v-model="advanceFilterCustomerId"
-                :items="[{ label: 'Все', value: null }, ...customerOptions]"
+                v-model="advanceFilterCustomerModel"
+                :items="[{ label: 'Все', value: undefined }, ...customerOptions]"
                 placeholder="Фильтр по сотруднику"
               />
             </UFormField>
             <UFormField label="Добавить аванс" class="flex-1">
               <div class="grid gap-2 sm:grid-cols-4">
-                <USelect v-model="advanceForm.customerId" :items="customerOptions" placeholder="Сотрудник" />
+                <USelect v-model="advanceFormCustomerModel" :items="customerOptions" placeholder="Сотрудник" />
                 <UInput
                   v-model="advanceForm.amount"
                   type="number"
@@ -1796,7 +1863,7 @@ async function saveCustomerSalary(customer: Customer) {
                     {{ adv.comment || '—' }}
                   </td>
                   <td class="px-3 py-2">
-                    {{ formatDate(adv.issuedAt || adv.createdAt) }}
+                    {{ formatDate(adv.issuedAt) }}
                   </td>
                 </tr>
                 <tr v-if="!isAdvancesLoading && !filteredAdvances.length">
@@ -1971,10 +2038,10 @@ async function saveCustomerSalary(customer: Customer) {
                   Расчет за {{ salaryMonthLabel }}
                 </p>
                 <p class="mt-1">
-                  Для оклада: (базовая / {{ effectiveSalaryMonthDays }} / {{ effectiveWorkHoursPerDay }} / {{ effectiveMinutesPerHour }}) * {{ effectivePenaltyMultiplier }} * минуты опоздания за месяц (дней в месяце определяется автоматически).
+                  Для оклада: (базовая / дней в месяце / часы графика объекта / {{ effectiveMinutesPerHour }}) * {{ effectivePenaltyMultiplier }} * минуты опоздания.
                 </p>
                 <p class="mt-1">
-                  Для почасовой: (ставка/час / 60) * отработанные минуты + надбавка.
+                  Для почасовой: (ставка/час / 60) * отработанные минуты. Оклад идет на карту, надбавка отражается как наличная часть.
                 </p>
               </div>
 
@@ -1986,6 +2053,33 @@ async function saveCustomerSalary(customer: Customer) {
                 aria-label="Настроить формулу зарплаты"
                 @click="salaryFormulaOpen = true"
               />
+            </div>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-3">
+            <div class="rounded-lg border border-default bg-elevated/30 p-4">
+              <p class="text-xs text-muted">
+                На карты
+              </p>
+              <p class="text-lg font-semibold">
+                {{ formatCurrency(salaryExpenseSummary.card) }}
+              </p>
+            </div>
+            <div class="rounded-lg border border-default bg-elevated/30 p-4">
+              <p class="text-xs text-muted">
+                Наличными
+              </p>
+              <p class="text-lg font-semibold">
+                {{ formatCurrency(salaryExpenseSummary.cash) }}
+              </p>
+            </div>
+            <div class="rounded-lg border border-default bg-elevated/30 p-4">
+              <p class="text-xs text-muted">
+                Всего начислено
+              </p>
+              <p class="text-lg font-semibold">
+                {{ formatCurrency(salaryExpenseSummary.total) }}
+              </p>
             </div>
           </div>
 
@@ -2018,13 +2112,19 @@ async function saveCustomerSalary(customer: Customer) {
                     Пользователь
                   </th>
                   <th class="px-3 py-2 text-left">
-                    Тип
+                    График
                   </th>
                   <th class="px-3 py-2 text-left">
                     Оклад / ставка
                   </th>
                   <th class="px-3 py-2 text-left">
                     Надбавка
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    На карту
+                  </th>
+                  <th class="px-3 py-2 text-left">
+                    Наличные
                   </th>
                   <th class="px-3 py-2 text-left">
                     Итого
@@ -2036,7 +2136,7 @@ async function saveCustomerSalary(customer: Customer) {
               </thead>
               <tbody>
                 <tr v-if="isLoading && !filteredSalaryCustomers.length">
-                  <td class="px-3 py-3 text-muted" colspan="7">
+                  <td class="px-3 py-3 text-muted" colspan="9">
                     Загрузка...
                   </td>
                 </tr>
@@ -2049,18 +2149,25 @@ async function saveCustomerSalary(customer: Customer) {
                     {{ customer.id }}
                   </td>
                   <td class="px-3 py-2">
-                    @{{ customer.username }}
+                    <div>
+                      <p class="font-medium">
+                        @{{ customer.username }}
+                      </p>
+                      <p class="text-xs text-muted">
+                        {{ customer.objectPinned || 'Без объекта' }}
+                      </p>
+                    </div>
                   </td>
                   <td class="px-3 py-2 min-w-40">
-                    <USelect
-                      v-model="salaryDrafts[customer.id]!.salaryType"
-                      :items="SALARY_TYPE_OPTIONS"
-                      class="w-full"
+                    <UBadge
+                      :label="getCustomerWorkSchedule(customer).shortLabel"
+                      :color="getScheduleCardColor(getCustomerWorkScheduleType(customer))"
+                      variant="subtle"
                     />
                   </td>
                   <td class="px-3 py-2 min-w-48">
                     <UInput
-                      v-if="salaryDrafts[customer.id]?.salaryType === 'hourly'"
+                      v-if="getSalaryType(customer.id) === 'hourly'"
                       :model-value="salaryDrafts[customer.id]?.hourlyRate ?? ''"
                       type="number"
                       min="0"
@@ -2075,7 +2182,6 @@ async function saveCustomerSalary(customer: Customer) {
                       min="0"
                       step="1"
                       inputmode="numeric"
-                      disabled
                       @update:model-value="updateSalaryDraft(customer.id, 'baseSalary', $event)"
                     />
                   </td>
@@ -2089,12 +2195,18 @@ async function saveCustomerSalary(customer: Customer) {
                     />
                   </td>
                   <td class="px-3 py-2 font-medium whitespace-nowrap">
+                    {{ formatCurrency(getCardPayout(customer.id)) }}
+                  </td>
+                  <td class="px-3 py-2 font-medium whitespace-nowrap">
+                    {{ formatCurrency(getCashPayout(customer.id)) }}
+                  </td>
+                  <td class="px-3 py-2 font-medium whitespace-nowrap">
                     <div class="space-y-1">
                       <p>{{ formatCurrency(getSalaryTotal(customer.id)) }}</p>
                       <p class="text-xs font-normal text-muted">
                         {{ isSalaryActivityLoading
                           ? 'Загрузка активности...'
-                          : (salaryDrafts[customer.id]?.salaryType === 'hourly'
+                          : (getSalaryType(customer.id) === 'hourly'
                             ? `Отработано: ${formatWorkMinutes(getEmployeeWorkMinutes(customer.id))}, ставка: ${formatCurrency(getHourlyRate(customer.id))}/час`
                             : `Опоздание: ${getEmployeeLateMinutes(customer.id)} мин, штраф: ${formatCurrency(getLatePenalty(customer.id))}`) }}
                       </p>
@@ -2111,7 +2223,7 @@ async function saveCustomerSalary(customer: Customer) {
                   </td>
                 </tr>
                 <tr v-if="!isLoading && !filteredSalaryCustomers.length">
-                  <td class="px-3 py-3 text-muted" colspan="7">
+                  <td class="px-3 py-3 text-muted" colspan="9">
                     {{ salaryUserFilter ? 'Ничего не найдено.' : 'Сотрудников пока нет.' }}
                   </td>
                 </tr>
@@ -2306,10 +2418,10 @@ async function saveCustomerSalary(customer: Customer) {
               </div>
               <div class="rounded-md border border-default p-3">
                 <p class="text-xs text-muted">
-                  Смена
+                  График
                 </p>
-                <p class="font-medium capitalize">
-                  {{ selectedCustomer.workShift === 'day' ? 'день' : 'ночь' }}
+                <p class="font-medium">
+                  {{ getCustomerWorkSchedule(selectedCustomer).label }}
                 </p>
               </div>
               <div class="rounded-md border border-default p-3">
@@ -2324,7 +2436,7 @@ async function saveCustomerSalary(customer: Customer) {
                 <p class="text-xs text-muted">
                   Зарплата
                 </p>
-                <template v-if="selectedCustomer.salaryType === 'hourly'">
+                <template v-if="getCustomerWorkSchedule(selectedCustomer).salaryType === 'hourly'">
                   <p class="font-medium">
                     {{ formatCurrency(selectedCustomer.hourlyRate) }}/час
                   </p>

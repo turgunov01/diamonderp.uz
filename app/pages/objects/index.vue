@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import {
+  getWorkScheduleDefinition,
+  getWorkScheduleOptions,
+  normalizeWorkScheduleType,
+  type WorkScheduleType
+} from '~~/shared/utils/work-schedules'
+
 type ObjectItem = {
   id: number
   building_id?: number | null
@@ -7,6 +14,13 @@ type ObjectItem = {
   address?: string | null
   code?: string | null
   is_active?: boolean
+  schedule_type?: WorkScheduleType | string | null
+  scheduleType?: WorkScheduleType | string | null
+}
+
+interface ObjectScheduleDraft {
+  scheduleType: WorkScheduleType
+  saving: boolean
 }
 
 const router = useRouter()
@@ -21,6 +35,8 @@ const deleteStep = ref<1 | 2>(1)
 const deleteTarget = ref<ObjectItem | null>(null)
 const deleteConfirmText = ref('')
 const deleting = ref(false)
+const scheduleOptions = getWorkScheduleOptions()
+const scheduleDrafts = ref<Record<number, ObjectScheduleDraft>>({})
 
 const { data: objects, error, status, refresh } = await useAutoRefreshFetch<ObjectItem[]>('/api/objects', {
   default: () => [],
@@ -28,6 +44,17 @@ const { data: objects, error, status, refresh } = await useAutoRefreshFetch<Obje
     buildingId: computed(() => activeBuilding.value?.id)
   }
 })
+
+watch(objects, (items) => {
+  const nextDrafts: Record<number, ObjectScheduleDraft> = {}
+  for (const item of items || []) {
+    nextDrafts[item.id] = {
+      scheduleType: getObjectScheduleType(item),
+      saving: false
+    }
+  }
+  scheduleDrafts.value = nextDrafts
+}, { immediate: true })
 
 watch(error, (value) => {
   if (!value) {
@@ -79,6 +106,14 @@ function setActiveObject(item: ObjectItem | null) {
   activeObjectIdCookie.value = item?.id ?? null
 }
 
+function getObjectScheduleType(item: ObjectItem) {
+  return normalizeWorkScheduleType(item.scheduleType ?? item.schedule_type)
+}
+
+function getObjectScheduleLabel(item: ObjectItem) {
+  return getWorkScheduleDefinition(getObjectScheduleType(item)).shortLabel
+}
+
 function openDeleteModal(item: ObjectItem) {
   if (!canManageObjects.value) {
     return
@@ -95,6 +130,15 @@ function closeDeleteModal() {
   deleteStep.value = 1
   deleteTarget.value = null
   deleteConfirmText.value = ''
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === 'object') {
+    const payload = error as { data?: { statusMessage?: string }, message?: string }
+    return payload.data?.statusMessage || payload.message || fallback
+  }
+
+  return fallback
 }
 
 function continueDelete() {
@@ -130,7 +174,7 @@ async function deleteObject() {
     toast.add({ title: 'Объект удалён', description: target.name, color: 'success' })
     closeDeleteModal()
   } catch (err: unknown) {
-    const msg = (err as any)?.data?.statusMessage || (err as Error)?.message || 'Не удалось удалить объект.'
+    const msg = getErrorMessage(err, 'Не удалось удалить объект.')
     toast.add({ title: 'Ошибка удаления', description: msg, color: 'error' })
   } finally {
     deleting.value = false
@@ -160,8 +204,34 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
       toast.add({ title: 'Объект деактивирован', description: item.name, color: 'info' })
     }
   } catch (err: unknown) {
-    const msg = (err as any)?.data?.statusMessage || (err as Error)?.message || 'Не удалось обновить объект'
+    const msg = getErrorMessage(err, 'Не удалось обновить объект')
     toast.add({ title: 'Ошибка', description: msg, color: 'error' })
+  }
+}
+
+async function saveObjectSchedule(item: ObjectItem) {
+  const draft = scheduleDrafts.value[item.id]
+  if (!canManageObjects.value || !draft || draft.saving) {
+    return
+  }
+
+  draft.saving = true
+
+  try {
+    await $fetch(`/api/objects/${item.id}`, {
+      method: 'PATCH',
+      body: {
+        scheduleType: draft.scheduleType
+      }
+    })
+
+    await refresh()
+    toast.add({ title: 'График обновлен', description: item.name, color: 'success' })
+  } catch (err: unknown) {
+    const msg = getErrorMessage(err, 'Не удалось обновить график')
+    toast.add({ title: 'Ошибка', description: msg, color: 'error' })
+  } finally {
+    draft.saving = false
   }
 }
 </script>
@@ -218,6 +288,9 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
                 Код
               </th>
               <th class="px-3 py-2 text-left">
+                График
+              </th>
+              <th class="px-3 py-2 text-left">
                 Статус
               </th>
               <th class="px-3 py-2 text-right">
@@ -246,6 +319,30 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
               </td>
               <td class="px-3 py-2">
                 {{ item.code || '-' }}
+              </td>
+              <td class="px-3 py-2 min-w-56">
+                <div v-if="canManageObjects" class="flex items-center gap-2">
+                  <USelect
+                    v-model="scheduleDrafts[item.id]!.scheduleType"
+                    :items="scheduleOptions"
+                    class="w-48"
+                  />
+                  <UButton
+                    icon="i-lucide-save"
+                    color="primary"
+                    variant="subtle"
+                    size="xs"
+                    :disabled="scheduleDrafts[item.id]!.scheduleType === getObjectScheduleType(item)"
+                    :loading="scheduleDrafts[item.id]!.saving"
+                    @click="saveObjectSchedule(item)"
+                  />
+                </div>
+                <UBadge
+                  v-else
+                  :label="getObjectScheduleLabel(item)"
+                  color="neutral"
+                  variant="subtle"
+                />
               </td>
               <td class="px-3 py-2">
                 <UBadge
@@ -276,13 +373,13 @@ async function toggleObject(item: ObjectItem, enabled: boolean) {
             </tr>
 
             <tr v-if="status === 'pending'">
-              <td class="px-3 py-4 text-muted" colspan="7">
+              <td class="px-3 py-4 text-muted" colspan="8">
                 Загрузка объектов...
               </td>
             </tr>
 
             <tr v-else-if="!objects.length">
-              <td class="px-3 py-4 text-muted" colspan="7">
+              <td class="px-3 py-4 text-muted" colspan="8">
                 {{ activeBuilding?.name ? 'Для этого здания объекты не найдены.' : 'Выберите здание, чтобы увидеть объекты.' }}
               </td>
             </tr>

@@ -4,6 +4,7 @@ create table if not exists public.object_task_lists (
   id bigint generated always as identity primary key,
   object_id bigint not null references public.objects(id) on delete cascade,
   employee_id bigint references public.customers(id) on delete cascade,
+  group_id uuid,
   title text not null,
   note text,
   due_date date,
@@ -36,6 +37,7 @@ create table if not exists public.object_task_items (
 alter table public.object_task_lists
   add column if not exists object_id bigint references public.objects(id) on delete cascade,
   add column if not exists employee_id bigint references public.customers(id) on delete cascade,
+  add column if not exists group_id uuid,
   add column if not exists title text,
   add column if not exists note text,
   add column if not exists due_date date,
@@ -64,6 +66,15 @@ end $$;
 do $$
 begin
   alter table public.object_task_lists
+    add constraint object_task_lists_group_employee_unique
+    unique (group_id, employee_id);
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table public.object_task_lists
     alter column employee_id drop not null;
 exception
   when undefined_column then null;
@@ -81,6 +92,7 @@ alter table public.object_task_items
 
 create index if not exists object_task_lists_object_id_idx on public.object_task_lists(object_id);
 create index if not exists object_task_lists_employee_id_idx on public.object_task_lists(employee_id);
+create index if not exists object_task_lists_group_id_idx on public.object_task_lists(group_id);
 create index if not exists object_task_lists_status_idx on public.object_task_lists(status);
 create index if not exists object_task_lists_due_date_idx on public.object_task_lists(due_date);
 create index if not exists object_task_lists_review_status_idx on public.object_task_lists(review_status);

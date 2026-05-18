@@ -2,10 +2,16 @@
 import { useLocalStorage } from '@vueuse/core'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import {
+  DEFAULT_WORK_SCHEDULE_TYPE,
+  getLegacyWorkScheduleType,
+  getWorkScheduleDefinition,
+  normalizeWorkScheduleType,
+  type WorkScheduleType
+} from '~~/shared/utils/work-schedules'
 
 type WorkShift = 'day' | 'night'
 type SalaryType = 'fixed' | 'hourly'
-type ShiftKind = 'day' | 'night' | 'hourly'
 type CustomerRole = string
 
 interface BulkImportPreviewResponse {
@@ -45,6 +51,8 @@ type DraftCustomer = {
 type ObjectItem = {
   id: number
   name: string
+  schedule_type?: WorkScheduleType | string | null
+  scheduleType?: WorkScheduleType | string | null
 }
 
 const DEFAULT_PASSWORD = '12345678'
@@ -116,7 +124,7 @@ const roleOptions = computed(() => {
     .filter(role => role.isActive)
     .map(role => ({ label: role.label, value: role.code }))
 
-  return dynamic.length ? dynamic : DEFAULT_ROLE_OPTIONS
+  return dynamic.length ? dynamic : [...DEFAULT_ROLE_OPTIONS]
 })
 
 const drafts = useLocalStorage<DraftCustomer[]>(
@@ -158,19 +166,6 @@ const pinnedObjectModel = computed({
   }
 })
 
-const shiftKindModel = computed<ShiftKind>({
-  get: () => (state.salaryType === 'hourly' ? 'hourly' : state.workShift),
-  set: (value) => {
-    if (value === 'hourly') {
-      state.salaryType = 'hourly'
-      return
-    }
-
-    state.salaryType = 'fixed'
-    state.workShift = value
-  }
-})
-
 const { data: objects } = await useFetch<ObjectItem[]>('/api/objects', {
   default: () => [],
   query: {
@@ -185,10 +180,53 @@ const objectOptions = computed(() =>
   }))
 )
 
+const objectScheduleByName = computed(() => {
+  const map = new Map<string, WorkScheduleType>()
+
+  for (const object of objects.value || []) {
+    const name = object.name?.trim()
+    if (!name) continue
+    map.set(name, normalizeWorkScheduleType(object.scheduleType ?? object.schedule_type))
+  }
+
+  return map
+})
+
 const pinnedObjectOptions = computed(() => [
   { label: 'Не закреплен', value: NOT_PINNED_VALUE },
   ...objectOptions.value
 ])
+
+function getSelectedScheduleType() {
+  const names = [
+    state.objectPinned?.trim(),
+    ...state.objectPositions.map(position => position.trim())
+  ].filter(Boolean)
+
+  for (const name of names) {
+    const scheduleType = objectScheduleByName.value.get(name)
+    if (scheduleType) {
+      return scheduleType
+    }
+  }
+
+  return getLegacyWorkScheduleType({
+    workShift: state.workShift,
+    salaryType: state.salaryType
+  })
+}
+
+const selectedSchedule = computed(() => getWorkScheduleDefinition(getSelectedScheduleType() || DEFAULT_WORK_SCHEDULE_TYPE))
+
+function syncScheduleFromObject() {
+  const schedule = selectedSchedule.value
+  state.salaryType = schedule.salaryType
+  state.workShift = schedule.workShift
+}
+
+watch([() => state.objectPinned, () => state.objectPositions, objectScheduleByName], () => {
+  syncScheduleFromObject()
+}, { deep: true })
 
 function pickFile() {
   fileInput.value?.click()
@@ -395,7 +433,7 @@ async function onFileSelected(event: Event) {
   }
 }
 
-async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
+async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) {
   if (!event || saving.value) {
     return
   }
@@ -408,11 +446,14 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
   saving.value = true
 
   try {
-    const fullName = event.data.fullName.trim()
-    const username = event.data.username.trim()
-    const phoneNumber = event.data.phoneNumber.trim()
-    const objectPinned = event.data.objectPinned?.trim() || ''
-    const objectPositions = buildObjectPositions(event.data.objectPositions, objectPinned)
+    const data = event.data as FormState
+    const fullName = data.fullName.trim()
+    const username = data.username.trim()
+    const phoneNumber = data.phoneNumber.trim()
+    const objectPinned = data.objectPinned?.trim() || ''
+    const objectPositions = buildObjectPositions(data.objectPositions, objectPinned)
+    syncScheduleFromObject()
+    const schedule = selectedSchedule.value
 
     const nextDraft: DraftCustomer = {
       ...draft,
@@ -420,10 +461,10 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
       fullName,
       username,
       phoneNumber,
-      role: event.data.role,
-      age: event.data.age,
-      workShift: event.data.workShift,
-      salaryType: event.data.salaryType,
+      role: data.role,
+      age: data.age,
+      workShift: schedule.workShift,
+      salaryType: schedule.salaryType,
       objectPinned,
       objectPositions
     }
@@ -438,11 +479,11 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
         avatar: { src: `https://i.pravatar.cc/128?u=${encodeURIComponent(username)}` },
         password: DEFAULT_PASSWORD,
         phoneNumber,
-        role: event.data.role,
+        role: data.role,
         passportFile: `bulk-import/${username}.pdf`,
-        age: event.data.age,
-        workShift: event.data.workShift,
-        salaryType: event.data.salaryType,
+        age: data.age,
+        workShift: schedule.workShift,
+        salaryType: schedule.salaryType,
         objectPinned,
         objectPositions
       }
@@ -510,7 +551,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
       v-model:open="draftsOpen"
       fullscreen
       title="Черновики массовой загрузки"
-      description="Строки из Excel сохранены локально. Заполните объекты/смену и создайте пользователей по одному."
+      description="Строки из Excel сохранены локально. Заполните объекты и создайте пользователей по одному."
     >
       <template #body>
         <div class="flex h-full min-h-0 flex-col gap-3">
@@ -615,15 +656,11 @@ async function onCreateSubmit(event?: FormSubmitEvent<FormState>) {
             />
           </UFormField>
 
-          <UFormField label="Смена" name="workShift">
-            <USelect
-              v-model="shiftKindModel"
-              :items="[
-                { label: 'День', value: 'day' },
-                { label: 'Ночь', value: 'night' },
-                { label: 'Почасовое', value: 'hourly' }
-              ]"
+          <UFormField label="График объекта">
+            <UInput
+              :model-value="selectedSchedule.label"
               class="w-full"
+              disabled
             />
           </UFormField>
 

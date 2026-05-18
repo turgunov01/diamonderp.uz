@@ -13,6 +13,7 @@ export function useRoleAccess() {
   const canManageObjectTasks = computed(() => isAdmin.value || isProcurement.value)
   const canManageExpenses = computed(() => isAdmin.value || isProcurement.value)
   const canDeleteExpenses = computed(() => isAdmin.value)
+  const canManageWarehouse = computed(() => isAdmin.value)
   const canManageAroma = computed(() => isAdmin.value || isProcurement.value)
   const canManageWaste = computed(() => isAdmin.value)
   const canManageMarble = computed(() => isAdmin.value)
@@ -30,6 +31,7 @@ export function useRoleAccess() {
     canManageObjectTasks,
     canManageExpenses,
     canDeleteExpenses,
+    canManageWarehouse,
     canManageAroma,
     canManageWaste,
     canManageMarble,

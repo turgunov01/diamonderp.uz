@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
+import type { AuthLocationPayload } from '~~/shared/types/auth'
 
 export type EmployeeActivityStatus = 'on_time' | 'late' | 'absent'
+export type EmployeeActivityLocation = AuthLocationPayload & { mapUrl?: string | null }
 
 export interface EmployeeActivityRecord {
   id: number
@@ -9,6 +11,8 @@ export interface EmployeeActivityRecord {
   date: string
   startedAt: string | null
   finishedAt: string | null
+  startedLocation: EmployeeActivityLocation | null
+  finishedLocation: EmployeeActivityLocation | null
   status: EmployeeActivityStatus
   workMinutes: number
   lateMinutes: number

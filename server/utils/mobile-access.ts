@@ -12,6 +12,12 @@ import {
   type VerifiedAuthTokenPayload
 } from './auth'
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from './supabase'
+import {
+  DEFAULT_WORK_SCHEDULE_TYPE,
+  normalizeWorkScheduleType,
+  type WorkScheduleType
+} from '~~/shared/utils/work-schedules'
+import { resolveWorkScheduleTypeFromObjects } from './object-schedules'
 
 interface ObjectRow {
   id: number
@@ -21,6 +27,7 @@ interface ObjectRow {
   address?: string | null
   code?: string | null
   is_active?: boolean | null
+  schedule_type?: WorkScheduleType | string | null
 }
 
 export type MobileFrontend = 'erp' | 'employee' | 'manager' | 'supervisor' | 'procurement'
@@ -34,6 +41,7 @@ export interface MobileObjectRecord {
   address?: string
   code?: string
   isActive: boolean
+  scheduleType: WorkScheduleType
 }
 
 export interface MobileAccessContext {
@@ -48,6 +56,7 @@ export interface MobileAccessContext {
   objectIds: number[]
   objectNames: string[]
   buildingId?: number | null
+  scheduleType?: WorkScheduleType
 }
 
 function mapObjectRow(row: ObjectRow): MobileObjectRecord {
@@ -58,8 +67,25 @@ function mapObjectRow(row: ObjectRow): MobileObjectRecord {
     description: row.description || undefined,
     address: row.address || undefined,
     code: row.code || undefined,
-    isActive: row.is_active !== false
+    isActive: row.is_active !== false,
+    scheduleType: normalizeWorkScheduleType(row.schedule_type)
   }
+}
+
+function isMissingScheduleTypeColumn(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+
+  const payload = error as { data?: { code?: string, message?: string }, code?: string, message?: string }
+  const code = payload.data?.code || payload.code
+  const message = payload.data?.message || payload.message
+
+  if (code !== 'PGRST204' && code !== '42703') {
+    return false
+  }
+
+  return typeof message === 'string' && message.includes('schedule_type')
 }
 
 function getFrontend(role: AuthRole): MobileFrontend {
@@ -116,7 +142,7 @@ function readBearerToken(event: H3Event) {
 async function fetchObjectsByBuilding(buildingId?: number | null) {
   const { url, serviceRoleKey } = getSupabaseServerConfig()
   const query: Record<string, string> = {
-    select: 'id,building_id,name,description,address,code,is_active',
+    select: 'id,building_id,name,description,address,code,is_active,schedule_type',
     order: 'id.asc'
   }
 
@@ -124,10 +150,32 @@ async function fetchObjectsByBuilding(buildingId?: number | null) {
     query.building_id = `eq.${buildingId}`
   }
 
-  const rows = await $fetch<ObjectRow[]>(`${url}/rest/v1/objects`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
-    query
-  })
+  let rows: ObjectRow[]
+
+  try {
+    rows = await $fetch<ObjectRow[]>(`${url}/rest/v1/objects`, {
+      headers: getSupabaseServerHeaders(serviceRoleKey),
+      query
+    })
+  } catch (error) {
+    if (!isMissingScheduleTypeColumn(error)) {
+      throw error
+    }
+
+    const fallbackQuery: Record<string, string> = {
+      select: 'id,building_id,name,description,address,code,is_active',
+      order: 'id.asc'
+    }
+
+    if (Number.isInteger(buildingId) && (buildingId ?? 0) > 0) {
+      fallbackQuery.building_id = `eq.${buildingId}`
+    }
+
+    rows = await $fetch<ObjectRow[]>(`${url}/rest/v1/objects`, {
+      headers: getSupabaseServerHeaders(serviceRoleKey),
+      query: fallbackQuery
+    })
+  }
 
   return rows.map(mapObjectRow)
 }
@@ -148,6 +196,15 @@ async function buildCustomerAccess(customer: CustomerProfileRow, payload: Verifi
     ? buildingObjects.filter(object => allowedObjectNames.includes(object.name.trim()))
     : (isFrontlineMobileRole(user.role) ? [] : buildingObjects)
 
+  const scheduleSourceObjects = objects.length ? objects : buildingObjects
+  const scheduleRows = scheduleSourceObjects.map(object => ({
+    id: object.id,
+    building_id: object.buildingId,
+    name: object.name,
+    schedule_type: object.scheduleType
+  }))
+  const scheduleType = resolveWorkScheduleTypeFromObjects(customer, scheduleRows)
+
   return {
     source: user.role,
     role: user.role,
@@ -158,7 +215,8 @@ async function buildCustomerAccess(customer: CustomerProfileRow, payload: Verifi
     objects,
     objectIds: objects.map(object => object.id),
     objectNames: objects.map(object => object.name),
-    buildingId: customer.building_id ?? null
+    buildingId: customer.building_id ?? null,
+    scheduleType
   }
 }
 
@@ -183,7 +241,8 @@ async function buildErpAccess(userRow: ErpUserAuthRow, payload: VerifiedAuthToke
     objects,
     objectIds: objects.map(object => object.id),
     objectNames: objects.map(object => object.name),
-    buildingId: null
+    buildingId: null,
+    scheduleType: DEFAULT_WORK_SCHEDULE_TYPE
   }
 }
 

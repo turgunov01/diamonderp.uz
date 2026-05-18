@@ -1,9 +1,11 @@
 import { finishEmployeeWork } from '../../../utils/employee-activity'
+import { recordAuthLocationEvent } from '../../../utils/auth-locations'
 import { isFrontlineMobileAccess, requireMobileAccess } from '../../../utils/mobile-access'
 import { readBody } from 'h3'
 
 interface FinishEmployeeWorkBody {
   finishedAt?: string
+  location?: unknown
 }
 
 export default eventHandler(async (event) => {
@@ -22,7 +24,18 @@ export default eventHandler(async (event) => {
     finishedAt: body.finishedAt,
     employeeName: access.customer.username,
     workShift: access.customer.work_shift ?? null,
-    objectPinned: access.customer.object_pinned ?? null
+    scheduleType: access.scheduleType,
+    objectPinned: access.customer.object_pinned ?? null,
+    location: body.location
+  })
+
+  await recordAuthLocationEvent({
+    event,
+    source: access.payload.sub.startsWith('erp:') ? 'erp' : 'customer',
+    userId: access.user.id,
+    role: access.user.role,
+    eventType: 'logout',
+    location: body.location
   })
 
   return {
@@ -32,4 +45,3 @@ export default eventHandler(async (event) => {
     activity: result.activity
   }
 })
-

@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import {
+  DEFAULT_WORK_SCHEDULE_TYPE,
+  getWorkScheduleOptions,
+  type WorkScheduleType
+} from '~~/shared/utils/work-schedules'
+
 type CreatedObject = {
   id: number
   name: string
@@ -14,8 +20,11 @@ const form = reactive({
   name: '',
   description: '',
   address: '',
-  code: ''
+  code: '',
+  scheduleType: DEFAULT_WORK_SCHEDULE_TYPE as WorkScheduleType
 })
+
+const scheduleOptions = getWorkScheduleOptions()
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === 'object') {
@@ -57,7 +66,8 @@ async function createObject() {
         name: form.name,
         description: form.description,
         address: form.address,
-        code: form.code
+        code: form.code,
+        scheduleType: form.scheduleType
       }
     })
 
@@ -145,6 +155,14 @@ async function createObject() {
               v-model="form.code"
               class="w-full"
               placeholder="main-entrance"
+            />
+          </UFormField>
+
+          <UFormField label="Производственный график">
+            <USelect
+              v-model="form.scheduleType"
+              :items="scheduleOptions"
+              class="w-full"
             />
           </UFormField>
 

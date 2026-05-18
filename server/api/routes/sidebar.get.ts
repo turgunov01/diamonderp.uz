@@ -71,8 +71,8 @@ const links: SidebarLinks = [
           to: '/expenses'
         },
         {
-          label: 'Отходы',
-          to: '/waste'
+          label: 'Склад',
+          to: '/warehouse'
         },
         {
           label: 'Кристаллизация',

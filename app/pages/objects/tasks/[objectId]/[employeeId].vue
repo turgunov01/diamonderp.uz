@@ -38,7 +38,8 @@ const {
 } = await useAutoRefreshFetch<ObjectTaskOverview>('/api/object-tasks', {
   default: () => ({ buildingId: null, objects: [] }),
   query: {
-    buildingId: computed(() => activeBuilding.value?.id)
+    buildingId: computed(() => activeBuilding.value?.id),
+    view: 'raw'
   },
   watch: [activeBuilding]
 })

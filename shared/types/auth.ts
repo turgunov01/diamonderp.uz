@@ -21,11 +21,23 @@ export interface AuthSession {
   avatar?: string | null
 }
 
+export interface AuthLocationPayload {
+  latitude: number
+  longitude: number
+  accuracy?: number | null
+  altitude?: number | null
+  altitudeAccuracy?: number | null
+  heading?: number | null
+  speed?: number | null
+  capturedAt?: string | null
+}
+
 export interface LoginRequestBody {
   email?: string
   phone?: string
   login?: string
   password: string
+  location?: AuthLocationPayload | null
 }
 
 export interface LoginResponse {

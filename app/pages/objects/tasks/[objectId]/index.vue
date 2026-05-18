@@ -29,7 +29,8 @@ const {
 } = await useAutoRefreshFetch<ObjectTaskOverview>('/api/object-tasks', {
   default: () => ({ buildingId: null, objects: [] }),
   query: {
-    buildingId: computed(() => activeBuilding.value?.id)
+    buildingId: computed(() => activeBuilding.value?.id),
+    view: 'grouped'
   },
   watch: [activeBuilding]
 })
@@ -49,6 +50,22 @@ watch(error, (value) => {
 
 const objects = computed(() => data.value?.objects || [])
 const object = computed<ObjectTaskCard | null>(() => objects.value.find(item => item.id === objectId.value) || null)
+
+const historyEmployeeId = ref<number | null>(null)
+const historyEmployeeOptions = computed(() => {
+  const employees = object.value?.employees || []
+  return employees.map((employee) => ({
+    label: `${employee.name}${employee.username ? ` · @${employee.username}` : ''}`,
+    value: employee.id
+  }))
+})
+
+watch(historyEmployeeId, (value) => {
+  if (typeof value === 'number' && value > 0) {
+    navigateTo(`/objects/tasks/${objectId.value}/${value}`)
+    historyEmployeeId.value = null
+  }
+})
 
 const boardColumns = computed(() => {
   const tasks = object.value?.tasks || []
@@ -214,7 +231,16 @@ function getItemPhotos(item: Pick<ObjectTaskItem, 'proofPhotoUrls' | 'proofPhoto
                 Как в Jira: три колонки по прогрессу выполнения.
               </p>
             </div>
-            <UBadge :label="`Всего: ${object.totalTasks}`" color="neutral" variant="subtle" />
+            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+              <USelect
+                v-if="historyEmployeeOptions.length"
+                v-model="historyEmployeeId"
+                :items="historyEmployeeOptions"
+                placeholder="История сотрудника"
+                class="w-full sm:w-72"
+              />
+              <UBadge :label="`Всего: ${object.totalTasks}`" color="neutral" variant="subtle" />
+            </div>
           </div>
 
           <div class="flex gap-4 overflow-x-auto pb-2">

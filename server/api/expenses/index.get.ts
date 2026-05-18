@@ -23,8 +23,8 @@ export default eventHandler(async (event): Promise<ExpenseResponse> => {
   const objectId = objectIdRaw ? Number(objectIdRaw) : NaN
   const filterByObject = Number.isInteger(objectId) && objectId > 0
 
-const query: Record<string, string> = {
-    select: 'id,title,category,vendor,planned_amount,actual_amount,currency,due_date,status,notes,created_at,updated_at',
+  const query: Record<string, string> = {
+    select: 'id,title,category,vendor,planned_amount,actual_amount,warehouse_item_id,quantity,currency,due_date,status,notes,created_at,updated_at,warehouseItem:warehouse_items(id,name,manufacturer,calculation_type,unit_price)',
     order: 'id.asc'
   }
 

@@ -1,9 +1,15 @@
 ﻿<script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import {
+  DEFAULT_WORK_SCHEDULE_TYPE,
+  getLegacyWorkScheduleType,
+  getWorkScheduleDefinition,
+  normalizeWorkScheduleType,
+  type WorkScheduleType
+} from '~~/shared/utils/work-schedules'
 
 type SalaryType = 'fixed' | 'hourly'
-type ShiftKind = 'day' | 'night' | 'hourly'
 
 type EditableCustomer = {
   id: number
@@ -33,6 +39,8 @@ type ObjectItem = {
   description?: string | null
   address?: string | null
   code?: string | null
+  schedule_type?: WorkScheduleType | string | null
+  scheduleType?: WorkScheduleType | string | null
 }
 
 const props = withDefaults(defineProps<{
@@ -167,6 +175,13 @@ const selectedBuildingId = computed(() => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
 })
 
+const buildingIdModel = computed<number | undefined>({
+  get: () => selectedBuildingId.value,
+  set: (value) => {
+    state.buildingId = typeof value === 'number' && value > 0 ? value : null
+  }
+})
+
 type CustomerRoleItem = {
   id: number
   buildingId: number | null
@@ -188,7 +203,7 @@ const roleOptions = computed(() => {
     .filter(role => role.isActive)
     .map(role => ({ label: role.label, value: role.code }))
 
-  return dynamic.length ? dynamic : DEFAULT_ROLE_OPTIONS
+  return dynamic.length ? dynamic : [...DEFAULT_ROLE_OPTIONS]
 })
 
 watch(activeBuilding, (building) => {
@@ -214,6 +229,18 @@ const objectOptions = computed(() => {
   }))
 })
 
+const objectScheduleByName = computed(() => {
+  const map = new Map<string, WorkScheduleType>()
+
+  for (const object of objects.value || []) {
+    const name = object.name?.trim()
+    if (!name) continue
+    map.set(name, normalizeWorkScheduleType(object.scheduleType ?? object.schedule_type))
+  }
+
+  return map
+})
+
 const pinnedObjectOptions = computed(() => [
   { label: 'Не закреплен', value: NOT_PINNED_VALUE },
   ...objectOptions.value
@@ -226,18 +253,36 @@ const pinnedObjectModel = computed({
   }
 })
 
-const shiftKindModel = computed<ShiftKind>({
-  get: () => (state.salaryType === 'hourly' ? 'hourly' : state.workShift),
-  set: (value) => {
-    if (value === 'hourly') {
-      state.salaryType = 'hourly'
-      return
-    }
+function getSelectedScheduleType() {
+  const names = [
+    state.objectPinned?.trim(),
+    ...state.objectPositions.map(position => position.trim())
+  ].filter(Boolean)
 
-    state.salaryType = 'fixed'
-    state.workShift = value
+  for (const name of names) {
+    const scheduleType = objectScheduleByName.value.get(name)
+    if (scheduleType) {
+      return scheduleType
+    }
   }
-})
+
+  return getLegacyWorkScheduleType({
+    workShift: state.workShift,
+    salaryType: state.salaryType
+  })
+}
+
+const selectedSchedule = computed(() => getWorkScheduleDefinition(getSelectedScheduleType() || DEFAULT_WORK_SCHEDULE_TYPE))
+
+function syncScheduleFromObject() {
+  const schedule = selectedSchedule.value
+  state.salaryType = schedule.salaryType
+  state.workShift = schedule.workShift
+}
+
+watch([() => state.objectPinned, () => state.objectPositions, objectScheduleByName], () => {
+  syncScheduleFromObject()
+}, { deep: true })
 
 function transliterate(value: string) {
   const map: Record<string, string> = {
@@ -364,7 +409,7 @@ function finalizeSubmit() {
   }, 0)
 }
 
-async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
+async function onSubmit(event?: FormSubmitEvent<Record<string, unknown>>) {
   if (!event || loading.value) {
     return
   }
@@ -372,14 +417,17 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
   loading.value = true
 
   try {
+    const data = event.data as FormSubmitState
     const buildingId = selectedBuildingId.value
     if (!buildingId) {
       throw new Error('Выберите здание перед сохранением сотрудника.')
     }
 
-    const fullName = event.data.fullName.trim()
-    const objectPinned = event.data.objectPinned?.trim() || ''
-    const objectPositions = buildObjectPositions(event.data.objectPositions, event.data.objectPinned || '')
+    const fullName = data.fullName.trim()
+    const objectPinned = data.objectPinned?.trim() || ''
+    const objectPositions = buildObjectPositions(data.objectPositions, data.objectPinned || '')
+    syncScheduleFromObject()
+    const schedule = selectedSchedule.value
 
     if (!isEditMode.value && !objectPositions.length) {
       throw new Error('Выберите хотя бы один объект.')
@@ -391,14 +439,14 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
         body: {
           buildingId,
           fullName,
-          username: event.data.username.trim(),
-          password: event.data.password.trim() || undefined,
-          phoneNumber: event.data.phoneNumber.trim(),
-          age: event.data.age,
-          workShift: event.data.workShift,
-          salaryType: event.data.salaryType,
-          hourlyRate: event.data.salaryType === 'hourly' ? event.data.hourlyRate : undefined,
-          role: event.data.role || 'customer',
+          username: data.username.trim(),
+          password: data.password.trim() || undefined,
+          phoneNumber: data.phoneNumber.trim(),
+          age: data.age,
+          workShift: schedule.workShift,
+          salaryType: schedule.salaryType,
+          hourlyRate: schedule.salaryType === 'hourly' ? data.hourlyRate : undefined,
+          role: data.role || 'customer',
           objectPinned,
           objectPositions
         }
@@ -406,7 +454,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
 
       toast.add({
         title: 'Изменения сохранены',
-        description: `Пользователь @${event.data.username} обновлен`,
+        description: `Пользователь @${data.username} обновлен`,
         color: 'success'
       })
     } else {
@@ -422,15 +470,15 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
 
       const form = new FormData()
       form.append('fullName', fullName)
-      form.append('username', event.data.username.trim())
+      form.append('username', data.username.trim())
       form.append('buildingId', String(buildingId))
-      form.append('password', event.data.password || DEFAULT_PASSWORD)
-      form.append('phoneNumber', event.data.phoneNumber.trim())
-      form.append('role', event.data.role || 'customer')
-      form.append('age', String(event.data.age))
-      form.append('workShift', event.data.workShift)
-      form.append('salaryType', event.data.salaryType)
-      form.append('hourlyRate', String(event.data.hourlyRate ?? 0))
+      form.append('password', data.password || DEFAULT_PASSWORD)
+      form.append('phoneNumber', data.phoneNumber.trim())
+      form.append('role', data.role || 'customer')
+      form.append('age', String(data.age))
+      form.append('workShift', schedule.workShift)
+      form.append('salaryType', schedule.salaryType)
+      form.append('hourlyRate', String(data.hourlyRate ?? 0))
       form.append('objectPinned', objectPinned)
       form.append('objectPositions', JSON.stringify(objectPositions))
       form.append('avatarFile', avatarFile.value)
@@ -444,7 +492,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
 
       toast.add({
         title: 'Успешно',
-        description: `Пользователь @${event.data.username} добавлен`,
+        description: `Пользователь @${data.username} добавлен`,
         color: 'success'
       })
     }
@@ -500,7 +548,7 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
 
         <UFormField v-if="isEditMode" label="Здание" name="buildingId">
           <USelect
-            v-model="state.buildingId"
+            v-model="buildingIdModel"
             :items="buildingOptions"
             class="w-full"
           />
@@ -566,19 +614,15 @@ async function onSubmit(event?: FormSubmitEvent<FormSubmitState>) {
           </UFormField>
         </template>
 
-        <UFormField label="Смена" name="workShift">
-          <USelect
-            v-model="shiftKindModel"
-            :items="[
-              { label: 'День', value: 'day' },
-              { label: 'Ночь', value: 'night' },
-              { label: 'Почасовое', value: 'hourly' }
-            ]"
+        <UFormField label="График объекта">
+          <UInput
+            :model-value="selectedSchedule.label"
             class="w-full"
+            disabled
           />
         </UFormField>
 
-        <UFormField v-if="state.salaryType === 'hourly'" label="Ставка (UZS/час)" name="hourlyRate">
+        <UFormField v-if="selectedSchedule.salaryType === 'hourly'" label="Ставка (UZS/час)" name="hourlyRate">
           <UInput
             v-model="state.hourlyRate"
             type="number"

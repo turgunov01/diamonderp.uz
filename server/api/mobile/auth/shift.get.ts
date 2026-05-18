@@ -6,7 +6,7 @@ import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../util
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
   const shift = access.customer
-    ? resolveMobileShiftInfo(access.customer?.work_shift)
+    ? resolveMobileShiftInfo(access.scheduleType ?? access.customer?.work_shift)
     : null
 
   // Check if shift has already been started today

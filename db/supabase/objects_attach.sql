@@ -4,7 +4,17 @@
 -- 0) extend objects with address/code (safe if already exists)
 alter table public.objects
   add column if not exists address text,
-  add column if not exists code text unique;
+  add column if not exists code text unique,
+  add column if not exists schedule_type text not null default 'day_12h';
+
+do $$
+begin
+  alter table public.objects
+    add constraint objects_schedule_type_check
+    check (schedule_type in ('day_12h', 'night_12h', 'day_8h', 'hourly', 'daily_24h'));
+exception
+  when duplicate_object then null;
+end $$;
 
 -- 1) expenses
 alter table public.expenses

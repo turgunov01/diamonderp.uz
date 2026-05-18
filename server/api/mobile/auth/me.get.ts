@@ -5,7 +5,7 @@ export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
   const mustChangePassword = Boolean(access.customer ? (access.customer.must_change_password ?? true) : false)
   const shift = access.customer
-    ? resolveMobileShiftInfo(access.customer?.work_shift)
+    ? resolveMobileShiftInfo(access.scheduleType ?? access.customer?.work_shift)
     : null
 
   return {
@@ -17,7 +17,8 @@ export default eventHandler(async (event) => {
     access: {
       buildingId: access.buildingId ?? null,
       objectIds: access.objectIds,
-      objectNames: access.objectNames
+      objectNames: access.objectNames,
+      scheduleType: access.scheduleType ?? null
     },
     shift,
     objects: access.objects

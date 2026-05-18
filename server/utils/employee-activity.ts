@@ -1,8 +1,19 @@
 ﻿import { getSupabaseServerConfig, getSupabaseServerHeaders } from './supabase'
+import {
+  getLegacyWorkScheduleType,
+  getWorkScheduleDefinition,
+  isWorkScheduleType,
+  type WorkScheduleSalaryType,
+  type WorkScheduleType
+} from '~~/shared/utils/work-schedules'
+import type { AuthLocationPayload } from '~~/shared/types/auth'
+import { resolveWorkScheduleTypeForCustomer } from './object-schedules'
+import { serializeAuthLocation } from './auth-locations'
 
 export type EmployeeActivityStatus = 'on_time' | 'late' | 'absent'
 
 type EmployeeWorkShift = 'day' | 'night'
+export type EmployeeActivityLocation = AuthLocationPayload & { mapUrl?: string | null }
 
 interface EmployeeActivityDbRow {
   id: number
@@ -14,6 +25,8 @@ interface EmployeeActivityDbRow {
   late_minutes: number | null
   started_at?: string | null
   finished_at?: string | null
+  started_location?: EmployeeActivityLocation | null
+  finished_location?: EmployeeActivityLocation | null
 }
 
 interface ActivityCustomerRow {
@@ -22,6 +35,8 @@ interface ActivityCustomerRow {
   username: string
   work_shift?: EmployeeWorkShift | null
   object_pinned?: string | null
+  object_positions?: string[] | null
+  salary_type?: WorkScheduleSalaryType | null
 }
 
 export interface EmployeeActivityRecord {
@@ -31,6 +46,8 @@ export interface EmployeeActivityRecord {
   date: string
   startedAt: string | null
   finishedAt: string | null
+  startedLocation: EmployeeActivityLocation | null
+  finishedLocation: EmployeeActivityLocation | null
   status: EmployeeActivityStatus
   workMinutes: number
   lateMinutes: number
@@ -51,6 +68,7 @@ export interface RecordEmployeeActivityResult {
 
 const EMPLOYEE_ACTIVITY_SELECT_LEGACY = 'id,employee_id,employee_name,activity_date,status,work_minutes,late_minutes'
 const EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES = `${EMPLOYEE_ACTIVITY_SELECT_LEGACY},started_at,finished_at`
+const EMPLOYEE_ACTIVITY_SELECT_WITH_LOCATIONS = `${EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES},started_location,finished_location`
 
 function isMissingEmployeeActivityTimeColumns(error: unknown) {
   if (!error || typeof error !== 'object') {
@@ -70,6 +88,26 @@ function isMissingEmployeeActivityTimeColumns(error: unknown) {
   }
 
   return message.includes('started_at') || message.includes('finished_at')
+}
+
+function isMissingEmployeeActivityLocationColumns(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+
+  const payload = error as { data?: { code?: string, message?: string }, code?: string, message?: string }
+  const code = payload.data?.code || payload.code
+  const message = payload.data?.message || payload.message
+
+  if (code !== 'PGRST204' && code !== '42703') {
+    return false
+  }
+
+  if (typeof message !== 'string') {
+    return false
+  }
+
+  return message.includes('started_location') || message.includes('finished_location')
 }
 
 function normalizeEmployeeIds(rows: EmployeeActivityDbRow[]) {
@@ -109,7 +147,7 @@ async function fetchCustomersByIds(employeeIds: number[]) {
   const { url, serviceRoleKey } = getSupabaseServerConfig()
   const params = new URLSearchParams()
 
-  params.set('select', 'id,building_id,username')
+  params.set('select', 'id,building_id,username,work_shift,object_pinned,object_positions,salary_type')
   params.set('id', `in.(${employeeIds.join(',')})`)
 
   const rows = await $fetch<ActivityCustomerRow[]>(`${url}/rest/v1/customers?${params.toString()}`, {
@@ -134,6 +172,8 @@ function mapEmployeeActivityDbRowToRecord(
     date: row.activity_date,
     startedAt: row.started_at ?? null,
     finishedAt: row.finished_at ?? null,
+    startedLocation: row.started_location ?? null,
+    finishedLocation: row.finished_location ?? null,
     status: row.status,
     workMinutes: row.work_minutes ?? 0,
     lateMinutes: row.late_minutes ?? 0
@@ -186,8 +226,6 @@ function parseRecordedAt(value?: string | Date | null) {
 const TASHKENT_UTC_OFFSET_HOURS = 5
 const DAY_SHIFT_START_HOUR = 8
 const DAY_SHIFT_END_HOUR = 20
-const NIGHT_SHIFT_START_HOUR = 20
-const NIGHT_SHIFT_END_HOUR = 8
 
 function getTashkentParts(value: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -231,6 +269,17 @@ function normalizeWorkShift(value: unknown): EmployeeWorkShift | null {
   return value === 'day' || value === 'night' ? value : null
 }
 
+function normalizeScheduleType(value: unknown, workShiftRaw?: unknown, salaryTypeRaw?: unknown): WorkScheduleType {
+  if (isWorkScheduleType(value)) {
+    return value
+  }
+
+  return getLegacyWorkScheduleType({
+    workShift: normalizeWorkShift(workShiftRaw),
+    salaryType: salaryTypeRaw === 'hourly' ? 'hourly' : 'fixed'
+  })
+}
+
 function shiftDate(year: number, month: number, day: number, hour: number, minute = 0) {
   return new Date(Date.UTC(year, month - 1, day, hour - TASHKENT_UTC_OFFSET_HOURS, minute, 0))
 }
@@ -263,21 +312,14 @@ function parseActivityDate(value: string) {
   }
 }
 
-function getShiftStartHour(workShift: EmployeeWorkShift | null) {
-  return workShift === 'night' ? NIGHT_SHIFT_START_HOUR : DAY_SHIFT_START_HOUR
-}
-
-function getShiftEndHour(workShift: EmployeeWorkShift | null) {
-  return workShift === 'night' ? NIGHT_SHIFT_END_HOUR : DAY_SHIFT_END_HOUR
-}
-
-function buildShiftRange(activityDate: string, workShift: EmployeeWorkShift | null) {
+function buildShiftRange(activityDate: string, scheduleType: WorkScheduleType) {
   const { year, month, day } = parseActivityDate(activityDate)
-  const startHour = getShiftStartHour(workShift)
-  const endHour = getShiftEndHour(workShift)
+  const schedule = getWorkScheduleDefinition(scheduleType)
+  const startHour = schedule.startHour ?? DAY_SHIFT_START_HOUR
+  const endHour = schedule.endHour ?? DAY_SHIFT_END_HOUR
   const startAt = shiftDate(year, month, day, startHour)
 
-  if (workShift === 'night') {
+  if (schedule.spansNextDay) {
     const nextDate = addTashkentDays({ year, month, day }, 1)
     return {
       startAt,
@@ -297,9 +339,15 @@ function clampDate(value: Date, from: Date, to: Date) {
   return value
 }
 
-function buildInitialActivityStatus(recordedAt: Date, workShiftRaw?: unknown) {
+function buildInitialActivityStatus(
+  recordedAt: Date,
+  scheduleTypeRaw?: unknown,
+  workShiftRaw?: unknown,
+  salaryTypeRaw?: unknown
+) {
   const parts = getTashkentParts(recordedAt)
-  const workShift = normalizeWorkShift(workShiftRaw)
+  const scheduleType = normalizeScheduleType(scheduleTypeRaw, workShiftRaw, salaryTypeRaw)
+  const schedule = getWorkScheduleDefinition(scheduleType)
 
   const year = Number(parts.year)
   const month = Number(parts.month)
@@ -314,12 +362,20 @@ function buildInitialActivityStatus(recordedAt: Date, workShiftRaw?: unknown) {
 
   let shiftDateParts = { year, month, day }
 
-  if (workShift === 'night' && parts.hour < NIGHT_SHIFT_END_HOUR) {
+  if (schedule.spansNextDay && schedule.endHour !== null && parts.hour < schedule.endHour) {
     shiftDateParts = addTashkentDays(shiftDateParts, -1)
   }
 
   const activityDate = `${shiftDateParts.year.toString().padStart(4, '0')}-${shiftDateParts.month.toString().padStart(2, '0')}-${shiftDateParts.day.toString().padStart(2, '0')}`
-  const shiftStartAt = shiftDate(shiftDateParts.year, shiftDateParts.month, shiftDateParts.day, getShiftStartHour(workShift))
+  if (schedule.salaryType === 'hourly' || schedule.startHour === null) {
+    return {
+      activityDate,
+      status: 'on_time' as const,
+      lateMinutes: 0
+    }
+  }
+
+  const shiftStartAt = shiftDate(shiftDateParts.year, shiftDateParts.month, shiftDateParts.day, schedule.startHour)
   const lateMinutes = Math.max(0, Math.floor((recordedAt.getTime() - shiftStartAt.getTime()) / 60000))
 
   if (lateMinutes <= 0) {
@@ -342,7 +398,7 @@ async function fetchActivityCustomer(employeeId: number) {
   const rows = await $fetch<ActivityCustomerRow[]>(`${url}/rest/v1/customers`, {
     headers: getSupabaseServerHeaders(serviceRoleKey),
     query: {
-      select: 'id,building_id,username,work_shift,object_pinned',
+      select: 'id,building_id,username,work_shift,object_pinned,object_positions,salary_type',
       id: `eq.${employeeId}`,
       limit: '1'
     }
@@ -375,26 +431,42 @@ async function fetchExistingActivity(employeeId: number, activityDate: string) {
     rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
       headers: getSupabaseServerHeaders(serviceRoleKey),
       query: {
-        select: EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES,
+        select: EMPLOYEE_ACTIVITY_SELECT_WITH_LOCATIONS,
         employee_id: `eq.${employeeId}`,
         activity_date: `eq.${activityDate}`,
         limit: '1'
       }
     })
   } catch (error) {
-    if (!isMissingEmployeeActivityTimeColumns(error)) {
+    if (!isMissingEmployeeActivityLocationColumns(error) && !isMissingEmployeeActivityTimeColumns(error)) {
       throw error
     }
 
-    rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
-      query: {
-        select: EMPLOYEE_ACTIVITY_SELECT_LEGACY,
-        employee_id: `eq.${employeeId}`,
-        activity_date: `eq.${activityDate}`,
-        limit: '1'
+    try {
+      rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
+        headers: getSupabaseServerHeaders(serviceRoleKey),
+        query: {
+          select: EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES,
+          employee_id: `eq.${employeeId}`,
+          activity_date: `eq.${activityDate}`,
+          limit: '1'
+        }
+      })
+    } catch (fallbackError) {
+      if (!isMissingEmployeeActivityTimeColumns(fallbackError)) {
+        throw fallbackError
       }
-    })
+
+      rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
+        headers: getSupabaseServerHeaders(serviceRoleKey),
+        query: {
+          select: EMPLOYEE_ACTIVITY_SELECT_LEGACY,
+          employee_id: `eq.${employeeId}`,
+          activity_date: `eq.${activityDate}`,
+          limit: '1'
+        }
+      })
+    }
   }
 
   return rows[0]
@@ -405,6 +477,7 @@ async function createActivity(
   employeeName: string,
   activityDate: string,
   startedAt: string,
+  startedLocation: EmployeeActivityLocation | null,
   initialStatus: { status: EmployeeActivityStatus, lateMinutes: number }
 ) {
   const { url, serviceRoleKey } = getSupabaseServerConfig()
@@ -422,31 +495,55 @@ async function createActivity(
         employee_name: employeeName,
         activity_date: activityDate,
         started_at: startedAt,
+        started_location: startedLocation,
         status: initialStatus.status,
         work_minutes: 0,
         late_minutes: initialStatus.lateMinutes
       }
     })
   } catch (error) {
-    if (!isMissingEmployeeActivityTimeColumns(error)) {
+    if (!isMissingEmployeeActivityLocationColumns(error) && !isMissingEmployeeActivityTimeColumns(error)) {
       throw error
     }
 
-    rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
-      method: 'POST',
-      headers: {
-        ...getSupabaseServerHeaders(serviceRoleKey),
-        Prefer: 'return=representation'
-      },
-      body: {
-        employee_id: employeeId,
-        employee_name: employeeName,
-        activity_date: activityDate,
-        status: initialStatus.status,
-        work_minutes: 0,
-        late_minutes: initialStatus.lateMinutes
+    try {
+      rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
+        method: 'POST',
+        headers: {
+          ...getSupabaseServerHeaders(serviceRoleKey),
+          Prefer: 'return=representation'
+        },
+        body: {
+          employee_id: employeeId,
+          employee_name: employeeName,
+          activity_date: activityDate,
+          started_at: startedAt,
+          status: initialStatus.status,
+          work_minutes: 0,
+          late_minutes: initialStatus.lateMinutes
+        }
+      })
+    } catch (fallbackError) {
+      if (!isMissingEmployeeActivityTimeColumns(fallbackError)) {
+        throw fallbackError
       }
-    })
+
+      rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
+        method: 'POST',
+        headers: {
+          ...getSupabaseServerHeaders(serviceRoleKey),
+          Prefer: 'return=representation'
+        },
+        body: {
+          employee_id: employeeId,
+          employee_name: employeeName,
+          activity_date: activityDate,
+          status: initialStatus.status,
+          work_minutes: 0,
+          late_minutes: initialStatus.lateMinutes
+        }
+      })
+    }
   }
 
   const createdActivity = rows[0]
@@ -490,17 +587,27 @@ export async function listEmployeeActivities(options: ListEmployeeActivitiesOpti
   let rows: EmployeeActivityDbRow[]
 
   try {
-    rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options, EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES), {
+    rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options, EMPLOYEE_ACTIVITY_SELECT_WITH_LOCATIONS), {
       headers: getSupabaseServerHeaders(serviceRoleKey)
     })
   } catch (error) {
-    if (!isMissingEmployeeActivityTimeColumns(error)) {
+    if (!isMissingEmployeeActivityLocationColumns(error) && !isMissingEmployeeActivityTimeColumns(error)) {
       throw error
     }
 
-    rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options, EMPLOYEE_ACTIVITY_SELECT_LEGACY), {
-      headers: getSupabaseServerHeaders(serviceRoleKey)
-    })
+    try {
+      rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options, EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES), {
+        headers: getSupabaseServerHeaders(serviceRoleKey)
+      })
+    } catch (fallbackError) {
+      if (!isMissingEmployeeActivityTimeColumns(fallbackError)) {
+        throw fallbackError
+      }
+
+      rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options, EMPLOYEE_ACTIVITY_SELECT_LEGACY), {
+        headers: getSupabaseServerHeaders(serviceRoleKey)
+      })
+    }
   }
 
   if (!rows.length) {
@@ -530,27 +637,50 @@ export async function listEmployeeActivities(options: ListEmployeeActivitiesOpti
 export async function recordEmployeeActivity(input: {
   employeeId: number
   recordedAt?: string | Date | null
+  location?: unknown
 }): Promise<RecordEmployeeActivityResult> {
   assertEmployeeId(input.employeeId)
 
   const recordedAt = parseRecordedAt(input.recordedAt)
   const customer = await fetchActivityCustomer(input.employeeId)
-  const initialStatus = buildInitialActivityStatus(recordedAt, customer.work_shift)
+  const scheduleType = await resolveWorkScheduleTypeForCustomer(customer)
+  const initialStatus = buildInitialActivityStatus(recordedAt, scheduleType, customer.work_shift, customer.salary_type)
   const activityDate = initialStatus.activityDate
   const existingActivity = await fetchExistingActivity(input.employeeId, activityDate)
+  const startedLocation = serializeAuthLocation(input.location)
 
   if (existingActivity) {
     const recordedAtIso = recordedAt.toISOString()
 
     let activity = existingActivity
 
-    if (!existingActivity.started_at) {
+    if (!existingActivity.started_at || (!existingActivity.started_location && startedLocation)) {
       try {
-        activity = await updateActivity(existingActivity.id, {
-          started_at: recordedAtIso
-        })
+        const updateBody: Record<string, unknown> = {}
+
+        if (!existingActivity.started_at) {
+          updateBody.started_at = recordedAtIso
+        }
+
+        if (!existingActivity.started_location && startedLocation) {
+          updateBody.started_location = startedLocation
+        }
+
+        activity = await updateActivity(existingActivity.id, updateBody)
       } catch (error) {
-        if (!isMissingEmployeeActivityTimeColumns(error)) {
+        if (isMissingEmployeeActivityLocationColumns(error)) {
+          if (!existingActivity.started_at) {
+            try {
+              activity = await updateActivity(existingActivity.id, {
+                started_at: recordedAtIso
+              })
+            } catch (fallbackError) {
+              if (!isMissingEmployeeActivityTimeColumns(fallbackError)) {
+                throw fallbackError
+              }
+            }
+          }
+        } else if (!isMissingEmployeeActivityTimeColumns(error)) {
           throw error
         }
       }
@@ -571,6 +701,7 @@ export async function recordEmployeeActivity(input: {
       customer.username,
       activityDate,
       recordedAt.toISOString(),
+      startedLocation,
       initialStatus
     )
   } catch (error) {
@@ -604,13 +735,14 @@ export async function finishEmployeeWork(input: {
   finishedAt?: string | Date | null
   employeeName?: string
   workShift?: EmployeeWorkShift | null
+  scheduleType?: WorkScheduleType | null
   objectPinned?: string | null
+  location?: unknown
 }): Promise<FinishEmployeeWorkResult> {
   assertEmployeeId(input.employeeId)
 
   const finishedAt = parseRecordedAt(input.finishedAt)
 
-  const workShift = normalizeWorkShift(input.workShift)
   const employeeName = typeof input.employeeName === 'string' && input.employeeName.trim()
     ? input.employeeName.trim()
     : undefined
@@ -628,7 +760,12 @@ export async function finishEmployeeWork(input: {
     : undefined
 
   const effectiveEmployeeName = employeeName ?? customer?.username ?? `Employee #${input.employeeId}`
-  const effectiveWorkShift = workShift ?? normalizeWorkShift(customer?.work_shift) ?? null
+  const effectiveScheduleType = input.scheduleType
+    ? normalizeScheduleType(input.scheduleType, input.workShift, customer?.salary_type)
+    : (customer
+        ? await resolveWorkScheduleTypeForCustomer(customer)
+        : normalizeScheduleType(null, input.workShift, null))
+  const effectiveSchedule = getWorkScheduleDefinition(effectiveScheduleType)
 
   const parts = getTashkentParts(finishedAt)
   const today = formatDateInTashkent(finishedAt)
@@ -642,7 +779,9 @@ export async function finishEmployeeWork(input: {
     return `${y.year.toString().padStart(4, '0')}-${y.month.toString().padStart(2, '0')}-${y.day.toString().padStart(2, '0')}`
   })()
 
-  const prefersToday = effectiveWorkShift !== 'night' || parts.hour >= NIGHT_SHIFT_START_HOUR
+  const scheduleStartHour = effectiveSchedule.startHour ?? DAY_SHIFT_START_HOUR
+  const scheduleEndsNextDay = effectiveSchedule.spansNextDay && effectiveSchedule.endHour !== null
+  const prefersToday = !scheduleEndsNextDay || parts.hour >= scheduleStartHour
   const primaryDate = prefersToday ? today : yesterday
   const fallbackDate = prefersToday ? yesterday : today
 
@@ -659,10 +798,20 @@ export async function finishEmployeeWork(input: {
     })
   }
 
-  const { startAt, endAt } = buildShiftRange(activity.activity_date, effectiveWorkShift)
-  const finishedAtClamped = clampDate(finishedAt, startAt, endAt)
-  const durationMinutes = Math.floor((finishedAtClamped.getTime() - startAt.getTime()) / 60000)
-  const lateMinutes = activity.late_minutes ?? 0
+  let durationMinutes = 0
+  let lateMinutes = activity.late_minutes ?? 0
+
+  if (effectiveSchedule.salaryType === 'hourly') {
+    const startedAt = activity.started_at ? new Date(activity.started_at) : null
+    durationMinutes = startedAt && !Number.isNaN(startedAt.getTime())
+      ? Math.floor((finishedAt.getTime() - startedAt.getTime()) / 60000)
+      : 0
+    lateMinutes = 0
+  } else {
+    const { startAt, endAt } = buildShiftRange(activity.activity_date, effectiveScheduleType)
+    const finishedAtClamped = clampDate(finishedAt, startAt, endAt)
+    durationMinutes = Math.floor((finishedAtClamped.getTime() - startAt.getTime()) / 60000)
+  }
 
   const workMinutes = activity.status === 'absent'
     ? 0
@@ -672,24 +821,39 @@ export async function finishEmployeeWork(input: {
     work_minutes: workMinutes
   }
 
-  if (activity.status === 'absent') {
+  if (activity.status === 'absent' || effectiveSchedule.salaryType === 'hourly') {
     patchBody.late_minutes = 0
   }
 
   const finishedAtIso = finishedAt.toISOString()
+  const finishedLocation = serializeAuthLocation(input.location)
   let updatedActivity: EmployeeActivityDbRow
 
   try {
     updatedActivity = await updateActivity(activity.id, {
       ...patchBody,
-      finished_at: finishedAtIso
+      finished_at: finishedAtIso,
+      finished_location: finishedLocation
     })
   } catch (error) {
-    if (!isMissingEmployeeActivityTimeColumns(error)) {
-      throw error
-    }
+    if (isMissingEmployeeActivityLocationColumns(error)) {
+      try {
+        updatedActivity = await updateActivity(activity.id, {
+          ...patchBody,
+          finished_at: finishedAtIso
+        })
+      } catch (fallbackError) {
+        if (!isMissingEmployeeActivityTimeColumns(fallbackError)) {
+          throw fallbackError
+        }
 
-    updatedActivity = await updateActivity(activity.id, patchBody)
+        updatedActivity = await updateActivity(activity.id, patchBody)
+      }
+    } else if (!isMissingEmployeeActivityTimeColumns(error)) {
+      throw error
+    } else {
+      updatedActivity = await updateActivity(activity.id, patchBody)
+    }
   }
 
   return {

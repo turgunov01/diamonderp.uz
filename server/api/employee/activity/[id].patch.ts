@@ -1,5 +1,5 @@
 import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
-import type { EmployeeActivityRecord, EmployeeActivityStatus } from '../../../utils/employee-activity'
+import type { EmployeeActivityLocation, EmployeeActivityRecord, EmployeeActivityStatus } from '../../../utils/employee-activity'
 import type { H3Event } from 'h3'
 
 interface EmployeeActivityDbRow {
@@ -12,6 +12,8 @@ interface EmployeeActivityDbRow {
   late_minutes: number | null
   started_at?: string | null
   finished_at?: string | null
+  started_location?: EmployeeActivityLocation | null
+  finished_location?: EmployeeActivityLocation | null
 }
 
 interface ActivityCustomerRow {
@@ -159,6 +161,8 @@ function mapDbRowToRecord(row: EmployeeActivityDbRow, customer?: ActivityCustome
     date: row.activity_date,
     startedAt: row.started_at ?? null,
     finishedAt: row.finished_at ?? null,
+    startedLocation: row.started_location ?? null,
+    finishedLocation: row.finished_location ?? null,
     status: row.status,
     workMinutes: row.work_minutes ?? 0,
     lateMinutes: row.late_minutes ?? 0

@@ -21,6 +21,8 @@ create table public.objects (
   address text,
   description text,
   code text,
+  schedule_type text not null default 'day_12h'
+    check (schedule_type in ('day_12h', 'night_12h', 'day_8h', 'hourly', 'daily_24h')),
   created_at timestamptz not null default now(),
   constraint objects_building_name_unique unique (building_id, name),
   constraint objects_building_code_unique unique (building_id, code)
@@ -159,17 +161,17 @@ values
   ('JW Marriott Hotel Tashkent', 'https://banner2.cleanpng.com/20180603/bvg/avonlllgv.webp', 'Hotel complex')
 on conflict (name) do nothing;
 
-insert into public.objects (building_id, name, address, description, code)
-select b.id, seed.name, seed.address, seed.description, seed.code
+insert into public.objects (building_id, name, address, description, code, schedule_type)
+select b.id, seed.name, seed.address, seed.description, seed.code, seed.schedule_type
 from (
   values
-    ('Tashkent City Mall', 'Main Entrance', 'Tashkent, Shaykhantahur', 'Main access point', 'tcm-main-entrance'),
-    ('Tashkent City Mall', 'Parking', 'Tashkent, B1', 'Underground parking', 'tcm-parking'),
-    ('Summit Business Center', 'Lobby', 'Tashkent, Yunusabad', 'Main lobby', 'summit-lobby'),
-    ('Summit Business Center', 'Office Floor 2', 'Tashkent, Floor 2', 'Office floor security', 'summit-floor-2'),
-    ('JW Marriott Hotel Tashkent', 'Reception', 'Tashkent, City center', 'Hotel reception', 'jw-reception'),
-    ('JW Marriott Hotel Tashkent', 'Conference Hall', 'Tashkent, Level 1', 'Conference security zone', 'jw-conf-hall')
-) as seed(building_name, name, address, description, code)
+    ('Tashkent City Mall', 'Main Entrance', 'Tashkent, Shaykhantahur', 'Main access point', 'tcm-main-entrance', 'day_12h'),
+    ('Tashkent City Mall', 'Parking', 'Tashkent, B1', 'Underground parking', 'tcm-parking', 'night_12h'),
+    ('Summit Business Center', 'Lobby', 'Tashkent, Yunusabad', 'Main lobby', 'summit-lobby', 'day_8h'),
+    ('Summit Business Center', 'Office Floor 2', 'Tashkent, Floor 2', 'Office floor security', 'summit-floor-2', 'day_8h'),
+    ('JW Marriott Hotel Tashkent', 'Reception', 'Tashkent, City center', 'Hotel reception', 'jw-reception', 'day_12h'),
+    ('JW Marriott Hotel Tashkent', 'Conference Hall', 'Tashkent, Level 1', 'Conference security zone', 'jw-conf-hall', 'daily_24h')
+) as seed(building_name, name, address, description, code, schedule_type)
 join public.buildings b on b.name = seed.building_name
 on conflict (building_id, name) do nothing;
 

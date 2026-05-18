@@ -1,5 +1,28 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
+
 type ExpenseStatus = 'draft' | 'approved' | 'rejected' | 'paid'
+type CalculationType = 'kg' | 'liter' | 'piece'
+
+interface WarehouseItem {
+  id: number
+  name: string
+  manufacturer: string
+  calculationType: CalculationType
+  unitPrice: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+interface WarehouseResponse {
+  items: WarehouseItem[]
+  summary: {
+    total: number
+    active: number
+    byCalculationType: Record<CalculationType, number>
+  }
+}
 
 interface ExpenseRecord {
   id: number
@@ -8,6 +31,9 @@ interface ExpenseRecord {
   vendor: string
   plannedAmount: number
   actualAmount?: number
+  warehouseItemId?: number
+  warehouseItem?: WarehouseItem
+  quantity?: number
   currency: string
   dueDate?: string
   status: ExpenseStatus
@@ -26,16 +52,21 @@ interface ExpensesResponse {
 }
 
 interface CreateExpenseState {
-  title: string
-  category: string
-  vendor: string
-  plannedAmount: number
+  warehouseItemId?: number
+  quantity: number
   dueDate: string
   notes: string
 }
 
+const unitLabels: Record<CalculationType, string> = {
+  kg: 'кг',
+  liter: 'л',
+  piece: 'шт'
+}
+
 const toast = useToast()
-const { canManageExpenses, canDeleteExpenses } = useRoleAccess()
+const router = useRouter()
+const { canManageExpenses, canDeleteExpenses, canManageWarehouse } = useRoleAccess()
 const createModalOpen = ref(false)
 const creating = ref(false)
 const updatingId = ref<number | null>(null)
@@ -44,23 +75,32 @@ const deletingId = ref<number | null>(null)
 const expenseToDelete = ref<ExpenseRecord | null>(null)
 
 const newExpense = reactive<CreateExpenseState>({
-  title: '',
-  category: 'Операционные',
-  vendor: '',
-  plannedAmount: 0,
+  warehouseItemId: undefined,
+  quantity: 1,
   dueDate: '',
   notes: ''
 })
 
-const categories = [
-  'Операционные',
-  'Логистика',
-  'Безопасность',
-  'Оборудование',
-  'Командировки'
-]
-
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
+
+const { data: warehouseData, error: warehouseError, refresh: refreshWarehouse } = await useAutoRefreshFetch<WarehouseResponse>('/api/warehouse', {
+  default: () => ({
+    items: [],
+    summary: {
+      total: 0,
+      active: 0,
+      byCalculationType: {
+        kg: 0,
+        liter: 0,
+        piece: 0
+      }
+    }
+  }),
+  query: {
+    activeOnly: true
+  },
+  immediate: true
+})
 
 const { data, error, refresh, execute, status, pending } = await useAutoRefreshFetch<ExpensesResponse>('/api/expenses', {
   default: () => ({
@@ -83,6 +123,18 @@ const { data, error, refresh, execute, status, pending } = await useAutoRefreshF
 })
 
 const isLoading = computed(() => pending.value || status.value === 'pending')
+const warehouseItems = computed(() => warehouseData.value?.items || [])
+const selectedWarehouseItem = computed(() => warehouseItems.value.find(item => item.id === newExpense.warehouseItemId) || null)
+const plannedAmount = computed(() => {
+  const item = selectedWarehouseItem.value
+  const quantity = Number(newExpense.quantity) || 0
+  return item ? Math.round(item.unitPrice * quantity) : 0
+})
+
+const warehouseOptions = computed(() => warehouseItems.value.map(item => ({
+  label: `${item.name} · ${item.manufacturer} · ${formatCurrency(item.unitPrice)} / ${unitLabels[item.calculationType]}`,
+  value: item.id
+})))
 
 watch(activeObject, (val) => {
   if (val?.id) {
@@ -96,11 +148,29 @@ watch(error, (value) => {
   }
 
   toast.add({
-    title: 'Не удалось загрузить расходы',
-    description: value.statusMessage || 'Проверьте API расходов.',
+    title: 'Не удалось загрузить закупки',
+    description: value.statusMessage || 'Проверьте API закупок.',
     color: 'error'
   })
 }, { immediate: true })
+
+watch(warehouseError, (value) => {
+  if (!value) {
+    return
+  }
+
+  toast.add({
+    title: 'Не удалось загрузить склад',
+    description: value.statusMessage || 'Проверьте API склада.',
+    color: 'error'
+  })
+}, { immediate: true })
+
+watch(createModalOpen, async (open) => {
+  if (open) {
+    await refreshWarehouse()
+  }
+})
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('ru-RU', {
@@ -116,6 +186,12 @@ function formatDate(value?: string) {
   }
 
   return new Date(value).toLocaleDateString('ru-RU')
+}
+
+function formatNumber(value?: number) {
+  return new Intl.NumberFormat('ru-RU', {
+    maximumFractionDigits: 3
+  }).format(Number(value) || 0)
 }
 
 function statusColor(status: ExpenseStatus) {
@@ -142,12 +218,44 @@ function getErrorMessage(error: unknown) {
 }
 
 function resetCreateState() {
-  newExpense.title = ''
-  newExpense.category = 'Операционные'
-  newExpense.vendor = ''
-  newExpense.plannedAmount = 0
+  newExpense.warehouseItemId = undefined
+  newExpense.quantity = 1
   newExpense.dueDate = ''
   newExpense.notes = ''
+}
+
+function getExpenseTitle(item: ExpenseRecord) {
+  return item.warehouseItem?.name || item.title
+}
+
+function getExpenseVendor(item: ExpenseRecord) {
+  return item.warehouseItem?.manufacturer || item.vendor
+}
+
+function getExpenseQuantity(item: ExpenseRecord) {
+  if (!item.quantity || !item.warehouseItem) {
+    return '-'
+  }
+
+  return `${formatNumber(item.quantity)} ${unitLabels[item.warehouseItem.calculationType]}`
+}
+
+function getExpenseUnitPrice(item: ExpenseRecord) {
+  if (!item.warehouseItem) {
+    return item.category
+  }
+
+  return `${formatCurrency(item.warehouseItem.unitPrice)} / ${unitLabels[item.warehouseItem.calculationType]}`
+}
+
+function openWarehouseCreate() {
+  router.push({
+    path: '/warehouse',
+    query: {
+      return: '/expenses',
+      create: '1'
+    }
+  })
 }
 
 async function createExpense() {
@@ -160,7 +268,17 @@ async function createExpense() {
   }
 
   if (!activeObject.value?.id) {
-    toast.add({ title: 'Выберите объект перед созданием расхода', color: 'warning' })
+    toast.add({ title: 'Выберите объект перед созданием закупки', color: 'warning' })
+    return
+  }
+
+  if (!newExpense.warehouseItemId) {
+    toast.add({ title: 'Выберите товар из склада', color: 'warning' })
+    return
+  }
+
+  if (!Number.isFinite(Number(newExpense.quantity)) || Number(newExpense.quantity) <= 0) {
+    toast.add({ title: 'Укажите количество больше нуля', color: 'warning' })
     return
   }
 
@@ -170,11 +288,9 @@ async function createExpense() {
     await $fetch('/api/expenses', {
       method: 'POST',
       body: {
-        objectId: activeObject.value?.id,
-        title: newExpense.title,
-        category: newExpense.category,
-        vendor: newExpense.vendor,
-        plannedAmount: newExpense.plannedAmount,
+        objectId: activeObject.value.id,
+        warehouseItemId: newExpense.warehouseItemId,
+        quantity: Number(newExpense.quantity),
         dueDate: newExpense.dueDate || undefined,
         notes: newExpense.notes || undefined,
         status: 'draft'
@@ -182,7 +298,7 @@ async function createExpense() {
     })
 
     toast.add({
-      title: 'Расход создан',
+      title: 'Закупка создана',
       color: 'success'
     })
 
@@ -191,7 +307,7 @@ async function createExpense() {
     await refresh()
   } catch (err: unknown) {
     toast.add({
-      title: 'Не удалось создать расход',
+      title: 'Не удалось создать закупку',
       description: getErrorMessage(err) || 'Проверьте поля формы.',
       color: 'error'
     })
@@ -264,8 +380,8 @@ async function deleteExpense() {
   }
 }
 
-function getExpenseActions(item: ExpenseRecord) {
-  const actions = []
+function getExpenseActions(item: ExpenseRecord): DropdownMenuItem[] {
+  const actions: DropdownMenuItem[] = []
 
   if (canManageExpenses.value) {
     actions.push(
@@ -291,7 +407,7 @@ function getExpenseActions(item: ExpenseRecord) {
     actions.push({
       label: 'Удалить',
       icon: 'i-lucide-trash',
-      color: 'error',
+      color: 'error' as const,
       onSelect: () => confirmDelete(item)
     })
   }
@@ -303,7 +419,7 @@ function getExpenseActions(item: ExpenseRecord) {
 <template>
   <UDashboardPanel id="expenses">
     <template #header>
-      <UDashboardNavbar title="Расходы">
+      <UDashboardNavbar title="Закупки">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -318,7 +434,7 @@ function getExpenseActions(item: ExpenseRecord) {
             />
             <UButton
               v-if="canManageExpenses"
-              label="Новый расход"
+              label="Новая закупка"
               icon="i-lucide-plus"
               @click="createModalOpen = true"
             />
@@ -378,9 +494,10 @@ function getExpenseActions(item: ExpenseRecord) {
               <thead>
                 <tr class="bg-elevated/50">
                   <th class="px-3 py-2 text-left">ID</th>
-                  <th class="px-3 py-2 text-left">Статья</th>
-                  <th class="px-3 py-2 text-left">Категория</th>
-                  <th class="px-3 py-2 text-left">Поставщик</th>
+                  <th class="px-3 py-2 text-left">Товар</th>
+                  <th class="px-3 py-2 text-left">Производитель</th>
+                  <th class="px-3 py-2 text-left">Количество</th>
+                  <th class="px-3 py-2 text-left">Цена</th>
                   <th class="px-3 py-2 text-left">План</th>
                   <th class="px-3 py-2 text-left">Факт</th>
                   <th class="px-3 py-2 text-left">Срок</th>
@@ -396,11 +513,12 @@ function getExpenseActions(item: ExpenseRecord) {
                 >
                   <td class="px-3 py-2">{{ item.id }}</td>
                   <td class="px-3 py-2">
-                    <p class="font-medium">{{ item.title }}</p>
+                    <p class="font-medium">{{ getExpenseTitle(item) }}</p>
                     <p class="text-xs text-muted">{{ item.notes || 'Без комментариев' }}</p>
                   </td>
-                  <td class="px-3 py-2">{{ item.category }}</td>
-                  <td class="px-3 py-2">{{ item.vendor }}</td>
+                  <td class="px-3 py-2">{{ getExpenseVendor(item) }}</td>
+                  <td class="px-3 py-2">{{ getExpenseQuantity(item) }}</td>
+                  <td class="px-3 py-2">{{ getExpenseUnitPrice(item) }}</td>
                   <td class="px-3 py-2">{{ formatCurrency(item.plannedAmount) }}</td>
                   <td class="px-3 py-2">{{ formatCurrency(item.actualAmount || 0) }}</td>
                   <td class="px-3 py-2">{{ formatDate(item.dueDate) }}</td>
@@ -424,8 +542,8 @@ function getExpenseActions(item: ExpenseRecord) {
                   </td>
                 </tr>
                 <tr v-if="!data.items.length">
-                  <td class="px-3 py-4 text-muted" colspan="9">
-                    Расходов пока нет.
+                  <td class="px-3 py-4 text-muted" colspan="10">
+                    Закупок пока нет.
                   </td>
                 </tr>
               </tbody>
@@ -437,30 +555,71 @@ function getExpenseActions(item: ExpenseRecord) {
       <UModal
         v-if="canManageExpenses"
         v-model:open="createModalOpen"
-        title="Новый расход"
-        description="Добавьте плановый расход и отслеживайте его статус"
+        title="Новая закупка"
+        description="Выберите позицию склада, укажите количество и срок"
       >
         <template #body>
           <div class="space-y-4">
-            <UFormField label="Статья">
-              <UInput v-model="newExpense.title" class="w-full" placeholder="Например: Закупка формы" />
+            <UFormField label="Выбрать товар">
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <USelect
+                  v-model="newExpense.warehouseItemId"
+                  :items="warehouseOptions"
+                  class="w-full"
+                  placeholder="Позиция склада"
+                />
+                <UButton
+                  v-if="canManageWarehouse"
+                  label="Добавить +"
+                  icon="i-lucide-plus"
+                  color="neutral"
+                  variant="subtle"
+                  class="sm:w-auto"
+                  @click="openWarehouseCreate"
+                />
+              </div>
             </UFormField>
 
-            <UFormField label="Категория">
-              <USelect
-                v-model="newExpense.category"
-                :items="categories.map(item => ({ label: item, value: item }))"
+            <UAlert
+              v-if="!warehouseItems.length"
+              color="warning"
+              variant="subtle"
+              title="Склад пуст"
+              :description="canManageWarehouse ? 'Сначала добавьте позицию склада, затем вернитесь к созданию закупки.' : 'Позиции склада создает администратор.'"
+            />
+
+            <UFormField label="Количество">
+              <UInput
+                v-model.number="newExpense.quantity"
+                type="number"
+                min="0.001"
+                step="0.001"
                 class="w-full"
               />
             </UFormField>
 
-            <UFormField label="Поставщик">
-              <UInput v-model="newExpense.vendor" class="w-full" placeholder="Название поставщика" />
-            </UFormField>
-
-            <UFormField label="Плановая сумма (UZS)">
-              <UInput v-model="newExpense.plannedAmount" type="number" min="0" step="1" class="w-full" />
-            </UFormField>
+            <div v-if="selectedWarehouseItem" class="rounded-lg border border-default bg-elevated/30 p-3">
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p class="text-xs text-muted">Товар</p>
+                  <p class="font-medium">{{ selectedWarehouseItem.name }}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-muted">Производитель</p>
+                  <p class="font-medium">{{ selectedWarehouseItem.manufacturer }}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-muted">Расчет</p>
+                  <p class="font-medium">
+                    {{ formatCurrency(selectedWarehouseItem.unitPrice) }} / {{ unitLabels[selectedWarehouseItem.calculationType] }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-xs text-muted">Плановая сумма</p>
+                  <p class="font-medium">{{ formatCurrency(plannedAmount) }}</p>
+                </div>
+              </div>
+            </div>
 
             <UFormField label="Срок оплаты">
               <UInput v-model="newExpense.dueDate" type="date" class="w-full" />
@@ -479,8 +638,10 @@ function getExpenseActions(item: ExpenseRecord) {
                 @click="createModalOpen = false"
               />
               <UButton
-                label="Сохранить"
+                label="Создать"
+                icon="i-lucide-check"
                 :loading="creating"
+                :disabled="!selectedWarehouseItem || !newExpense.quantity"
                 @click="createExpense"
               />
             </div>
@@ -491,15 +652,14 @@ function getExpenseActions(item: ExpenseRecord) {
       <UModal
         v-if="canDeleteExpenses"
         v-model:open="deleteModalOpen"
-        title="Удалить расход?"
+        title="Удалить закупку?"
         description="При удалении запись удаляется с сервера без возможности восстановления."
-        :ui="{ width: 'sm:max-w-md' }"
       >
         <template #body>
           <div class="space-y-3">
             <p class="text-sm text-muted">
-              Вы уверены, что хотите удалить расход
-              <strong>{{ expenseToDelete?.title }}</strong>?
+              Вы уверены, что хотите удалить закупку
+              <strong>{{ expenseToDelete ? getExpenseTitle(expenseToDelete) : '' }}</strong>?
             </p>
             <div class="flex items-center justify-end gap-2">
               <UButton
@@ -523,4 +683,3 @@ function getExpenseActions(item: ExpenseRecord) {
     </template>
   </UDashboardPanel>
 </template>
-

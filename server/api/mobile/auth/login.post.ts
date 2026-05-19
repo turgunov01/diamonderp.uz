@@ -2,6 +2,7 @@ import type { LoginRequestBody } from '~~/shared/types/auth'
 import { authenticateLogin } from '../../../utils/auth'
 import { recordAuthLocationEvent } from '../../../utils/auth-locations'
 import { recordEmployeeActivity } from '../../../utils/employee-activity'
+import { recordEmployeeLocationPoints } from '../../../utils/employee-locations'
 import { isFrontlineMobileAccess, resolveMobileAccessFromPayload } from '../../../utils/mobile-access'
 import { resolveMobileShiftInfo } from '../../../utils/mobile-shift'
 
@@ -30,6 +31,19 @@ export default eventHandler(async (event) => {
       location: body?.location
     })
     shiftStarted = activity?.created === true
+
+    if (body?.location) {
+      await recordEmployeeLocationPoints({
+        points: [{
+          employeeId: access.customer.id,
+          employeeName: access.customer.username,
+          activityId: activity.activity.id,
+          buildingId: access.customer.building_id ?? null,
+          recordedAt: activity.recordedAt,
+          location: body.location
+        }]
+      }).catch(() => undefined)
+    }
   }
 
   const shift = access.customer

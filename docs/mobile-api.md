@@ -15,6 +15,7 @@
 ```text
 POST /api/mobile/auth/login
 GET /api/mobile/auth/shift
+POST /api/mobile/activity/location
 GET /api/mobile/objects
 GET /api/mobile/documents
 GET /api/mobile/reports/aroma
@@ -82,6 +83,21 @@ Authorization: Bearer <token>
 {
   "email": "admin@diamond.local",
   "password": "password123"
+}
+```
+
+Для сотрудников можно добавить `location`; она запишется как стартовая точка смены и первая точка маршрута:
+
+```json
+{
+  "login": "998901234567",
+  "password": "123456",
+  "location": {
+    "latitude": 41.311081,
+    "longitude": 69.240562,
+    "accuracy": 18,
+    "capturedAt": "2026-03-29T11:50:00.000Z"
+  }
 }
 ```
 
@@ -291,7 +307,13 @@ Body (optional):
 
 ```json
 {
-  "finishedAt": "2026-03-29T15:00:00.000Z"
+  "finishedAt": "2026-03-29T15:00:00.000Z",
+  "location": {
+    "latitude": 41.311502,
+    "longitude": 69.241120,
+    "accuracy": 20,
+    "capturedAt": "2026-03-29T15:00:00.000Z"
+  }
 }
 ```
 
@@ -320,6 +342,88 @@ Body (optional):
 
 - endpoint ищет существующую запись attendance для текущей смены (как правило, она создается при логине)
 - `workMinutes` = `max(0, minutes(shiftStart → min(finishedAt, shiftEnd)) - lateMinutes)`
+
+### POST `/api/mobile/activity/location`
+
+Записывает текущую точку маршрута сотрудника. Используется мобильным приложением для фонового трекинга и отображения маршрута в HR → Активность сотрудников.
+
+Header:
+
+```http
+Authorization: Bearer <token>
+```
+
+Body:
+
+```json
+{
+  "location": {
+    "latitude": 41.311081,
+    "longitude": 69.240562,
+    "accuracy": 18,
+    "heading": 95,
+    "speed": 1.4,
+    "capturedAt": "2026-03-29T11:55:00.000Z"
+  }
+}
+```
+
+Для пакетной отправки после офлайна можно передать `locations`:
+
+```json
+{
+  "locations": [
+    {
+      "latitude": 41.311081,
+      "longitude": 69.240562,
+      "accuracy": 18,
+      "capturedAt": "2026-03-29T11:55:00.000Z"
+    },
+    {
+      "latitude": 41.311502,
+      "longitude": 69.241120,
+      "accuracy": 20,
+      "capturedAt": "2026-03-29T11:56:00.000Z"
+    }
+  ]
+}
+```
+
+Ответ:
+
+```json
+{
+  "role": "customer",
+  "frontend": "employee",
+  "count": 1,
+  "locations": [
+    {
+      "id": 1001,
+      "employeeId": 25,
+      "employeeName": "Ali Valiyev",
+      "activityId": 77,
+      "buildingId": 3,
+      "recordedAt": "2026-03-29T11:55:00.000Z",
+      "capturedAt": "2026-03-29T11:55:00.000Z",
+      "latitude": 41.311081,
+      "longitude": 69.240562,
+      "accuracy": 18,
+      "altitude": null,
+      "altitudeAccuracy": null,
+      "heading": 95,
+      "speed": 1.4,
+      "mapUrl": "https://www.google.com/maps?q=41.311081,69.240562"
+    }
+  ]
+}
+```
+
+Правила:
+
+- endpoint доступен только сотрудникам (`customer`/кастомные мобильные роли)
+- если attendance за смену еще не создан, он будет создан как при логине
+- максимум 250 точек в одном запросе
+- перед включением нужно выполнить `db/supabase/employee_location_points.sql`
 
 ## 2. Objects
 

@@ -2,7 +2,7 @@
 import { h } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import { storeToRefs } from 'pinia'
-import type { EmployeeActivityRecord, EmployeeActivityStatus } from '~/stores/employeeActivity'
+import type { EmployeeActivityRecord, EmployeeActivityStatus, EmployeeLocationPointRecord } from '~/stores/employeeActivity'
 
 interface CustomerFilterItem {
   id: number
@@ -26,9 +26,11 @@ const employeeActivityStore = useEmployeeActivityStore()
 const { list, loading } = storeToRefs(employeeActivityStore)
 const activeBuilding = useState<{ id: number, name: string } | null>('active-building')
 const editOpen = ref(false)
+const routeOpen = ref(false)
 const editLoading = ref(false)
 const employeesLoading = ref(false)
 const editingRecord = ref<EmployeeActivityRecord | null>(null)
+const selectedRouteRecord = ref<EmployeeActivityRecord | null>(null)
 const employeeOptions = ref<EmployeeSelectItem[]>([])
 
 const filters = reactive({
@@ -77,8 +79,34 @@ function formatActivityTime(value?: string | null) {
   })
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return '—'
+  }
+
+  return new Date(value).toLocaleString('ru-RU', {
+    timeZone: 'Asia/Tashkent',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  })
+}
+
 function formatMinutes(value: number) {
   return `${value.toLocaleString()} мин`
+}
+
+function formatCoordinate(value: number) {
+  return value.toFixed(6)
+}
+
+function formatMeters(value?: number | null) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${Math.round(value)} м`
+    : '—'
 }
 
 function getErrorMessage(error: unknown) {
@@ -159,7 +187,7 @@ watch(() => activeBuilding.value?.id, async (newBuildingId, oldBuildingId) => {
   }
 
   filters.employeeIds = []
-  employeeActivityStore.$patch({ list: [] })
+  employeeActivityStore.$patch({ list: [], routePoints: [] })
   await loadPageData()
 })
 
@@ -183,6 +211,25 @@ async function resetFilters() {
   filters.to = ''
   filters.employeeIds = []
   await loadActivities()
+}
+
+async function openRouteModal(record: EmployeeActivityRecord) {
+  selectedRouteRecord.value = record
+  routeOpen.value = true
+  employeeActivityStore.$patch({ routePoints: [] })
+
+  try {
+    await employeeActivityStore.fetchLocationPoints({
+      activityId: record.id,
+      limit: 5000
+    })
+  } catch (error) {
+    toast.add({
+      title: 'Не удалось загрузить маршрут',
+      description: getErrorMessage(error) || 'Проверьте таблицу employee_location_points и API маршрутов.',
+      color: 'error'
+    })
+  }
 }
 
 function openEditModal(record: EmployeeActivityRecord) {
@@ -266,7 +313,7 @@ async function saveEditRecord() {
 if (import.meta.server) {
   await loadPageData()
 } else {
-  employeeActivityStore.$patch({ list: [] })
+  employeeActivityStore.$patch({ list: [], routePoints: [] })
   employeeOptions.value = []
   void loadPageData()
 }
@@ -281,6 +328,103 @@ const lateCount = computed(() =>
 
 const absentCount = computed(() =>
   list.value.filter(item => item.status === 'absent').length
+)
+
+const routePoints = computed(() => employeeActivityStore.routePoints)
+const routeLoading = computed(() => employeeActivityStore.routeLoading)
+const routeFirstPoint = computed(() => routePoints.value[0] ?? null)
+const routeLastPoint = computed(() => routePoints.value.length ? routePoints.value[routePoints.value.length - 1] : null)
+
+const routeDurationLabel = computed(() => {
+  const firstPoint = routeFirstPoint.value
+  const lastPoint = routeLastPoint.value
+
+  if (!firstPoint || !lastPoint || firstPoint.id === lastPoint.id) {
+    return '—'
+  }
+
+  const minutes = Math.max(0, Math.round((new Date(lastPoint.recordedAt).getTime() - new Date(firstPoint.recordedAt).getTime()) / 60000))
+  if (minutes < 60) {
+    return `${minutes} мин`
+  }
+
+  const hours = Math.floor(minutes / 60)
+  const restMinutes = minutes % 60
+  return restMinutes ? `${hours} ч ${restMinutes} мин` : `${hours} ч`
+})
+
+function buildRouteMapUrl(points: EmployeeLocationPointRecord[]) {
+  if (!points.length) {
+    return null
+  }
+
+  if (points.length === 1) {
+    return points[0]?.mapUrl || null
+  }
+
+  const firstPoint = points[0]
+  const lastPoint = points[points.length - 1]
+  if (!firstPoint || !lastPoint) {
+    return null
+  }
+
+  const url = new URL('https://www.google.com/maps/dir/')
+  const params = new URLSearchParams()
+  const middlePoints = points.slice(1, -1)
+  const waypointStep = middlePoints.length > 8 ? Math.ceil(middlePoints.length / 8) : 1
+  const waypoints = middlePoints
+    .filter((_, index) => index % waypointStep === 0)
+    .slice(0, 8)
+    .map(point => `${point.latitude},${point.longitude}`)
+
+  params.set('api', '1')
+  params.set('origin', `${firstPoint.latitude},${firstPoint.longitude}`)
+  params.set('destination', `${lastPoint.latitude},${lastPoint.longitude}`)
+  params.set('travelmode', 'walking')
+
+  if (waypoints.length) {
+    params.set('waypoints', waypoints.join('|'))
+  }
+
+  url.search = params.toString()
+  return url.toString()
+}
+
+const routeMapUrl = computed(() => buildRouteMapUrl(routePoints.value))
+
+const routeSvgPoints = computed(() => {
+  if (!routePoints.value.length) {
+    return [] as Array<{ x: number, y: number }>
+  }
+
+  if (routePoints.value.length === 1) {
+    return [{ x: 50, y: 50 }]
+  }
+
+  const lats = routePoints.value.map(point => point.latitude)
+  const lngs = routePoints.value.map(point => point.longitude)
+  const minLat = Math.min(...lats)
+  const maxLat = Math.max(...lats)
+  const minLng = Math.min(...lngs)
+  const maxLng = Math.max(...lngs)
+  const latSpan = maxLat - minLat || 0.000001
+  const lngSpan = maxLng - minLng || 0.000001
+  const padding = 8
+  const size = 100 - padding * 2
+
+  return routePoints.value.map(point => ({
+    x: padding + ((point.longitude - minLng) / lngSpan) * size,
+    y: padding + ((maxLat - point.latitude) / latSpan) * size
+  }))
+})
+
+const routePolyline = computed(() =>
+  routeSvgPoints.value.map(point => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ')
+)
+
+const routeSvgFirstPoint = computed(() => routeSvgPoints.value[0] ?? null)
+const routeSvgLastPoint = computed(() =>
+  routeSvgPoints.value.length ? routeSvgPoints.value[routeSvgPoints.value.length - 1] : null
 )
 
 const columns: TableColumn<EmployeeActivityRecord>[] = [
@@ -324,7 +468,15 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
   {
     id: 'actions',
     header: () => h('div', { class: 'text-right' }, 'Действия'),
-    cell: ({ row }) => h('div', { class: 'flex justify-end' }, [
+    cell: ({ row }) => h('div', { class: 'flex justify-end gap-2' }, [
+      h(UButton, {
+        label: 'Маршрут',
+        icon: 'i-lucide-route',
+        size: 'xs',
+        color: 'neutral',
+        variant: 'subtle',
+        onClick: () => openRouteModal(row.original)
+      }),
       h(UButton, {
         label: 'Редактировать',
         icon: 'i-lucide-pencil',
@@ -361,7 +513,7 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
                   Активность сотрудников
                 </h1>
                 <p class="max-w-2xl text-sm text-muted">
-                  Отслеживайте посещаемость, рабочее время и опоздания сотрудников.
+                  Отслеживайте посещаемость, рабочее время, опоздания и маршруты сотрудников.
                 </p>
               </div>
             </div>
@@ -515,6 +667,170 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
           </div>
         </UCard>
       </div>
+
+      <UModal
+        v-model:open="routeOpen"
+        :title="selectedRouteRecord ? `Маршрут: ${selectedRouteRecord.employeeName}` : 'Маршрут сотрудника'"
+        :description="selectedRouteRecord ? `Точки маршрута за ${formatDate(selectedRouteRecord.date)}` : 'Сохраненные точки маршрута'"
+      >
+        <template #body>
+          <div class="space-y-4">
+            <div class="grid gap-3 sm:grid-cols-3">
+              <div class="rounded-lg border border-default p-3">
+                <p class="text-xs text-muted">
+                  Точек
+                </p>
+                <p class="mt-1 text-lg font-semibold text-highlighted">
+                  {{ routePoints.length }}
+                </p>
+              </div>
+
+              <div class="rounded-lg border border-default p-3">
+                <p class="text-xs text-muted">
+                  Период
+                </p>
+                <p class="mt-1 text-sm font-medium text-highlighted">
+                  {{ routeDurationLabel }}
+                </p>
+              </div>
+
+              <div class="rounded-lg border border-default p-3">
+                <p class="text-xs text-muted">
+                  Последняя точка
+                </p>
+                <p class="mt-1 text-sm font-medium text-highlighted">
+                  {{ routeLastPoint ? formatActivityTime(routeLastPoint.recordedAt) : '—' }}
+                </p>
+              </div>
+            </div>
+
+            <div class="h-72 overflow-hidden rounded-lg border border-default bg-elevated/30">
+              <div v-if="routeLoading" class="flex h-full items-center justify-center text-sm text-muted">
+                Загрузка маршрута...
+              </div>
+
+              <svg
+                v-else-if="routeSvgPoints.length"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="xMidYMid meet"
+                class="h-full w-full text-primary"
+                role="img"
+                aria-label="Линия маршрута"
+              >
+                <polyline
+                  v-if="routeSvgPoints.length > 1"
+                  :points="routePolyline"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <circle
+                  v-for="(point, index) in routeSvgPoints"
+                  :key="`route-point-${index}`"
+                  :cx="point.x"
+                  :cy="point.y"
+                  r="0.9"
+                  class="fill-primary opacity-50"
+                />
+                <circle
+                  v-if="routeSvgFirstPoint"
+                  :cx="routeSvgFirstPoint.x"
+                  :cy="routeSvgFirstPoint.y"
+                  r="2.4"
+                  class="fill-green-500"
+                />
+                <circle
+                  v-if="routeSvgLastPoint && routeSvgPoints.length > 1"
+                  :cx="routeSvgLastPoint.x"
+                  :cy="routeSvgLastPoint.y"
+                  r="2.4"
+                  class="fill-red-500"
+                />
+              </svg>
+
+              <div v-else class="flex h-full items-center justify-center px-6 text-center text-sm text-muted">
+                Точки маршрута для этой записи пока не найдены.
+              </div>
+            </div>
+
+            <div class="max-h-72 overflow-auto rounded-lg border border-default">
+              <table class="min-w-full text-sm">
+                <thead class="bg-elevated/60 text-left text-xs text-muted">
+                  <tr>
+                    <th class="px-3 py-2 font-medium">
+                      Время
+                    </th>
+                    <th class="px-3 py-2 font-medium">
+                      Координаты
+                    </th>
+                    <th class="px-3 py-2 font-medium">
+                      Точность
+                    </th>
+                    <th class="px-3 py-2 text-right font-medium">
+                      Карта
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="point in routePoints"
+                    :key="point.id"
+                    class="border-t border-default"
+                  >
+                    <td class="px-3 py-2 whitespace-nowrap">
+                      {{ formatDateTime(point.recordedAt) }}
+                    </td>
+                    <td class="px-3 py-2 font-mono text-xs">
+                      {{ formatCoordinate(point.latitude) }}, {{ formatCoordinate(point.longitude) }}
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap">
+                      {{ formatMeters(point.accuracy) }}
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      <UButton
+                        :to="point.mapUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        icon="i-lucide-map-pin"
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                      />
+                    </td>
+                  </tr>
+                  <tr v-if="!routePoints.length && !routeLoading">
+                    <td class="px-3 py-4 text-center text-muted" colspan="4">
+                      Нет сохраненных точек.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UButton
+              label="Закрыть"
+              color="neutral"
+              variant="subtle"
+              @click="routeOpen = false"
+            />
+            <UButton
+              v-if="routeMapUrl"
+              label="Открыть маршрут"
+              icon="i-lucide-map"
+              color="primary"
+              :to="routeMapUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          </div>
+        </template>
+      </UModal>
 
       <UModal
         v-model:open="editOpen"

@@ -18,11 +18,34 @@ export interface EmployeeActivityRecord {
   lateMinutes: number
 }
 
+export interface EmployeeLocationPointRecord {
+  id: number
+  employeeId: number
+  employeeName: string
+  activityId: number | null
+  buildingId: number | null
+  recordedAt: string
+  capturedAt: string | null
+  latitude: number
+  longitude: number
+  accuracy: number | null
+  altitude: number | null
+  altitudeAccuracy: number | null
+  heading: number | null
+  speed: number | null
+  mapUrl: string
+}
+
 interface FetchActivitiesParams {
   from?: string
   to?: string
   buildingId?: number
   employeeIds?: number[]
+}
+
+interface FetchLocationPointsParams extends FetchActivitiesParams {
+  activityId?: number
+  limit?: number
 }
 
 interface UpdateEmployeeActivityPayload {
@@ -35,6 +58,8 @@ interface UpdateEmployeeActivityPayload {
 export const useEmployeeActivityStore = defineStore('employee-activity', {
   state: () => ({
     list: [] as EmployeeActivityRecord[],
+    routePoints: [] as EmployeeLocationPointRecord[],
+    routeLoading: false,
     loading: false
   }),
   actions: {
@@ -52,6 +77,24 @@ export const useEmployeeActivityStore = defineStore('employee-activity', {
         })
       } finally {
         this.loading = false
+      }
+    },
+    async fetchLocationPoints(params: FetchLocationPointsParams = {}) {
+      this.routeLoading = true
+
+      try {
+        this.routePoints = await $fetch<EmployeeLocationPointRecord[]>('/api/employee/activity/locations', {
+          query: {
+            activityId: params.activityId || undefined,
+            from: params.from || undefined,
+            to: params.to || undefined,
+            buildingId: params.buildingId || undefined,
+            employeeIds: params.employeeIds?.length ? params.employeeIds.join(',') : undefined,
+            limit: params.limit || undefined
+          }
+        })
+      } finally {
+        this.routeLoading = false
       }
     },
     async updateActivity(activityId: number, payload: UpdateEmployeeActivityPayload) {

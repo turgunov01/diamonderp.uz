@@ -1,5 +1,6 @@
 import { finishEmployeeWork } from '../../../utils/employee-activity'
 import { recordAuthLocationEvent } from '../../../utils/auth-locations'
+import { recordEmployeeLocationPoints } from '../../../utils/employee-locations'
 import { isFrontlineMobileAccess, requireMobileAccess } from '../../../utils/mobile-access'
 import { readBody } from 'h3'
 
@@ -37,6 +38,19 @@ export default eventHandler(async (event) => {
     eventType: 'logout',
     location: body.location
   })
+
+  if (body.location) {
+    await recordEmployeeLocationPoints({
+      points: [{
+        employeeId: access.customer.id,
+        employeeName: access.customer.username,
+        activityId: result.activity.id,
+        buildingId: access.customer.building_id ?? null,
+        recordedAt: result.finishedAt,
+        location: body.location
+      }]
+    }).catch(() => undefined)
+  }
 
   return {
     role: access.role,

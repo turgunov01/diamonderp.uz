@@ -1,4 +1,4 @@
-﻿-- Supabase SQL: documents, dispatches and signatures
+﻿-- Postgres SQL: documents, dispatches and signatures
 
 create table if not exists public.document_templates (
   id bigint generated always as identity primary key,

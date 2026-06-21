@@ -1,8 +1,8 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import { mapCustomerDbRowToRecord, type CustomerDbRow } from './customers'
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const buildingIdRaw = getQuery(event).buildingId
   const buildingId = typeof buildingIdRaw === 'string' ? Number(buildingIdRaw) : NaN
 
@@ -17,7 +17,7 @@ export default eventHandler(async (event) => {
   }
 
   const rows = await $fetch<CustomerDbRow[]>(`${url}/rest/v1/customers`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query
   })
 

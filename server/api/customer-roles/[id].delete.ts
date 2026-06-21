@@ -1,5 +1,5 @@
-import type { H3Event } from 'h3'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import type { H3Event } from 'h3'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import type { CustomerRoleDbRow } from './roles'
 
 function parseRoleId(event: H3Event) {
@@ -9,7 +9,7 @@ function parseRoleId(event: H3Event) {
   if (!rawId || !Number.isInteger(roleId) || roleId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Некорректный идентификатор роли.'
+      statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ СЂРѕР»Рё.'
     })
   }
 
@@ -17,9 +17,9 @@ function parseRoleId(event: H3Event) {
 }
 
 async function fetchRoleById(roleId: number) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const rows = await $fetch<CustomerRoleDbRow[]>(`${url}/rest/v1/customer_roles`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       select: 'id,building_id,code,label',
       id: `eq.${roleId}`,
@@ -31,7 +31,7 @@ async function fetchRoleById(roleId: number) {
 }
 
 async function roleIsUsed(role: CustomerRoleDbRow) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const query: Record<string, string> = {
     select: 'id',
     role: `eq.${role.code}`,
@@ -43,7 +43,7 @@ async function roleIsUsed(role: CustomerRoleDbRow) {
   }
 
   const rows = await $fetch<Array<{ id: number }>>(`${url}/rest/v1/customers`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query
   })
 
@@ -57,22 +57,22 @@ export default eventHandler(async (event) => {
   if (!role) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Роль не найдена.'
+      statusMessage: 'Р РѕР»СЊ РЅРµ РЅР°Р№РґРµРЅР°.'
     })
   }
 
   if (await roleIsUsed(role)) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Роль используется у сотрудников. Сначала измените роли у сотрудников.'
+      statusMessage: 'Р РѕР»СЊ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ Сѓ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ. РЎРЅР°С‡Р°Р»Р° РёР·РјРµРЅРёС‚Рµ СЂРѕР»Рё Сѓ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ.'
     })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   await $fetch(`${url}/rest/v1/customer_roles?id=eq.${roleId}`, {
     method: 'DELETE',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=minimal'
     }
   })

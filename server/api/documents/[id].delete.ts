@@ -1,5 +1,5 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
-import { getSupabaseErrorData, parseObjectIdInput } from './documents'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
+import { getDataApiErrorData, parseObjectIdInput } from './documents'
 
 interface DeletedTemplateRow {
   id: number
@@ -11,12 +11,12 @@ export default eventHandler(async (event) => {
   const objectId = parseObjectIdInput(getQuery(event).objectId, 'objectId query param is required.')
 
   if (!rawId || !Number.isInteger(templateId) || templateId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id шаблона.' })
+    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id С€Р°Р±Р»РѕРЅР°.' })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const headers = {
-    ...getSupabaseServerHeaders(serviceRoleKey),
+    ...getDataApiServerHeaders(serviceRoleKey),
     Prefer: 'return=representation'
   }
 
@@ -32,16 +32,16 @@ export default eventHandler(async (event) => {
 
     const deleted = rows?.[0]
     if (!deleted) {
-      throw createError({ statusCode: 404, statusMessage: 'Шаблон не найден.' })
+      throw createError({ statusCode: 404, statusMessage: 'РЁР°Р±Р»РѕРЅ РЅРµ РЅР°Р№РґРµРЅ.' })
     }
 
     return { success: true, id: templateId }
   } catch (error: unknown) {
-    const data = getSupabaseErrorData(error)
+    const data = getDataApiErrorData(error)
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/supabase/documents.sql.'
+        statusMessage: 'РўР°Р±Р»РёС†Р° "document_templates" РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚. РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ db/postgres/documents.sql.'
       })
     }
     throw error

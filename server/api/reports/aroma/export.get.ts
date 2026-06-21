@@ -1,5 +1,5 @@
-import ExcelJS from 'exceljs'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+﻿import ExcelJS from 'exceljs'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 
 type AromaDeviceRow = {
   id: number
@@ -23,8 +23,8 @@ type AromaRefillRow = {
 }
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
   const objectIdRaw = getQuery(event).objectId
   const objectId = objectIdRaw ? Number(objectIdRaw) : NaN
   const filterByObject = Number.isInteger(objectId) && objectId > 0
@@ -49,48 +49,48 @@ export default eventHandler(async (event) => {
 
   const workbook = new ExcelJS.Workbook()
   workbook.created = new Date()
-  const deviceSheet = workbook.addWorksheet('Диффузоры')
+  const deviceSheet = workbook.addWorksheet('Р”РёС„С„СѓР·РѕСЂС‹')
   deviceSheet.columns = [
     { header: 'ID', key: 'id', width: 8 },
-    { header: 'Объект', key: 'object', width: 10 },
-    { header: 'Название', key: 'name', width: 24 },
-    { header: 'Локация', key: 'location', width: 18 },
-    { header: 'Замена (дн.)', key: 'refillEveryDays', width: 14 },
-    { header: 'Объем (мл)', key: 'volume', width: 12 },
-    { header: 'Цена за заправку', key: 'pricePerRefill', width: 16 },
-    { header: 'Последняя заправка', key: 'lastRefill', width: 18 },
-    { header: 'Активен', key: 'active', width: 10 }
+    { header: 'РћР±СЉРµРєС‚', key: 'object', width: 10 },
+    { header: 'РќР°Р·РІР°РЅРёРµ', key: 'name', width: 24 },
+    { header: 'Р›РѕРєР°С†РёСЏ', key: 'location', width: 18 },
+    { header: 'Р—Р°РјРµРЅР° (РґРЅ.)', key: 'refillEveryDays', width: 14 },
+    { header: 'РћР±СЉРµРј (РјР»)', key: 'volume', width: 12 },
+    { header: 'Р¦РµРЅР° Р·Р° Р·Р°РїСЂР°РІРєСѓ', key: 'pricePerRefill', width: 16 },
+    { header: 'РџРѕСЃР»РµРґРЅСЏСЏ Р·Р°РїСЂР°РІРєР°', key: 'lastRefill', width: 18 },
+    { header: 'РђРєС‚РёРІРµРЅ', key: 'active', width: 10 }
   ]
 
   devices.forEach((d) => {
     deviceSheet.addRow({
       id: d.id,
-      object: d.object_id ?? '—',
+      object: d.object_id ?? 'вЂ”',
       name: d.name,
-      location: d.location || '—',
+      location: d.location || 'вЂ”',
       refillEveryDays: d.refill_every_days,
       volume: d.volume_ml,
       pricePerRefill: Number(d.price_per_refill || 0),
       lastRefill: new Date(d.last_refill).toLocaleDateString('ru-RU'),
-      active: d.active ? 'да' : 'нет'
+      active: d.active ? 'РґР°' : 'РЅРµС‚'
     })
   })
 
-  const refillSheet = workbook.addWorksheet('Заправки')
+  const refillSheet = workbook.addWorksheet('Р—Р°РїСЂР°РІРєРё')
   refillSheet.columns = [
     { header: 'ID', key: 'id', width: 8 },
-    { header: 'Устройство', key: 'device', width: 12 },
-    { header: 'Объект', key: 'object', width: 10 },
-    { header: 'Объем (мл)', key: 'amount', width: 12 },
-    { header: 'Стоимость', key: 'price', width: 12 },
-    { header: 'Дата заправки', key: 'date', width: 18 }
+    { header: 'РЈСЃС‚СЂРѕР№СЃС‚РІРѕ', key: 'device', width: 12 },
+    { header: 'РћР±СЉРµРєС‚', key: 'object', width: 10 },
+    { header: 'РћР±СЉРµРј (РјР»)', key: 'amount', width: 12 },
+    { header: 'РЎС‚РѕРёРјРѕСЃС‚СЊ', key: 'price', width: 12 },
+    { header: 'Р”Р°С‚Р° Р·Р°РїСЂР°РІРєРё', key: 'date', width: 18 }
   ]
 
   refills.forEach((r) => {
     refillSheet.addRow({
       id: r.id,
       device: r.device_id,
-      object: r.object_id ?? '—',
+      object: r.object_id ?? 'вЂ”',
       amount: r.amount_ml,
       price: Number(r.price || 0),
       date: new Date(r.refilled_at).toLocaleString('ru-RU')

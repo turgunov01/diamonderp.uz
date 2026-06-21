@@ -1,4 +1,4 @@
-﻿-- Supabase SQL: object task lists for web assignment and mobile employee to-do access
+﻿-- Postgres SQL: object task lists for web assignment and mobile employee to-do access
 
 create table if not exists public.object_task_lists (
   id bigint generated always as identity primary key,

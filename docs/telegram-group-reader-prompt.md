@@ -1,7 +1,7 @@
-Build a production Telegram group reader for this product.
+﻿Build a production Telegram group reader for this product.
 
 Product context:
-- Stack: Nuxt 3 + Nuxt UI + Supabase.
+- Stack: Nuxt 3 + Nuxt UI + Postgres.
 - Backend entrypoint already exists at `server/api/telegram/webhook.post.ts`.
 - Shared Telegram helpers already exist at `server/utils/telegram.ts`.
 - The app now uses a real hierarchy:
@@ -16,14 +16,14 @@ Product context:
 - The current code already supports:
   - webhook secret verification
   - `TELEGRAM_DEFAULT_OBJECT_ID` fallback
-  - chat/message persistence into Supabase
+  - chat/message persistence into Postgres
   - `telegram_group_bindings` lookup
 - The improved implementation should keep that structure and harden it.
 
 Goal:
 - Read incoming Telegram group messages for this security/building management dashboard.
 - Route each Telegram group to the correct object in the product.
-- Persist chats and messages in Supabase so the dashboard `/chats` page shows only object-scoped conversations.
+- Persist chats and messages in Postgres so the dashboard `/chats` page shows only object-scoped conversations.
 - Keep the solution production-oriented and ready for later media support.
 
 Business rules for this product:
@@ -44,9 +44,9 @@ Existing relevant files:
 - `server/api/chats/[id].get.ts`
 - `server/api/chats/[id]/messages.post.ts`
 - `app/pages/chats.vue`
-- `db/supabase/telegram.sql`
-- `db/supabase/telegram_group_bindings.sql`
-- `db/supabase/buildings_rebuild.sql`
+- `db/postgres/telegram.sql`
+- `db/postgres/telegram_group_bindings.sql`
+- `db/postgres/buildings_rebuild.sql`
 
 Existing relevant tables:
 - `public.buildings`
@@ -159,8 +159,8 @@ Environment variables:
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_WEBHOOK_SECRET`
 - `TELEGRAM_DEFAULT_OBJECT_ID`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `POSTGRES_HOST`
+- `APP_INTERNAL_API_SECRET`
 
 Ask for these deliverables:
 - Complete Nuxt server implementation for webhook-based Telegram ingestion

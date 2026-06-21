@@ -1,7 +1,7 @@
 ﻿import { requireMobileAccess } from '../../../utils/mobile-access'
 import { resolveMobileShiftInfo } from '../../../utils/mobile-shift'
 import { listEmployeeActivities } from '../../../utils/employee-activity'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)

@@ -1,5 +1,5 @@
-import { serializeAuthLocation } from './auth-locations'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from './supabase'
+﻿import { serializeAuthLocation } from './auth-locations'
+import { getDataApiServerConfig, getDataApiServerHeaders } from './data-api'
 
 export interface EmployeeLocationPointRecord {
   id: number
@@ -145,14 +145,14 @@ async function fetchCustomersByIds(employeeIds: number[]) {
     return new Map<number, ActivityCustomerRow>()
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const params = new URLSearchParams()
 
   params.set('select', 'id,username')
   params.set('id', `in.(${employeeIds.join(',')})`)
 
   const rows = await $fetch<ActivityCustomerRow[]>(`${url}/rest/v1/customers?${params.toString()}`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey)
+    headers: getDataApiServerHeaders(serviceRoleKey)
   })
 
   return new Map(rows.map(row => [row.id, row]))
@@ -179,7 +179,7 @@ function isMissingEmployeeLocationPointsTable(error: unknown) {
 function createMissingEmployeeLocationPointsTableError() {
   return createError({
     statusCode: 409,
-    statusMessage: 'Таблица employee_location_points отсутствует. Сначала выполните db/supabase/employee_location_points.sql.'
+    statusMessage: 'РўР°Р±Р»РёС†Р° employee_location_points РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚. РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ db/postgres/employee_location_points.sql.'
   })
 }
 
@@ -245,14 +245,14 @@ export async function recordEmployeeLocationPoints(input: { points: EmployeeLoca
     return [] as EmployeeLocationPointRecord[]
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   let rows: EmployeeLocationPointDbRow[]
 
   try {
     rows = await $fetch<EmployeeLocationPointDbRow[]>(`${url}/rest/v1/employee_location_points`, {
       method: 'POST',
       headers: {
-        ...getSupabaseServerHeaders(serviceRoleKey),
+        ...getDataApiServerHeaders(serviceRoleKey),
         Prefer: 'return=representation'
       },
       body: rowsToInsert
@@ -280,12 +280,12 @@ export async function recordEmployeeLocationPoints(input: { points: EmployeeLoca
 }
 
 export async function listEmployeeLocationPoints(options: ListEmployeeLocationPointsOptions = {}) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   let rows: EmployeeLocationPointDbRow[]
 
   try {
     rows = await $fetch<EmployeeLocationPointDbRow[]>(buildEmployeeLocationQuery(url, options), {
-      headers: getSupabaseServerHeaders(serviceRoleKey)
+      headers: getDataApiServerHeaders(serviceRoleKey)
     })
   } catch (error) {
     if (isMissingEmployeeLocationPointsTable(error)) {

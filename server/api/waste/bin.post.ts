@@ -1,26 +1,26 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import type { BinCategory, BinStatus, WasteBinRow } from './waste'
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const body = await readBody<{ category?: BinCategory, volumeM3?: number, weightKg?: number, status?: BinStatus, objectId?: number | null }>(event)
 
   const category = body.category
-  if (!category || !['Макулатура', 'Пластик', 'Общее'].includes(category)) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле category обязательно.' })
+  if (!category || !['РњР°РєСѓР»Р°С‚СѓСЂР°', 'РџР»Р°СЃС‚РёРє', 'РћР±С‰РµРµ'].includes(category)) {
+    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ category РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
   }
 
   const volumeM3 = Number(body.volumeM3 ?? 0)
   const weightKg = Number(body.weightKg ?? 0)
   const status = body.status || 'available'
   if (!['available', 'loaded'].includes(status)) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле status некорректно.' })
+    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ status РЅРµРєРѕСЂСЂРµРєС‚РЅРѕ.' })
   }
 
   const rows = await $fetch<WasteBinRow[]>(`${url}/rest/v1/waste_bins`, {
     method: 'POST',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=representation'
     },
     body: {

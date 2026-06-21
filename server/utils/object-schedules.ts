@@ -1,11 +1,11 @@
-import {
+﻿import {
   getLegacyWorkScheduleType,
   normalizeWorkScheduleType,
   type WorkScheduleSalaryType,
   type WorkScheduleShift,
   type WorkScheduleType
 } from '~~/shared/utils/work-schedules'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from './supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from './data-api'
 
 export interface ObjectScheduleRow {
   id: number
@@ -84,7 +84,7 @@ function buildObjectScheduleMap(rows: ObjectScheduleRow[]) {
 }
 
 export async function listObjectSchedules(buildingId?: number | null) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const query: Record<string, string> = {
     select: 'id,building_id,name,schedule_type',
     order: 'id.asc'
@@ -96,7 +96,7 @@ export async function listObjectSchedules(buildingId?: number | null) {
 
   try {
     return await $fetch<ObjectScheduleRow[]>(`${url}/rest/v1/objects`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query
     })
   } catch (error) {
@@ -114,7 +114,7 @@ export async function listObjectSchedules(buildingId?: number | null) {
     }
 
     return await $fetch<ObjectScheduleRow[]>(`${url}/rest/v1/objects`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query: fallbackQuery
     })
   }

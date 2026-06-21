@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   isWarehouseCalculationType,
   mapWarehouseItemDbRowToRecord,
@@ -17,14 +17,14 @@ interface CreateWarehouseItemBody {
 
 function parseCreateBody(body: unknown): CreateWarehouseItemBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
+    throw createError({ statusCode: 400, statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј РѕР±СЉРµРєС‚РѕРј.' })
   }
 
   const input = body as Partial<CreateWarehouseItemBody>
   const calculationType = input.calculationType
 
   if (!isWarehouseCalculationType(calculationType)) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный тип расчета.' })
+    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ С‚РёРї СЂР°СЃС‡РµС‚Р°.' })
   }
 
   return {
@@ -37,12 +37,12 @@ function parseCreateBody(body: unknown): CreateWarehouseItemBody {
 
 export default eventHandler(async (event) => {
   const payload = parseCreateBody(await readBody(event))
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   const rows = await $fetch<WarehouseItemDbRow[]>(`${url}/rest/v1/warehouse_items`, {
     method: 'POST',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=representation'
     },
     body: {
@@ -56,7 +56,7 @@ export default eventHandler(async (event) => {
 
   const created = rows[0]
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Supabase не вернул созданную позицию.' })
+    throw createError({ statusCode: 500, statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» СЃРѕР·РґР°РЅРЅСѓСЋ РїРѕР·РёС†РёСЋ.' })
   }
 
   setResponseStatus(event, 201)

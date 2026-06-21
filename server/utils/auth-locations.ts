@@ -1,6 +1,6 @@
-import type { H3Event } from 'h3'
+﻿import type { H3Event } from 'h3'
 import type { AuthLocationPayload, AuthRole } from '~~/shared/types/auth'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from './supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from './data-api'
 
 export type AuthLocationEventType = 'login' | 'logout'
 export type AuthLocationSource = 'erp' | 'customer'
@@ -113,8 +113,8 @@ async function updateLastAuthLocation(input: {
   occurredAt: string
   location: ReturnType<typeof serializeAuthLocation>
 }) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
   const table = input.source === 'customer' ? 'customers' : 'erp_users'
   const timestampColumn = input.eventType === 'login' ? 'last_login_at' : 'last_logout_at'
   const locationColumn = input.eventType === 'login' ? 'last_login_location' : 'last_logout_location'
@@ -158,8 +158,8 @@ async function insertAuthLocationEvent(input: {
   userAgent: string | null
   ipAddress: string | null
 }) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   await $fetch(`${url}/rest/v1/auth_location_events`, {
     method: 'POST',

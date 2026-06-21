@@ -1,4 +1,6 @@
-interface SupabaseServerConfig {
+﻿import { getInternalApiHeaders, getInternalApiSecret } from './internal-api'
+
+interface DataApiServerConfig {
   url: string
   serviceRoleKey: string
   avatarBucket: string
@@ -13,30 +15,17 @@ function normalizeUrl(value: string) {
   return value.endsWith('/') ? value.slice(0, -1) : value
 }
 
-export function getSupabaseServerConfig(): SupabaseServerConfig {
+export function getDataApiServerConfig(): DataApiServerConfig {
   const config = useRuntimeConfig()
-  const url = config.supabase?.url
-  const serviceRoleKey = config.supabase?.serviceRoleKey
-  const avatarBucket = config.supabase?.avatarBucket
-  const passportBucket = config.supabase?.passportBucket
-  const documentTemplateBucket = config.supabase?.documentTemplateBucket
-  const documentTemplateUploadBucket = config.supabase?.documentTemplateUploadBucket
-  const documentSignatureBucket = config.supabase?.documentSignatureBucket
-  const taskPhotoBucket = config.supabase?.taskPhotoBucket
-
-  if (typeof url !== 'string' || !url.length) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'SUPABASE_URL is not configured.'
-    })
-  }
-
-  if (typeof serviceRoleKey !== 'string' || !serviceRoleKey.length) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'SUPABASE_SERVICE_ROLE_KEY is not configured.'
-    })
-  }
+  const storage = config.storage || {}
+  const url = typeof storage.baseUrl === 'string' ? storage.baseUrl : ''
+  const serviceRoleKey = getInternalApiSecret()
+  const avatarBucket = storage.avatarBucket
+  const passportBucket = storage.passportBucket
+  const documentTemplateBucket = storage.documentTemplateBucket
+  const documentTemplateUploadBucket = storage.documentTemplateUploadBucket
+  const documentSignatureBucket = storage.documentSignatureBucket
+  const taskPhotoBucket = storage.taskPhotoBucket
 
   return {
     url: normalizeUrl(url),
@@ -58,9 +47,6 @@ export function getSupabaseServerConfig(): SupabaseServerConfig {
   }
 }
 
-export function getSupabaseServerHeaders(serviceRoleKey: string) {
-  return {
-    apikey: serviceRoleKey,
-    Authorization: `Bearer ${serviceRoleKey}`
-  }
+export function getDataApiServerHeaders(serviceRoleKey: string) {
+  return getInternalApiHeaders(serviceRoleKey)
 }

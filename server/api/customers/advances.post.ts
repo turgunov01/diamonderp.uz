@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import { mapAdvanceDbRowToRecord, type EmployeeAdvanceDbRow } from './advances'
 
 interface CreateAdvanceBody {
@@ -13,18 +13,18 @@ interface CreateAdvanceBody {
 
 function parseBody(body: unknown): CreateAdvanceBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть объектом.' })
+    throw createError({ statusCode: 400, statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РѕР±СЉРµРєС‚РѕРј.' })
   }
 
   const input = body as Record<string, unknown>
   const customerId = Number(input.customerId)
   if (!Number.isInteger(customerId) || customerId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'customerId обязателен.' })
+    throw createError({ statusCode: 400, statusMessage: 'customerId РѕР±СЏР·Р°С‚РµР»РµРЅ.' })
   }
 
   const amount = Number(input.amount)
   if (!Number.isInteger(amount) || amount <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'amount должен быть положительным целым числом.' })
+    throw createError({ statusCode: 400, statusMessage: 'amount РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј С†РµР»С‹Рј С‡РёСЃР»РѕРј.' })
   }
 
   const currency = typeof input.currency === 'string' && input.currency.trim().length
@@ -44,9 +44,9 @@ function parseBody(body: unknown): CreateAdvanceBody {
 
 export default eventHandler(async (event) => {
   const payload = parseBody(await readBody(event))
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const headers = {
-    ...getSupabaseServerHeaders(serviceRoleKey),
+    ...getDataApiServerHeaders(serviceRoleKey),
     Prefer: 'return=representation'
   }
 
@@ -66,7 +66,7 @@ export default eventHandler(async (event) => {
 
   const created = rows[0]
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Не удалось создать аванс.' })
+    throw createError({ statusCode: 500, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ Р°РІР°РЅСЃ.' })
   }
 
   setResponseStatus(event, 201)

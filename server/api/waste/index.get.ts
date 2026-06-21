@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import { mapBinRow, mapReportRow, type WasteBin, type WasteBinRow, type WasteReport, type WasteReportRow } from './waste'
 
 interface WasteResponse {
@@ -7,12 +7,12 @@ interface WasteResponse {
 }
 
 export default eventHandler(async (event): Promise<WasteResponse> => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const objectIdRaw = getQuery(event).objectId
   const objectId = objectIdRaw ? Number(objectIdRaw) : NaN
   const filterByObject = Number.isInteger(objectId) && objectId > 0
 
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const binQuery: Record<string, string> = {
     select: 'id,object_id,category,volume_m3,weight_kg,status,created_at,updated_at',

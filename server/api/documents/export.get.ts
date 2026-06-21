@@ -1,6 +1,6 @@
-import ExcelJS from 'exceljs'
+﻿import ExcelJS from 'exceljs'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   mapDispatchDbRowToRecord,
   mapSignedDbRowToRecord,
@@ -165,8 +165,8 @@ export default eventHandler(async (event) => {
   const format = parseExportFormat(query.format)
   const scope = parseExportScope(query.scope)
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const [templateRows, dispatchRows, signedRows] = await Promise.all([
     $fetch<DocumentTemplateDbRow[]>(`${url}/rest/v1/document_templates`, {

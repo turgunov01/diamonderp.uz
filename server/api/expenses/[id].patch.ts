@@ -1,4 +1,4 @@
-﻿import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   isExpenseStatus,
   mapExpenseDbRowToRecord,
@@ -61,12 +61,12 @@ function parseUpdateBody(body: unknown) {
 export default eventHandler(async (event) => {
   const expenseId = parseExpenseId(event)
   const patch = parseUpdateBody(await readBody(event))
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   const rows = await $fetch<ExpenseDbRow[]>(`${url}/rest/v1/expenses`, {
     method: 'PATCH',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=representation'
     },
     query: {

@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 export interface ObjectDbRow {
   id: number
@@ -24,13 +24,13 @@ export function mapObjectDbRowToRecord(row: ObjectDbRow): ObjectRecord {
 }
 
 export default eventHandler(async () => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   let rows: ObjectDbRow[]
 
   try {
     rows = await $fetch<ObjectDbRow[]>(`${url}/rest/v1/objects`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query: {
         select: 'id,name,description,created_at',
         order: 'id.asc'

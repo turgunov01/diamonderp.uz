@@ -1,8 +1,8 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const body = await readBody<{
     from?: string
@@ -36,7 +36,7 @@ export default eventHandler(async (event) => {
   }
   if (body.objectId) refillQuery.object_id = `eq.${body.objectId}`
   if (fromDate) refillQuery.refilled_at = `gte.${fromDate.toISOString()}`
-  // Supabase doesn't allow range in one key; we add lte via or param not ideal; keep simple filter client-side
+  // The REST adapter keeps one value per filter key here; keep the upper bound client-side.
 
   const refillsRaw = await $fetch<any[]>(`${url}/rest/v1/aroma_refills`, {
     headers,

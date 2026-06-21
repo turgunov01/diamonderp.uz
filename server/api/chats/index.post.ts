@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 interface Body {
   title: string
@@ -10,11 +10,11 @@ interface Body {
 export default eventHandler(async (event) => {
   const body = await readBody<Body>(event)
   if (!body?.title) {
-    throw createError({ statusCode: 400, statusMessage: 'Название обязательно.' })
+    throw createError({ statusCode: 400, statusMessage: 'РќР°Р·РІР°РЅРёРµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const insertedChats = await $fetch<Array<{ id: number }>>(`${url}/rest/v1/chats`, {
     method: 'POST',
@@ -31,7 +31,7 @@ export default eventHandler(async (event) => {
 
   const chat = insertedChats[0]
   if (!chat?.id) {
-    throw createError({ statusCode: 500, statusMessage: 'Supabase не вернул id созданного чата.' })
+    throw createError({ statusCode: 500, statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» id СЃРѕР·РґР°РЅРЅРѕРіРѕ С‡Р°С‚Р°.' })
   }
 
   if (body.memberIds?.length) {

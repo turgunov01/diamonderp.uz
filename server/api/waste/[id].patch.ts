@@ -1,12 +1,12 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import type { WasteBinRow } from './waste'
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const idRaw = getRouterParam(event, 'id')
   const id = Number(idRaw)
   if (!idRaw || !Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id' })
+    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id' })
   }
 
   const body = await readBody<Partial<WasteBinRow>>(event)
@@ -14,7 +14,7 @@ export default eventHandler(async (event) => {
   const rows = await $fetch<WasteBinRow[]>(`${url}/rest/v1/waste_bins`, {
     method: 'PATCH',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=representation'
     },
     query: { id: `eq.${id}` },
@@ -29,7 +29,7 @@ export default eventHandler(async (event) => {
 
   const row = rows[0]
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'Бак не найден' })
+    throw createError({ statusCode: 404, statusMessage: 'Р‘Р°Рє РЅРµ РЅР°Р№РґРµРЅ' })
   }
 
   return row

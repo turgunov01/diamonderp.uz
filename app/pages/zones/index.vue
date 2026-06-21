@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { h } from "vue";
 import type { TableColumn } from "@nuxt/ui";
 import { getPaginationRowModel } from "@tanstack/table-core";
@@ -38,9 +38,9 @@ watch(
     if (!newError) return;
 
     toast.add({
-      title: "Не удалось загрузить зоны",
+      title: "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ Р·РѕРЅС‹",
       description:
-        newError.statusMessage || "Проверьте API и переменные окружения Supabase.",
+        newError.statusMessage || "РџСЂРѕРІРµСЂСЊС‚Рµ API Рё РїРµСЂРµРјРµРЅРЅС‹Рµ РѕРєСЂСѓР¶РµРЅРёСЏ Postgres.",
       color: "error",
     });
   },
@@ -70,7 +70,7 @@ function closeMembersView() {
 }
 
 async function deleteZone(zone: Zone) {
-  const confirmed = confirm(`Удалить зону "${zone.name}"?`);
+  const confirmed = confirm(`РЈРґР°Р»РёС‚СЊ Р·РѕРЅСѓ "${zone.name}"?`);
   if (!confirmed) return;
 
   try {
@@ -79,16 +79,16 @@ async function deleteZone(zone: Zone) {
     });
 
     toast.add({
-      title: "Удалено",
-      description: `Зона "${zone.name}" удалена`,
+      title: "РЈРґР°Р»РµРЅРѕ",
+      description: `Р—РѕРЅР° "${zone.name}" СѓРґР°Р»РµРЅР°`,
       color: "success",
     });
 
     await refresh();
   } catch {
     toast.add({
-      title: "Ошибка",
-      description: "Не удалось удалить зону",
+      title: "РћС€РёР±РєР°",
+      description: "РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ Р·РѕРЅСѓ",
       color: "error",
     });
   }
@@ -96,16 +96,16 @@ async function deleteZone(zone: Zone) {
 
 const zonesColumns: TableColumn<Zone>[] = [
   { accessorKey: "id", header: "ID" },
-  { accessorKey: "name", header: "Название" },
-  { accessorKey: "description", header: "Описание" },
+  { accessorKey: "name", header: "РќР°Р·РІР°РЅРёРµ" },
+  { accessorKey: "description", header: "РћРїРёСЃР°РЅРёРµ" },
   {
     id: "members",
-    header: "Пользователей",
+    header: "РџРѕР»СЊР·РѕРІР°С‚РµР»РµР№",
     cell: ({ row }) => getZoneMembers(row.original.name).length,
   },
   {
     id: "actions",
-    header: "Действия",
+    header: "Р”РµР№СЃС‚РІРёСЏ",
     cell: ({ row }) => {
       return h("div", { class: "flex justify-end gap-2" }, [
         h(UButton, {
@@ -141,7 +141,7 @@ const name = computed({
 <template>
   <UDashboardPanel id="zones">
     <template #header>
-      <UDashboardNavbar title="Управление зонами">
+      <UDashboardNavbar title="РЈРїСЂР°РІР»РµРЅРёРµ Р·РѕРЅР°РјРё">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -164,12 +164,12 @@ const name = computed({
             v-model="name"
             class="max-w-sm"
             icon="i-lucide-search"
-            placeholder="Фильтр по названию зоны..."
+            placeholder="Р¤РёР»СЊС‚СЂ РїРѕ РЅР°Р·РІР°РЅРёСЋ Р·РѕРЅС‹..."
           />
 
           <div class="flex flex-wrap items-center gap-1.5">
             <UButton
-              label="Создать зону"
+              label="РЎРѕР·РґР°С‚СЊ Р·РѕРЅСѓ"
               icon="i-lucide-plus"
               color="primary"
               @click="useRouter().push('/zones/create')"
@@ -202,14 +202,14 @@ const name = computed({
 
         <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
           <div class="text-sm text-white">
-            Показано с {{ pagination.pageIndex * pagination.pageSize + 1 }} по
+            РџРѕРєР°Р·Р°РЅРѕ СЃ {{ pagination.pageIndex * pagination.pageSize + 1 }} РїРѕ
             {{
               Math.min(
                 (pagination.pageIndex + 1) * pagination.pageSize,
                 zones?.length || 0
               )
             }}
-            из {{ zones?.length || 0 }} зон
+            РёР· {{ zones?.length || 0 }} Р·РѕРЅ
           </div>
 
           <UPagination
@@ -223,8 +223,8 @@ const name = computed({
 
       <div v-else class="space-y-4">
         <UPageCard
-          :title="`Сотрудники в зоне ${selectedZoneForMembers.name}`"
-          :description="`Назначено пользователей: ${zoneMembers.length}`"
+          :title="`РЎРѕС‚СЂСѓРґРЅРёРєРё РІ Р·РѕРЅРµ ${selectedZoneForMembers.name}`"
+          :description="`РќР°Р·РЅР°С‡РµРЅРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№: ${zoneMembers.length}`"
           variant="subtle"
           orientation="horizontal"
         >
@@ -239,23 +239,23 @@ const name = computed({
             >
               <UAvatar
                 :src="user.avatar?.src || undefined"
-                :alt="user.username || 'Пользователь'"
+                :alt="user.username || 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ'"
                 size="md"
               />
               <div>
                 <div class="font-semibold text-sm">
-                  {{ user.username || "Без имени" }}
+                  {{ user.username || "Р‘РµР· РёРјРµРЅРё" }}
                 </div>
                 <div class="text-xs text-white">
-                  Возраст: {{ user.age ?? "-" }}, Смена: {{ user.workShift ?? "-" }}
+                  Р’РѕР·СЂР°СЃС‚: {{ user.age ?? "-" }}, РЎРјРµРЅР°: {{ user.workShift ?? "-" }}
                 </div>
               </div>
             </div>
           </div>
 
           <div v-else class="py-8 text-center text-default">
-            Локации не имеют закрепленных пользователей. <br />
-            Попросите сотрудников прикрепить себя к локации для отображения их здесь.
+            Р›РѕРєР°С†РёРё РЅРµ РёРјРµСЋС‚ Р·Р°РєСЂРµРїР»РµРЅРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№. <br />
+            РџРѕРїСЂРѕСЃРёС‚Рµ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ РїСЂРёРєСЂРµРїРёС‚СЊ СЃРµР±СЏ Рє Р»РѕРєР°С†РёРё РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РёС… Р·РґРµСЃСЊ.
           </div>
         </UPageCard>
       </div>

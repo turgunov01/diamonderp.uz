@@ -6,11 +6,11 @@ import {
   resolveScopedObjectIds
 } from '../../../utils/mobile-access'
 import { buildEqOrInFilter, encodeIn } from '../../../utils/postgrest'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 import type { AuthRole } from '~~/shared/types/auth'
 import { getRoleLabel } from '~~/shared/utils/access'
 import {
-  getSupabaseErrorData,
+  getDataApiErrorData,
   mapDispatchDbRowToRecord,
   mapSignedDbRowToRecord,
   mapTemplateDbRowToRecord,
@@ -39,7 +39,7 @@ function resolvePositionToken(role: AuthRole) {
 }
 
 function isMissingTableError(error: unknown) {
-  const data = getSupabaseErrorData(error)
+  const data = getDataApiErrorData(error)
   return data?.code === '42P01'
 }
 
@@ -75,8 +75,8 @@ export default eventHandler(async (event) => {
     }
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const objectIdsForFilter = requestedObjectId ? [requestedObjectId] : objectIds
   const objectFilter = objectIdsForFilter.length ? buildEqOrInFilter(objectIdsForFilter) : undefined

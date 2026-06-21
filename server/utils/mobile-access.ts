@@ -11,7 +11,7 @@ import {
   type ErpUserAuthRow,
   type VerifiedAuthTokenPayload
 } from './auth'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from './supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from './data-api'
 import {
   DEFAULT_WORK_SCHEDULE_TYPE,
   normalizeWorkScheduleType,
@@ -140,7 +140,7 @@ function readBearerToken(event: H3Event) {
 }
 
 async function fetchObjectsByBuilding(buildingId?: number | null) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const query: Record<string, string> = {
     select: 'id,building_id,name,description,address,code,is_active,schedule_type',
     order: 'id.asc'
@@ -154,7 +154,7 @@ async function fetchObjectsByBuilding(buildingId?: number | null) {
 
   try {
     rows = await $fetch<ObjectRow[]>(`${url}/rest/v1/objects`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query
     })
   } catch (error) {
@@ -172,7 +172,7 @@ async function fetchObjectsByBuilding(buildingId?: number | null) {
     }
 
     rows = await $fetch<ObjectRow[]>(`${url}/rest/v1/objects`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query: fallbackQuery
     })
   }

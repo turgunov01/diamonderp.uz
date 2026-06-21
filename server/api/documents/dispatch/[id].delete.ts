@@ -1,14 +1,14 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 import { parseObjectIdInput } from '../documents'
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const idRaw = getRouterParam(event, 'id')
   const dispatchId = Number(idRaw)
   if (!idRaw || !Number.isInteger(dispatchId) || dispatchId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id отправки.' })
+    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id РѕС‚РїСЂР°РІРєРё.' })
   }
 
   const objectId = parseObjectIdInput(getQuery(event).objectId, 'objectId query param is required.')
@@ -37,7 +37,7 @@ export default eventHandler(async (event) => {
 
   const count = Number(res.headers.get('content-range')?.split('/')?.[1] ?? '0')
   if (!count) {
-    throw createError({ statusCode: 404, statusMessage: 'Отправка не найдена.' })
+    throw createError({ statusCode: 404, statusMessage: 'РћС‚РїСЂР°РІРєР° РЅРµ РЅР°Р№РґРµРЅР°.' })
   }
 
   return { deleted: true }

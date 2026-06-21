@@ -1,6 +1,6 @@
-﻿import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
-  getSupabaseErrorData,
+  getDataApiErrorData,
   mapDispatchDbRowToRecord,
   mapSignedDbRowToRecord,
   mapTemplateDbRowToRecord,
@@ -27,7 +27,7 @@ interface RecipientLiteRow {
 }
 
 function isMissingTableError(error: unknown) {
-  const data = getSupabaseErrorData(error)
+  const data = getDataApiErrorData(error)
   return data?.code === '42P01'
 }
 
@@ -47,8 +47,8 @@ function encodeIn(values: number[]) {
 }
 
 export default eventHandler(async (event): Promise<DocumentsResponse> => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
   const objectId = parseObjectIdInput(getQuery(event).objectId, 'objectId query param is required.')
 
   const [templateRows, dispatchRows, signedRows] = await Promise.all([

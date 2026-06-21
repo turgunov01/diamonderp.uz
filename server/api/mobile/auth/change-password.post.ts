@@ -1,6 +1,6 @@
-import { compare, hash } from 'bcryptjs'
+﻿import { compare, hash } from 'bcryptjs'
 import { requireMobileAccess } from '../../../utils/mobile-access'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 
 interface ChangePasswordBody {
   currentPassword: string
@@ -21,10 +21,10 @@ function isNonEmptyString(value: unknown): value is string {
 
 function transliterateToLatin(value: string) {
   const map: Record<string, string> = {
-    а: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y',
-    к: 'k', қ: 'q', л: 'l', м: 'm', н: 'n', ң: 'ng', о: 'o', ө: 'o', п: 'p', р: 'r', с: 's', т: 't',
-    у: 'u', ұ: 'u', ү: 'u', ф: 'f', х: 'h', ҳ: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ы: 'y', э: 'e',
-    ю: 'yu', я: 'ya', ь: '', ъ: '', йо: 'yo', ў: 'o'
+    'Р°': 'a', 'Р±': 'b', 'РІ': 'v', 'Рі': 'g', 'Т“': 'g', 'Рґ': 'd', 'Рµ': 'e', 'С‘': 'e', 'Р¶': 'zh', 'Р·': 'z', 'Рё': 'i', 'Р№': 'y',
+    'Рє': 'k', 'Т›': 'q', 'Р»': 'l', 'Рј': 'm', 'РЅ': 'n', 'ТЈ': 'ng', 'Рѕ': 'o', 'У©': 'o', 'Рї': 'p', 'СЂ': 'r', 'СЃ': 's', 'С‚': 't',
+    'Сѓ': 'u', 'Т±': 'u', 'ТЇ': 'u', 'С„': 'f', 'С…': 'h', 'Ті': 'h', 'С†': 'ts', 'С‡': 'ch', 'С€': 'sh', 'С‰': 'sch', 'С‹': 'y', 'СЌ': 'e',
+    'СЋ': 'yu', 'СЏ': 'ya', 'СЊ': '', 'СЉ': '', 'Р№Рѕ': 'yo', 'Сћ': 'o'
   }
 
   return value
@@ -42,7 +42,7 @@ function ensurePasswordSafe(password: string, fullName: string, username: string
   if (normalizedPassword === normalizedName || normalizedPassword === normalizedUsername) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Пароль не может совпадать с ФИО или никнеймом.'
+      statusMessage: 'РџР°СЂРѕР»СЊ РЅРµ РјРѕР¶РµС‚ СЃРѕРІРїР°РґР°С‚СЊ СЃ Р¤РРћ РёР»Рё РЅРёРєРЅРµР№РјРѕРј.'
     })
   }
 }
@@ -82,8 +82,8 @@ export default eventHandler(async (event) => {
     })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const rows = await $fetch<CustomerPasswordRow[]>(`${url}/rest/v1/customers`, {
     headers,

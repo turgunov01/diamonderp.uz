@@ -1,5 +1,5 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
-import { getSupabaseErrorData } from '../documents/documents'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
+import { getDataApiErrorData } from '../documents/documents'
 
 type ObjectRow = {
   id: number
@@ -14,7 +14,7 @@ type ObjectRow = {
 function parseObjectId(idRaw: string | undefined) {
   const id = Number(idRaw)
   if (!idRaw || !Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id объекта.' })
+    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id РѕР±СЉРµРєС‚Р°.' })
   }
 
   return id
@@ -22,8 +22,8 @@ function parseObjectId(idRaw: string | undefined) {
 
 export default eventHandler(async (event) => {
   const id = parseObjectId(getRouterParam(event, 'id'))
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   try {
     const rows = await $fetch<ObjectRow[]>(`${url}/rest/v1/objects`, {
@@ -37,19 +37,19 @@ export default eventHandler(async (event) => {
 
     const deleted = rows[0]
     if (!deleted) {
-      throw createError({ statusCode: 404, statusMessage: 'Объект не найден.' })
+      throw createError({ statusCode: 404, statusMessage: 'РћР±СЉРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ.' })
     }
 
     return deleted
   } catch (error: unknown) {
-    const data = getSupabaseErrorData(error)
+    const data = getDataApiErrorData(error)
 
     // Common case: foreign key constraint violation when object is referenced by other tables.
     // Postgres error code: 23503 (foreign_key_violation)
     if (data?.code === '23503') {
       throw createError({
         statusCode: 409,
-        statusMessage: 'Нельзя удалить объект: есть связанные записи (документы/сотрудники/отчёты). Сначала удалите или отвяжите зависимости.'
+        statusMessage: 'РќРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ РѕР±СЉРµРєС‚: РµСЃС‚СЊ СЃРІСЏР·Р°РЅРЅС‹Рµ Р·Р°РїРёСЃРё (РґРѕРєСѓРјРµРЅС‚С‹/СЃРѕС‚СЂСѓРґРЅРёРєРё/РѕС‚С‡С‘С‚С‹). РЎРЅР°С‡Р°Р»Р° СѓРґР°Р»РёС‚Рµ РёР»Рё РѕС‚РІСЏР¶РёС‚Рµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё.'
       })
     }
 

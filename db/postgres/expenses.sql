@@ -1,4 +1,4 @@
-﻿-- Supabase SQL: expenses register
+﻿-- Postgres SQL: expenses register
 
 create table if not exists public.expenses (
   id bigint generated always as identity primary key,

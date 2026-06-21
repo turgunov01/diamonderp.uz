@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import { mapCustomerRoleRow, normalizeRoleCode, type CustomerRoleDbRow } from './roles'
 
 interface CreateCustomerRoleBody {
@@ -16,7 +16,7 @@ function parseBuildingId(value: unknown) {
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле buildingId должно быть положительным целым числом или null.'
+      statusMessage: 'РџРѕР»Рµ buildingId РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј С†РµР»С‹Рј С‡РёСЃР»РѕРј РёР»Рё null.'
     })
   }
 
@@ -32,22 +32,22 @@ export default eventHandler(async (event) => {
   if (!code) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле code обязательно (латиница/цифры/._-).'
+      statusMessage: 'РџРѕР»Рµ code РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ (Р»Р°С‚РёРЅРёС†Р°/С†РёС„СЂС‹/._-).'
     })
   }
 
   if (!label) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле label обязательно.'
+      statusMessage: 'РџРѕР»Рµ label РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.'
     })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const [created] = await $fetch<CustomerRoleDbRow[]>(`${url}/rest/v1/customer_roles`, {
     method: 'POST',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=representation'
     },
     body: {
@@ -61,7 +61,7 @@ export default eventHandler(async (event) => {
   if (!created) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Не удалось создать роль.'
+      statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ СЂРѕР»СЊ.'
     })
   }
 

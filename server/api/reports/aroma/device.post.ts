@@ -1,8 +1,8 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const body = await readBody<{
     name?: string
@@ -16,7 +16,7 @@ export default eventHandler(async (event) => {
   }>(event)
 
   if (!body.name || !body.name.trim()) {
-    throw createError({ statusCode: 400, statusMessage: 'Название обязательно.' })
+    throw createError({ statusCode: 400, statusMessage: 'РќР°Р·РІР°РЅРёРµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
   }
 
   const rows = await $fetch<any[]>(`${url}/rest/v1/aroma_devices`, {

@@ -1,4 +1,4 @@
-﻿import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   mapExpenseDbRowToRecord,
   type ExpenseDbRow,
@@ -17,7 +17,7 @@ interface ExpenseResponse {
 }
 
 export default eventHandler(async (event): Promise<ExpenseResponse> => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   const objectIdRaw = getQuery(event).objectId
   const objectId = objectIdRaw ? Number(objectIdRaw) : NaN
@@ -33,7 +33,7 @@ export default eventHandler(async (event): Promise<ExpenseResponse> => {
   }
 
   const rows = await $fetch<ExpenseDbRow[]>(`${url}/rest/v1/expenses`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query
   })
 

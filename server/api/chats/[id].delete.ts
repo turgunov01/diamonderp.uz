@@ -1,14 +1,14 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 export default eventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'))
 
   if (!Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id чата.' })
+    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id С‡Р°С‚Р°.' })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   // Ensure chat exists
   const [chat] = await $fetch<{ id: number }[]>(`${url}/rest/v1/chats`, {
@@ -21,7 +21,7 @@ export default eventHandler(async (event) => {
   }).catch(() => [] as { id: number }[])
 
   if (!chat) {
-    throw createError({ statusCode: 404, statusMessage: 'Чат не найден.' })
+    throw createError({ statusCode: 404, statusMessage: 'Р§Р°С‚ РЅРµ РЅР°Р№РґРµРЅ.' })
   }
 
   await $fetch(`${url}/rest/v1/chats`, {

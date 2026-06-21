@@ -1,10 +1,10 @@
 ﻿# Theory: Realtime sockets for chats
 
 ## Goal
-Add a WebSocket (or Supabase Realtime) channel per chat so messages deliver instantly to all open clients without manual refresh.
+Add a WebSocket (or Postgres-backed realtime) channel per chat so messages deliver instantly to all open clients without manual refresh.
 
 ## Suggested stack
-- Supabase Realtime (Postgres replication) or a dedicated WS server (Socket.IO / ws) behind Nuxt server middleware.
+- Postgres-backed realtime (Postgres replication) or a dedicated WS server (Socket.IO / ws) behind Nuxt server middleware.
 - Channel name convention: `chat:<chatId>`.
 - Event types: `message:new`, `message:update`, `message:delete`, `chat:meta` (title/isGroup updates), optionally `typing`.
 
@@ -23,7 +23,7 @@ Add a WebSocket (or Supabase Realtime) channel per chat so messages deliver inst
 
 ## Security
 - Require auth; scope channels by membership/tenant if applicable.
-- For Supabase Realtime: configure RLS + row-level filters; for custom WS: verify session JWT before joining channel.
+- For Postgres-backed realtime: configure RLS + row-level filters; for custom WS: verify session JWT before joining channel.
 
 ## Client handling
 - use composable `useChatChannel(chatId)` that handles subscribe/unsubscribe and exposes `onEvent` callbacks.
@@ -49,11 +49,11 @@ Allow adding/removing users in real time and notifying online members.
 
 ## DB considerations
 - Ensure `chat_members` has indexes on (chat_id) and (user_id).
-- For Supabase Realtime, listen on `chat_members` table filtered by chat_id.
+- For Postgres-backed realtime, listen on `chat_members` table filtered by chat_id.
 
 ---
 
 # Notes
-- Start with Supabase Realtime if you already use Supabase; otherwise Socket.IO behind `/api/socket` is fine.
+- Start with Postgres-backed notifications if you already have replication configured; otherwise Socket.IO behind `/api/socket` is fine.
 - Keep payloads small; avoid sending full history—only deltas.
 - Handle reconnect/backfill: on reconnect, refetch last N messages to close any gaps.

@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 type ChatRow = {
   id: number
@@ -40,9 +40,9 @@ function encodePostgrestIn(values: number[]) {
 }
 
 export default eventHandler(async (event): Promise<ChatItem[]> => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const headers = getDataApiServerHeaders(serviceRoleKey)
   const { objectId: objectIdRaw, buildingId: buildingIdRaw } = getQuery(event)
   const objectId = objectIdRaw ? Number(objectIdRaw) : NaN
   const buildingId = buildingIdRaw ? Number(buildingIdRaw) : NaN
@@ -133,14 +133,15 @@ export default eventHandler(async (event): Promise<ChatItem[]> => {
 
   return rows.map((row) => {
     const latestMessage = latestMessageByChatId.get(row.id)
-    const object = objectsById.get(row.object_id)
+    const objectId = row.object_id ?? null
+    const object = objectId ? objectsById.get(objectId) : undefined
 
     return {
       id: row.id,
       title: row.title,
       isGroup: row.is_group,
       updatedAt: row.updated_at,
-      objectId: row.object_id,
+      objectId,
       objectName: object?.name,
       tgChatId: row.tg_chat_id || undefined,
       tgType: row.tg_type || undefined,

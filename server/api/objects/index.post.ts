@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import { normalizeWorkScheduleType, type WorkScheduleType } from '~~/shared/utils/work-schedules'
 
 interface Body {
@@ -40,14 +40,14 @@ function isMissingScheduleTypeColumn(error: unknown) {
 export default eventHandler(async (event) => {
   const body = await readBody<Body>(event)
   if (!body?.name?.trim()) {
-    throw createError({ statusCode: 400, statusMessage: 'Название обязательно.' })
+    throw createError({ statusCode: 400, statusMessage: 'РќР°Р·РІР°РЅРёРµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
   }
   if (!body?.buildingId || body.buildingId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'buildingId обязателен.' })
+    throw createError({ statusCode: 400, statusMessage: 'buildingId РѕР±СЏР·Р°С‚РµР»РµРЅ.' })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const insertBody = {
     building_id: body.buildingId,
@@ -89,7 +89,7 @@ export default eventHandler(async (event) => {
   const [created] = rows
 
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Не удалось создать объект.' })
+    throw createError({ statusCode: 500, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РѕР±СЉРµРєС‚.' })
   }
 
   setResponseStatus(event, 201)

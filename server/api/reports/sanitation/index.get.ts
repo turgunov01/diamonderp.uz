@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 
 type SanitationEventRow = {
   id: number
@@ -27,8 +27,8 @@ export interface SanitationEvent {
 }
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const objectIdRaw = getQuery(event).objectId
   const objectId = objectIdRaw ? Number(objectIdRaw) : NaN

@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 interface Body {
   tgChatId?: number
@@ -23,16 +23,16 @@ export default eventHandler(async (event) => {
   const objectId = Number(body?.objectId)
 
   if (!Number.isInteger(tgChatId) || tgChatId === 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле tgChatId обязательно.' })
+    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ tgChatId РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
   }
 
   if (!Number.isInteger(objectId) || objectId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле objectId обязательно.' })
+    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ objectId РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const headers = {
-    ...getSupabaseServerHeaders(serviceRoleKey),
+    ...getDataApiServerHeaders(serviceRoleKey),
     Prefer: 'return=representation,resolution=merge-duplicates'
   }
 
@@ -52,7 +52,7 @@ export default eventHandler(async (event) => {
   })
 
   if (!saved?.id) {
-    throw createError({ statusCode: 500, statusMessage: 'Не удалось сохранить привязку Telegram.' })
+    throw createError({ statusCode: 500, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РїСЂРёРІСЏР·РєСѓ Telegram.' })
   }
 
   return {

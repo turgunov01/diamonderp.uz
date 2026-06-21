@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 interface CreateBuildingBody {
   name: string
@@ -19,16 +19,16 @@ export default eventHandler(async (event) => {
   if (!body?.name?.trim()) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Название обязательно.'
+      statusMessage: 'РќР°Р·РІР°РЅРёРµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.'
     })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   const [created] = await $fetch<BuildingRow[]>(`${url}/rest/v1/buildings`, {
     method: 'POST',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=representation'
     },
     body: {
@@ -41,7 +41,7 @@ export default eventHandler(async (event) => {
   if (!created) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Не удалось создать здание.'
+      statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ Р·РґР°РЅРёРµ.'
     })
   }
 

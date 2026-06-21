@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import { getDefaultObjectId, getTelegramFileUrl, verifyTelegramSecret } from '../../utils/telegram'
 
 type TgUser = { id: number, first_name?: string, last_name?: string, username?: string }
@@ -37,7 +37,7 @@ type ExistingMessageRow = {
 
 export default eventHandler(async (event) => {
   if (!verifyTelegramSecret(event)) {
-    throw createError({ statusCode: 401, statusMessage: 'Некорректный секрет webhook.' })
+    throw createError({ statusCode: 401, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ СЃРµРєСЂРµС‚ webhook.' })
   }
 
   const update = await readBody<TgUpdate>(event)
@@ -55,10 +55,12 @@ export default eventHandler(async (event) => {
   let mediaUrl: string | null = null
   if (photo?.length) {
     const largest = photo[photo.length - 1]
-    try {
-      mediaUrl = await getTelegramFileUrl(largest.file_id)
-    } catch {
-      mediaUrl = null
+    if (largest) {
+      try {
+        mediaUrl = await getTelegramFileUrl(largest.file_id)
+      } catch {
+        mediaUrl = null
+      }
     }
   } else if (animation?.file_id) {
     try {
@@ -85,8 +87,8 @@ export default eventHandler(async (event) => {
     content = '[media]'
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   let objectId = getDefaultObjectId()
 
@@ -154,7 +156,7 @@ export default eventHandler(async (event) => {
 
     const createdChat = inserted[0]
     if (!createdChat?.id) {
-      throw createError({ statusCode: 500, statusMessage: 'Не удалось создать или обновить чат для Telegram.' })
+      throw createError({ statusCode: 500, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РёР»Рё РѕР±РЅРѕРІРёС‚СЊ С‡Р°С‚ РґР»СЏ Telegram.' })
     }
 
     chatId = createdChat.id

@@ -43,8 +43,6 @@ interface ChatDetail {
   messages: ChatMessage[]
 }
 
-import { createClient, type SupabaseClient, type RealtimeChannel } from '@supabase/supabase-js'
-
 const toast = useToast()
 
 const activeBuilding = useState<ActiveBuilding | null>('active-building', () => null)
@@ -66,8 +64,6 @@ const contextMenu = reactive({
 const messagesContainer = ref<HTMLElement | null>(null)
 const stream = ref<EventSource | null>(null)
 const streamReconnect = ref<ReturnType<typeof setTimeout> | null>(null)
-const supabaseClient = ref<SupabaseClient | null>(null)
-const realtimeChannel = ref<RealtimeChannel | null>(null)
 const refreshTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const chatListTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const imageRequested = reactive<Record<string | number, boolean>>({})
@@ -267,27 +263,6 @@ function openStream(chatId: number) {
   stream.value = es
 }
 
-function handleRealtimeRow(row: any) {
-  const chatId = Number(row.chat_id)
-  if (!chatId) return
-
-  const message: ChatMessage = {
-    id: row.id,
-    authorId: row.author_id,
-    text: row.content,
-    createdAt: row.created_at,
-    externalId: row.external_id || undefined,
-    direction: (row.direction as 'in' | 'out' | null) || 'in',
-    status: (row.status as ChatMessage['status']) || 'sent'
-  }
-
-  const knownChat = safeChatList.value.some(c => c.id === chatId)
-  if (!knownChat) return
-
-  upsertMessage(chatId, message)
-  scrollToBottomSoon()
-}
-
 function mergeChatDetail(detail: ChatDetail) {
   if (!detail) return
 
@@ -370,44 +345,6 @@ async function fetchAndMergeChatList() {
   }
 }
 
-async function startRealtime() {
-  if (!process.client) return
-  const config = useRuntimeConfig()
-  if (!config.public.supabaseUrl || !config.public.supabaseAnonKey) return
-
-  if (!supabaseClient.value) {
-    supabaseClient.value = createClient(config.public.supabaseUrl, config.public.supabaseAnonKey)
-  }
-
-  const client = supabaseClient.value
-  if (!client) return
-
-  if (realtimeChannel.value) {
-    client.removeChannel(realtimeChannel.value)
-    realtimeChannel.value = null
-  }
-
-  const chatIds = safeChatList.value.map(c => c.id).filter(Boolean)
-  const filter = chatIds.length ? `chat_id=in.(${chatIds.join(',')})` : undefined
-
-  const channel = client.channel('chat-messages-realtime')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'chat_messages',
-      ...(filter ? { filter } : {})
-    }, (payload) => handleRealtimeRow(payload.new))
-    .on('postgres_changes', {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'chat_messages',
-      ...(filter ? { filter } : {})
-    }, (payload) => handleRealtimeRow(payload.new))
-
-  realtimeChannel.value = channel
-  await channel.subscribe()
-}
-
 function scrollToBottomSoon() {
   if (!process.client) return
   requestAnimationFrame(() => {
@@ -447,9 +384,6 @@ if (process.client) {
 
   onBeforeUnmount(() => {
     closeStream()
-    if (supabaseClient.value && realtimeChannel.value) {
-      supabaseClient.value.removeChannel(realtimeChannel.value)
-    }
     if (refreshTimer.value) {
       clearInterval(refreshTimer.value)
     }
@@ -462,15 +396,9 @@ if (process.client) {
     scrollToBottomSoon()
   })
 
-  watch(chatList, () => {
-    startRealtime()
-  })
-
   watch(selectedConversation, () => {
     scrollToBottomSoon()
   })
-
-  startRealtime()
 }
 
 function formatListTime(value?: string) {
@@ -525,8 +453,9 @@ function getDisplayName(message: ChatMessage) {
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return 'U'
-  const first = parts[0][0] || ''
-  const second = parts[1]?.[0] || parts[0][1] || ''
+  const firstPart = parts[0] || ''
+  const first = firstPart[0] || ''
+  const second = parts[1]?.[0] || firstPart[1] || ''
   return (first + second).toUpperCase()
 }
 
@@ -550,7 +479,7 @@ function handleVideoLoaded(e: Event, id: string | number) {
 function isVideoMedia(message: ChatMessage) {
   const url = getImageUrl(message)
   if (!url) return false
-  const clean = url.split('?')[0].toLowerCase()
+  const clean = (url.split('?')[0] || '').toLowerCase()
   return /\.(mp4|webm|gif)$/.test(clean) || message.mediaKind === 'video'
 }
 
@@ -735,7 +664,7 @@ async function deleteChat(chatId?: number | null) {
         <template #right>
           <UBadge v-if="activeBuilding" :label="activeBuilding.name" color="neutral" variant="subtle" />
           <UButton v-if="selectedChatId" icon="i-lucide-trash" color="error" variant="ghost" :loading="deletingChat"
-            @click="deleteChat" />
+            @click="deleteChat()" />
           <UButton icon="i-lucide-plus" label="Новый чат" :disabled="!activeBuilding" @click="newChatOpen = true" />
         </template>
       </UDashboardNavbar>

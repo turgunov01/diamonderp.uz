@@ -1,8 +1,8 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import { mapAdvanceDbRowToRecord, type EmployeeAdvanceDbRow, type AdvanceStatus } from './advances'
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const queryParams = getQuery(event)
 
   const select = 'id,customer_id,amount,currency,comment,status,issued_by,issued_at,settled_at,object_id,building_id'
@@ -50,7 +50,7 @@ export default eventHandler(async (event) => {
   }
 
   const rows = await $fetch<EmployeeAdvanceDbRow[]>(`${url}/rest/v1/employee_advances`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query
   })
 

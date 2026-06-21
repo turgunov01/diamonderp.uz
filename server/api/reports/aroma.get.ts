@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 type AromaDeviceRow = {
   id: number
@@ -22,8 +22,8 @@ type AromaRefillRow = {
 }
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const objectIdRaw = getQuery(event).objectId
   const objectId = objectIdRaw ? Number(objectIdRaw) : NaN
@@ -51,7 +51,7 @@ export default eventHandler(async (event) => {
     id: d.id,
     objectId: d.object_id,
     name: d.name,
-    location: d.location || '—',
+    location: d.location || 'вЂ”',
     refillEveryDays: d.refill_every_days,
     volumeMl: d.volume_ml,
     pricePerRefill: Number(d.price_per_refill || 0),

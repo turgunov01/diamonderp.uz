@@ -1,6 +1,6 @@
-import ExcelJS from 'exceljs'
+﻿import ExcelJS from 'exceljs'
 import { Readable } from 'node:stream'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import type { WorkShift } from './customers'
 
 interface ImportRowError {
@@ -57,7 +57,7 @@ function parseRequiredBuildingId(value: unknown) {
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Выберите здание перед импортом.'
+      statusMessage: 'Р’С‹Р±РµСЂРёС‚Рµ Р·РґР°РЅРёРµ РїРµСЂРµРґ РёРјРїРѕСЂС‚РѕРј.'
     })
   }
 
@@ -75,10 +75,10 @@ function sanitizeUsername(value: string) {
 
 function transliterateToLatin(value: string) {
   const map: Record<string, string> = {
-    а: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y',
-    к: 'k', қ: 'q', л: 'l', м: 'm', н: 'n', ң: 'ng', о: 'o', ө: 'o', п: 'p', р: 'r', с: 's', т: 't',
-    у: 'u', ұ: 'u', ү: 'u', ф: 'f', х: 'h', ҳ: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ы: 'y', э: 'e',
-    ю: 'yu', я: 'ya', ь: '', ъ: '', ў: 'o', ӯ: 'o'
+    'Р°': 'a', 'Р±': 'b', 'РІ': 'v', 'Рі': 'g', 'Т“': 'g', 'Рґ': 'd', 'Рµ': 'e', 'С‘': 'e', 'Р¶': 'zh', 'Р·': 'z', 'Рё': 'i', 'Р№': 'y',
+    'Рє': 'k', 'Т›': 'q', 'Р»': 'l', 'Рј': 'm', 'РЅ': 'n', 'ТЈ': 'ng', 'Рѕ': 'o', 'У©': 'o', 'Рї': 'p', 'СЂ': 'r', 'СЃ': 's', 'С‚': 't',
+    'Сѓ': 'u', 'Т±': 'u', 'ТЇ': 'u', 'С„': 'f', 'С…': 'h', 'Ті': 'h', 'С†': 'ts', 'С‡': 'ch', 'С€': 'sh', 'С‰': 'sch', 'С‹': 'y', 'СЌ': 'e',
+    'СЋ': 'yu', 'СЏ': 'ya', 'СЊ': '', 'СЉ': '', 'Сћ': 'o', 'УЇ': 'o'
   }
 
   return value
@@ -205,7 +205,7 @@ async function parseSpreadsheet(bytes: Uint8Array, fileName: string) {
   if (extension !== 'csv' && extension !== 'xlsx') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поддерживаются только файлы .xlsx или .csv.'
+      statusMessage: 'РџРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ С‚РѕР»СЊРєРѕ С„Р°Р№Р»С‹ .xlsx РёР»Рё .csv.'
     })
   }
 
@@ -223,7 +223,7 @@ async function parseSpreadsheet(bytes: Uint8Array, fileName: string) {
   } catch {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Не удалось прочитать файл. Убедитесь, что это валидный .xlsx или .csv.'
+      statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ С„Р°Р№Р». РЈР±РµРґРёС‚РµСЃСЊ, С‡С‚Рѕ СЌС‚Рѕ РІР°Р»РёРґРЅС‹Р№ .xlsx РёР»Рё .csv.'
     })
   }
 
@@ -264,14 +264,14 @@ function pickValue(row: Record<string, unknown>, keys: string[]) {
 export default eventHandler(async (event) => {
   const form = await readMultipartFormData(event)
   if (!form?.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Данные multipart/form-data пусты.' })
+    throw createError({ statusCode: 400, statusMessage: 'Р”Р°РЅРЅС‹Рµ multipart/form-data РїСѓСЃС‚С‹.' })
   }
 
   const filePart = form.find(part => part.name === 'file' && part.filename) as MultipartPart | undefined
   const buildingField = form.find(part => part.name === 'buildingId' && !part.filename) as MultipartPart | undefined
 
   if (!filePart?.filename) {
-    throw createError({ statusCode: 400, statusMessage: 'Файл обязателен в поле "file".' })
+    throw createError({ statusCode: 400, statusMessage: 'Р¤Р°Р№Р» РѕР±СЏР·Р°С‚РµР»РµРЅ РІ РїРѕР»Рµ "file".' })
   }
 
   const selectedBuildingId = parseRequiredBuildingId(
@@ -281,11 +281,11 @@ export default eventHandler(async (event) => {
   const rawRows = await parseSpreadsheet(filePart.data, filePart.filename)
 
   if (!rawRows.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Таблица пуста.' })
+    throw createError({ statusCode: 400, statusMessage: 'РўР°Р±Р»РёС†Р° РїСѓСЃС‚Р°.' })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const existingCustomers = await $fetch<ExistingCustomerLiteRow[]>(`${url}/rest/v1/customers`, {
     headers,
@@ -311,39 +311,39 @@ export default eventHandler(async (event) => {
       'fullname',
       'full_name',
       'fio',
-      'фио',
-      'фамилияимяотчество',
-      'имяфамилия'
+      'С„РёРѕ',
+      'С„Р°РјРёР»РёСЏРёРјСЏРѕС‚С‡РµСЃС‚РІРѕ',
+      'РёРјСЏС„Р°РјРёР»РёСЏ'
     ])
     const phoneRaw = pickValue(rawRow, [
       'phonenumber',
       'phone',
       'telephone',
       'tel',
-      'телефон',
-      'номертелефона',
-      'номер'
+      'С‚РµР»РµС„РѕРЅ',
+      'РЅРѕРјРµСЂС‚РµР»РµС„РѕРЅР°',
+      'РЅРѕРјРµСЂ'
     ])
     const usernameRaw = pickValue(rawRow, [
       'username',
       'login',
       'user',
-      'логин',
-      'пользователь'
+      'Р»РѕРіРёРЅ',
+      'РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ'
     ])
-    const ageRaw = pickValue(rawRow, ['age', 'возраст'])
-    const workShiftRaw = pickValue(rawRow, ['workshift', 'shift', 'смена'])
+    const ageRaw = pickValue(rawRow, ['age', 'РІРѕР·СЂР°СЃС‚'])
+    const workShiftRaw = pickValue(rawRow, ['workshift', 'shift', 'СЃРјРµРЅР°'])
 
     const fullName = normalizeWhitespace(String(fullNameRaw ?? usernameRaw ?? ''))
     const phoneInput = String(phoneRaw ?? '').trim()
 
     if (!fullName) {
-      errors.push({ row: rowNumber, message: 'fullName (ФИО) обязательно.' })
+      errors.push({ row: rowNumber, message: 'fullName (Р¤РРћ) РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
       return
     }
 
     if (!phoneInput) {
-      errors.push({ row: rowNumber, message: 'phoneNumber (телефон) обязательно.' })
+      errors.push({ row: rowNumber, message: 'phoneNumber (С‚РµР»РµС„РѕРЅ) РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
       return
     }
 
@@ -351,13 +351,13 @@ export default eventHandler(async (event) => {
     const phoneNumber = normalizedPhone || phoneInput
 
     if (!normalizedPhone) {
-      issues.push('Телефон выглядит некорректным — проверьте формат.')
+      issues.push('РўРµР»РµС„РѕРЅ РІС‹РіР»СЏРґРёС‚ РЅРµРєРѕСЂСЂРµРєС‚РЅС‹Рј вЂ” РїСЂРѕРІРµСЂСЊС‚Рµ С„РѕСЂРјР°С‚.')
     } else {
       if (existingPhoneSet.has(normalizedPhone)) {
-        issues.push(`Телефон ${normalizedPhone} уже есть в базе.`)
+        issues.push(`РўРµР»РµС„РѕРЅ ${normalizedPhone} СѓР¶Рµ РµСЃС‚СЊ РІ Р±Р°Р·Рµ.`)
       }
       if (seenFilePhones.has(normalizedPhone)) {
-        issues.push(`Телефон ${normalizedPhone} дублируется в файле.`)
+        issues.push(`РўРµР»РµС„РѕРЅ ${normalizedPhone} РґСѓР±Р»РёСЂСѓРµС‚СЃСЏ РІ С„Р°Р№Р»Рµ.`)
       }
       seenFilePhones.add(normalizedPhone)
     }
@@ -372,7 +372,7 @@ export default eventHandler(async (event) => {
     if (providedUsername.length >= 3) {
       baseUsername = providedUsername
       if (existingUsernameSet.has(baseUsername)) {
-        issues.push(`username "${baseUsername}" уже существует — будет предложен другой.`)
+        issues.push(`username "${baseUsername}" СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚ вЂ” Р±СѓРґРµС‚ РїСЂРµРґР»РѕР¶РµРЅ РґСЂСѓРіРѕР№.`)
       }
     } else {
       baseUsername = generateUsernameFromFullName(fullName)
@@ -381,13 +381,13 @@ export default eventHandler(async (event) => {
       }
 
       if (existingUsernameSet.has(baseUsername)) {
-        issues.push(`username "${baseUsername}" уже существует — будет предложен другой.`)
+        issues.push(`username "${baseUsername}" СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚ вЂ” Р±СѓРґРµС‚ РїСЂРµРґР»РѕР¶РµРЅ РґСЂСѓРіРѕР№.`)
       }
     }
 
     const username = reserveUniqueUsername(baseUsername, existingUsernameSet, seenFileUsernames)
     if (username !== baseUsername) {
-      issues.push(`username изменен на "${username}".`)
+      issues.push(`username РёР·РјРµРЅРµРЅ РЅР° "${username}".`)
     }
 
     seenFileUsernames.add(username)
@@ -395,12 +395,12 @@ export default eventHandler(async (event) => {
     const ageParsed = typeof ageRaw === 'number' ? ageRaw : Number(ageRaw)
     const age = Number.isInteger(ageParsed) && ageParsed > 0 ? ageParsed : null
     if (age !== null && age < 18) {
-      issues.push('Возраст меньше 18 — нужно исправить.')
+      issues.push('Р’РѕР·СЂР°СЃС‚ РјРµРЅСЊС€Рµ 18 вЂ” РЅСѓР¶РЅРѕ РёСЃРїСЂР°РІРёС‚СЊ.')
     }
 
     const workShift = isWorkShift(workShiftRaw) ? workShiftRaw : null
     if (workShiftRaw !== undefined && workShift === null) {
-      issues.push('Смена должна быть day или night — нужно исправить.')
+      issues.push('РЎРјРµРЅР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ day РёР»Рё night вЂ” РЅСѓР¶РЅРѕ РёСЃРїСЂР°РІРёС‚СЊ.')
     }
 
     items.push({

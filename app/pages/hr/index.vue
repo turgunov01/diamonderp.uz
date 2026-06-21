@@ -530,7 +530,7 @@ watch(error, (newError) => {
 
   toast.add({
     title: 'Не удалось загрузить клиентов',
-    description: newError.statusMessage || 'Проверьте API и переменные окружения Supabase.',
+    description: newError.statusMessage || 'Проверьте API и переменные окружения Postgres.',
     color: 'error'
   })
 }, { immediate: true })
@@ -1345,8 +1345,8 @@ function buildPassportPublicUrl(rawPath: string) {
     return trimmed
   }
 
-  const baseUrl = runtimeConfig.public?.supabaseUrl
-  const bucket = runtimeConfig.public?.supabasePassportBucket || 'customer-passports'
+  const baseUrl = runtimeConfig.public?.storageBaseUrl
+  const bucket = runtimeConfig.public?.storagePassportBucket || 'customer-passports'
   if (!baseUrl) {
     return trimmed
   }

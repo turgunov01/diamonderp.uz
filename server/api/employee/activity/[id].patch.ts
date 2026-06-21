@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 import type { EmployeeActivityLocation, EmployeeActivityRecord, EmployeeActivityStatus } from '../../../utils/employee-activity'
 import type { H3Event } from 'h3'
 
@@ -35,7 +35,7 @@ function parseActivityId(event: H3Event) {
   if (!rawId || !Number.isInteger(activityId) || activityId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Некорректный идентификатор активности.'
+      statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р°РєС‚РёРІРЅРѕСЃС‚Рё.'
     })
   }
 
@@ -50,7 +50,7 @@ function parseDate(value: unknown) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле date должно быть в формате YYYY-MM-DD.'
+      statusMessage: 'РџРѕР»Рµ date РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РІ С„РѕСЂРјР°С‚Рµ YYYY-MM-DD.'
     })
   }
 
@@ -63,7 +63,7 @@ function parseMinutes(value: unknown, fieldName: string) {
   if (!Number.isInteger(amount) || amount < 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: `Поле ${fieldName} должно быть целым числом не меньше 0.`
+      statusMessage: `РџРѕР»Рµ ${fieldName} РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ С†РµР»С‹Рј С‡РёСЃР»РѕРј РЅРµ РјРµРЅСЊС€Рµ 0.`
     })
   }
 
@@ -74,7 +74,7 @@ function parseUpdateBody(body: unknown) {
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Тело запроса должно быть корректным JSON-объектом.'
+      statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј JSON-РѕР±СЉРµРєС‚РѕРј.'
     })
   }
 
@@ -89,7 +89,7 @@ function parseUpdateBody(body: unknown) {
     if (!isStatus(input.status)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле status должно быть on_time, late или absent.'
+        statusMessage: 'РџРѕР»Рµ status РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ on_time, late РёР»Рё absent.'
       })
     }
 
@@ -107,7 +107,7 @@ function parseUpdateBody(body: unknown) {
   if (!Object.keys(nextBody).length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Нужно передать хотя бы одно поле для обновления.'
+      statusMessage: 'РќСѓР¶РЅРѕ РїРµСЂРµРґР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕ РїРѕР»Рµ РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ.'
     })
   }
 
@@ -141,9 +141,9 @@ async function fetchCustomer(employeeId: number | null) {
     return undefined
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const rows = await $fetch<ActivityCustomerRow[]>(`${url}/rest/v1/customers`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       select: 'id,username',
       id: `eq.${employeeId}`
@@ -157,7 +157,7 @@ function mapDbRowToRecord(row: EmployeeActivityDbRow, customer?: ActivityCustome
   return {
     id: row.id,
     employeeId: row.employee_id,
-    employeeName: customer?.username?.trim() || row.employee_name?.trim() || `Сотрудник #${row.employee_id ?? row.id}`,
+    employeeName: customer?.username?.trim() || row.employee_name?.trim() || `РЎРѕС‚СЂСѓРґРЅРёРє #${row.employee_id ?? row.id}`,
     date: row.activity_date,
     startedAt: row.started_at ?? null,
     finishedAt: row.finished_at ?? null,
@@ -172,12 +172,12 @@ function mapDbRowToRecord(row: EmployeeActivityDbRow, customer?: ActivityCustome
 export default eventHandler(async (event) => {
   const activityId = parseActivityId(event)
   const updateBody = parseUpdateBody(await readBody(event))
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   const rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
     method: 'PATCH',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=representation'
     },
     query: {
@@ -190,7 +190,7 @@ export default eventHandler(async (event) => {
   if (!updatedRow) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Запись активности не найдена.'
+      statusMessage: 'Р—Р°РїРёСЃСЊ Р°РєС‚РёРІРЅРѕСЃС‚Рё РЅРµ РЅР°Р№РґРµРЅР°.'
     })
   }
 

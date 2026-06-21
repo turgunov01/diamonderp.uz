@@ -1,7 +1,7 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   ensureStorageBucket,
-  getSupabaseErrorData,
+  getDataApiErrorData,
   mapSignedDbRowToRecord,
   sanitizePathSegment,
   encodeStoragePath,
@@ -24,14 +24,14 @@ interface SignBody {
 function parseNumberField(value: unknown, field: string) {
   const num = Number(value)
   if (!Number.isInteger(num) || num <= 0) {
-    throw createError({ statusCode: 400, statusMessage: `${field} обязателен.` })
+    throw createError({ statusCode: 400, statusMessage: `${field} РѕР±СЏР·Р°С‚РµР»РµРЅ.` })
   }
   return num
 }
 
 function parseBody(body: unknown): SignBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть объектом.' })
+    throw createError({ statusCode: 400, statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РѕР±СЉРµРєС‚РѕРј.' })
   }
 
   const input = body as Record<string, unknown>
@@ -40,13 +40,13 @@ function parseBody(body: unknown): SignBody {
   const signatureImage = typeof input.signatureImage === 'string' ? input.signatureImage.trim() : ''
 
   if (!employeeName) {
-    throw createError({ statusCode: 400, statusMessage: 'employeeName обязателен.' })
+    throw createError({ statusCode: 400, statusMessage: 'employeeName РѕР±СЏР·Р°С‚РµР»РµРЅ.' })
   }
   if (!phoneNumber) {
-    throw createError({ statusCode: 400, statusMessage: 'phoneNumber обязателен.' })
+    throw createError({ statusCode: 400, statusMessage: 'phoneNumber РѕР±СЏР·Р°С‚РµР»РµРЅ.' })
   }
   if (!signatureImage) {
-    throw createError({ statusCode: 400, statusMessage: 'signatureImage обязателен.' })
+    throw createError({ statusCode: 400, statusMessage: 'signatureImage РѕР±СЏР·Р°С‚РµР»РµРЅ.' })
   }
 
   return {
@@ -65,8 +65,8 @@ function toBuffer(dataUrl: string) {
   const match = dataUrl.match(/^data:(.+);base64,(.+)$/)
   if (match) {
     return {
-      contentType: match[1],
-      buffer: Buffer.from(match[2], 'base64')
+      contentType: match[1] || 'image/jpeg',
+      buffer: Buffer.from(match[2] || '', 'base64')
     }
   }
   // plain base64 without data url
@@ -78,15 +78,15 @@ function toBuffer(dataUrl: string) {
 
 export default eventHandler(async (event) => {
   const payload = parseBody(await readBody(event))
-  const { url, serviceRoleKey, documentSignatureBucket } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey, documentSignatureBucket } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   await ensureStorageBucket({
     url,
     serviceRoleKey,
     bucket: documentSignatureBucket,
     isPublic: false,
-    missingErrorMessage: `Не удалось подготовить бакет "${documentSignatureBucket}".`
+    missingErrorMessage: `РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРіРѕС‚РѕРІРёС‚СЊ Р±Р°РєРµС‚ "${documentSignatureBucket}".`
   })
 
   const dispatchRows = await $fetch<DocumentDispatchDbRow[]>(`${url}/rest/v1/document_dispatches`, {
@@ -101,7 +101,7 @@ export default eventHandler(async (event) => {
 
   const dispatch = dispatchRows[0]
   if (!dispatch) {
-    throw createError({ statusCode: 404, statusMessage: 'Отправка договора не найдена.' })
+    throw createError({ statusCode: 404, statusMessage: 'РћС‚РїСЂР°РІРєР° РґРѕРіРѕРІРѕСЂР° РЅРµ РЅР°Р№РґРµРЅР°.' })
   }
 
   const { buffer, contentType } = toBuffer(payload.signatureImage)
@@ -116,7 +116,7 @@ export default eventHandler(async (event) => {
     path: signaturePath,
     data: buffer,
     contentType: contentType || 'image/jpeg',
-    uploadErrorMessage: 'Не удалось сохранить подпись.'
+    uploadErrorMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РїРѕРґРїРёСЃСЊ.'
   })
 
   const signatureUrl = `${url}/storage/v1/object/${documentSignatureBucket}/${encodeStoragePath(signaturePath)}`
@@ -144,7 +144,7 @@ export default eventHandler(async (event) => {
 
   const signed = inserted[0]
   if (!signed) {
-    throw createError({ statusCode: 500, statusMessage: 'Не удалось сохранить подпись.' })
+    throw createError({ statusCode: 500, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РїРѕРґРїРёСЃСЊ.' })
   }
 
   const newSignedCount = (dispatch.signed_count || 0) + 1

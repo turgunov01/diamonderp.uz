@@ -1,6 +1,6 @@
 ﻿import { parseRequestedObjectId, requireMobileAccess, resolveScopedObjectIds } from '../../../utils/mobile-access'
 import { buildEqOrInFilter } from '../../../utils/postgrest'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 
 type SanitationEventRow = {
   id: number
@@ -24,9 +24,9 @@ export default eventHandler(async (event) => {
     return { events: [] }
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const rows = await $fetch<SanitationEventRow[]>(`${url}/rest/v1/sanitation_events`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       select: 'id,object_id,type,performed_at,team,executors,notes,photos,created_at,updated_at',
       object_id: buildEqOrInFilter(objectIds),

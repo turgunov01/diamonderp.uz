@@ -1,6 +1,6 @@
-import ExcelJS from 'exceljs'
+﻿import ExcelJS from 'exceljs'
 import { Readable } from 'node:stream'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   mapCreateBodyToDbInsert,
   type CreateCustomerBody,
@@ -190,10 +190,10 @@ function normalizeWhitespace(value: string) {
 
 function transliterateToLatin(value: string) {
   const map: Record<string, string> = {
-    а: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y',
-    к: 'k', қ: 'q', л: 'l', м: 'm', н: 'n', ң: 'ng', о: 'o', ө: 'o', п: 'p', р: 'r', с: 's', т: 't',
-    у: 'u', ұ: 'u', ү: 'u', ф: 'f', х: 'h', ҳ: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ы: 'y', э: 'e',
-    ю: 'yu', я: 'ya', ь: '', ъ: '', ў: 'o', ӯ: 'o'
+    'Р°': 'a', 'Р±': 'b', 'РІ': 'v', 'Рі': 'g', 'Т“': 'g', 'Рґ': 'd', 'Рµ': 'e', 'С‘': 'e', 'Р¶': 'zh', 'Р·': 'z', 'Рё': 'i', 'Р№': 'y',
+    'Рє': 'k', 'Т›': 'q', 'Р»': 'l', 'Рј': 'm', 'РЅ': 'n', 'ТЈ': 'ng', 'Рѕ': 'o', 'У©': 'o', 'Рї': 'p', 'СЂ': 'r', 'СЃ': 's', 'С‚': 't',
+    'Сѓ': 'u', 'Т±': 'u', 'ТЇ': 'u', 'С„': 'f', 'С…': 'h', 'Ті': 'h', 'С†': 'ts', 'С‡': 'ch', 'С€': 'sh', 'С‰': 'sch', 'С‹': 'y', 'СЌ': 'e',
+    'СЋ': 'yu', 'СЏ': 'ya', 'СЊ': '', 'СЉ': '', 'Сћ': 'o', 'УЇ': 'o'
   }
 
   return value
@@ -316,7 +316,7 @@ async function parseSpreadsheet(bytes: Uint8Array, fileName: string) {
   if (extension !== 'csv' && extension !== 'xlsx') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поддерживаются только файлы .xlsx или .csv.'
+      statusMessage: 'РџРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ С‚РѕР»СЊРєРѕ С„Р°Р№Р»С‹ .xlsx РёР»Рё .csv.'
     })
   }
 
@@ -334,7 +334,7 @@ async function parseSpreadsheet(bytes: Uint8Array, fileName: string) {
   } catch {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Не удалось прочитать файл. Убедитесь, что это валидный .xlsx или .csv.'
+      statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ С„Р°Р№Р». РЈР±РµРґРёС‚РµСЃСЊ, С‡С‚Рѕ СЌС‚Рѕ РІР°Р»РёРґРЅС‹Р№ .xlsx РёР»Рё .csv.'
     })
   }
 
@@ -348,13 +348,13 @@ async function parseSpreadsheet(bytes: Uint8Array, fileName: string) {
 export default eventHandler(async (event) => {
   const form = await readMultipartFormData(event)
   if (!form?.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Данные multipart/form-data пусты.' })
+    throw createError({ statusCode: 400, statusMessage: 'Р”Р°РЅРЅС‹Рµ multipart/form-data РїСѓСЃС‚С‹.' })
   }
 
   const filePart = form.find(part => part.name === 'file' && part.filename) as MultipartPart | undefined
   const buildingField = form.find(part => part.name === 'buildingId' && !part.filename)
   if (!filePart || !filePart.filename) {
-    throw createError({ statusCode: 400, statusMessage: 'Файл обязателен в поле "file".' })
+    throw createError({ statusCode: 400, statusMessage: 'Р¤Р°Р№Р» РѕР±СЏР·Р°С‚РµР»РµРЅ РІ РїРѕР»Рµ "file".' })
   }
 
   const selectedBuildingId = buildingField
@@ -364,11 +364,11 @@ export default eventHandler(async (event) => {
   const rawRows = await parseSpreadsheet(filePart.data, filePart.filename)
 
   if (!rawRows.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Таблица пуста.' })
+    throw createError({ statusCode: 400, statusMessage: 'РўР°Р±Р»РёС†Р° РїСѓСЃС‚Р°.' })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const existingCustomers = await $fetch<ExistingCustomerLiteRow[]>(`${url}/rest/v1/customers`, {
     headers,

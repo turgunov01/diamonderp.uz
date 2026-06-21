@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   isExpenseStatus,
   mapExpenseDbRowToRecord,
@@ -45,7 +45,7 @@ function requiredTrimmedString(value: unknown, fieldName: string) {
 
 function parseCreateBody(body: unknown): ParsedCreateExpenseBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
+    throw createError({ statusCode: 400, statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј РѕР±СЉРµРєС‚РѕРј.' })
   }
 
   const input = body as Partial<CreateExpenseBody>
@@ -76,7 +76,7 @@ function parseCreateBody(body: unknown): ParsedCreateExpenseBody {
   let status: ExpenseStatus = 'draft'
   if (input.status !== undefined) {
     if (!isExpenseStatus(input.status)) {
-      throw createError({ statusCode: 400, statusMessage: 'Некорректный статус.' })
+      throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ СЃС‚Р°С‚СѓСЃ.' })
     }
     status = input.status
   }
@@ -102,7 +102,7 @@ function parseCreateBody(body: unknown): ParsedCreateExpenseBody {
 
 async function fetchWarehouseItem(url: string, serviceRoleKey: string, id: number) {
   const rows = await $fetch<WarehouseItemDbRow[]>(`${url}/rest/v1/warehouse_items`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       select: 'id,name,manufacturer,calculation_type,unit_price,is_active,created_at,updated_at',
       id: `eq.${id}`,
@@ -113,7 +113,7 @@ async function fetchWarehouseItem(url: string, serviceRoleKey: string, id: numbe
 
   const row = rows[0]
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'Позиция склада не найдена.' })
+    throw createError({ statusCode: 404, statusMessage: 'РџРѕР·РёС†РёСЏ СЃРєР»Р°РґР° РЅРµ РЅР°Р№РґРµРЅР°.' })
   }
 
   return mapWarehouseItemDbRowToRecord(row)
@@ -121,7 +121,7 @@ async function fetchWarehouseItem(url: string, serviceRoleKey: string, id: numbe
 
 export default eventHandler(async (event) => {
   const payload = parseCreateBody(await readBody(event))
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const warehouseItem = payload.warehouseItemId
     ? await fetchWarehouseItem(url, serviceRoleKey, payload.warehouseItemId)
     : null
@@ -132,12 +132,12 @@ export default eventHandler(async (event) => {
   const rows = await $fetch<ExpenseDbRow[]>(`${url}/rest/v1/expenses`, {
     method: 'POST',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=representation'
     },
     body: {
       title: warehouseItem?.name || payload.title,
-      category: warehouseItem ? 'Склад' : payload.category,
+      category: warehouseItem ? 'РЎРєР»Р°Рґ' : payload.category,
       vendor: warehouseItem?.manufacturer || payload.vendor,
       planned_amount: plannedAmount,
       actual_amount: payload.actualAmount ?? null,
@@ -153,7 +153,7 @@ export default eventHandler(async (event) => {
 
   const created = rows[0]
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Supabase не вернул созданный расход.' })
+    throw createError({ statusCode: 500, statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» СЃРѕР·РґР°РЅРЅС‹Р№ СЂР°СЃС…РѕРґ.' })
   }
 
   setResponseStatus(event, 201)

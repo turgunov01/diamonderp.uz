@@ -1,4 +1,4 @@
--- Supabase SQL: auth login/logout geolocation audit.
+﻿-- Postgres SQL: auth login/logout geolocation audit.
 
 create table if not exists public.auth_location_events (
   id bigint generated always as identity primary key,
@@ -38,18 +38,30 @@ alter table if exists public.erp_users
   add column if not exists last_login_location jsonb,
   add column if not exists last_logout_location jsonb;
 
-alter table public.auth_location_events enable row level security;
+do $$
+declare
+  can_manage_auth_location_events boolean;
+begin
+  select pg_get_userbyid(c.relowner) = current_user
+    or exists (
+      select 1
+      from pg_roles
+      where rolname = current_user
+        and rolsuper
+    )
+  into can_manage_auth_location_events
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public'
+    and c.relname = 'auth_location_events';
 
-drop policy if exists "Allow read auth location events" on public.auth_location_events;
-create policy "Allow read auth location events"
-on public.auth_location_events
-for select
-to authenticated
-using (true);
-
-drop policy if exists "Allow insert auth location events" on public.auth_location_events;
-create policy "Allow insert auth location events"
-on public.auth_location_events
-for insert
-to authenticated
-with check (true);
+  if can_manage_auth_location_events then
+    execute 'alter table public.auth_location_events enable row level security';
+    execute 'drop policy if exists "Allow read auth location events" on public.auth_location_events';
+    execute 'create policy "Allow read auth location events" on public.auth_location_events for select to authenticated using (true)';
+    execute 'drop policy if exists "Allow insert auth location events" on public.auth_location_events';
+    execute 'create policy "Allow insert auth location events" on public.auth_location_events for insert to authenticated with check (true)';
+  else
+    raise notice 'Skipping RLS policies for public.auth_location_events because % is not the table owner.', current_user;
+  end if;
+end $$;

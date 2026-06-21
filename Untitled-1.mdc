@@ -1,4 +1,4 @@
-The selector from your screenshot is in [app/components/TeamsMenu.vue](c:/Users/User/Desktop/projects/diamond/app/components/TeamsMenu.vue). Right now it is not connected to the database at all. It is a hardcoded fake list:
+﻿The selector from your screenshot is in [app/components/TeamsMenu.vue](c:/Users/User/Desktop/projects/diamond/app/components/TeamsMenu.vue). Right now it is not connected to the database at all. It is a hardcoded fake list:
 
 - `Tashkent City Mall`
 - `Summit Business Center`
@@ -6,13 +6,13 @@ The selector from your screenshot is in [app/components/TeamsMenu.vue](c:/Users/
 
 So at the moment, your app has this mismatch:
 
-- the top selector shows fake “buildings”
+- the top selector shows fake вЂњbuildingsвЂќ
 - the real data model uses only `objects`
 - the global app context is `activeObject`, not `activeBuilding`
 
 Current state in code:
 - [app/components/TeamsMenu.vue](c:/Users/User/Desktop/projects/diamond/app/components/TeamsMenu.vue): static building dropdown
-- [db/supabase/objects.sql](c:/Users/User/Desktop/projects/diamond/db/supabase/objects.sql): only `objects` table exists
+- [db/postgres/objects.sql](c:/Users/User/Desktop/projects/diamond/db/postgres/objects.sql): only `objects` table exists
 - [app/layouts/default.vue](c:/Users/User/Desktop/projects/diamond/app/layouts/default.vue): app stores only `active-object`
 - many APIs already filter by `objectId`, for example chats and expenses
 
@@ -67,10 +67,10 @@ Best practice: add `building_id` directly to customers too. It makes filtering r
   - `object_positions`
 
 **Why this is necessary**
-Right now “building” and “object” are mixed together. If you keep that structure, you cannot correctly do:
-- “show only this building’s users”
-- “create object inside current building automatically”
-- “show only this building’s dashboard data”
+Right now вЂњbuildingвЂќ and вЂњobjectвЂќ are mixed together. If you keep that structure, you cannot correctly do:
+- вЂњshow only this buildingвЂ™s usersвЂќ
+- вЂњcreate object inside current building automaticallyвЂќ
+- вЂњshow only this buildingвЂ™s dashboard dataвЂќ
 
 Because there is no real DB relation for building ownership yet.
 

@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 type BuildingRow = {
   id: number
@@ -8,10 +8,10 @@ type BuildingRow = {
 }
 
 export default eventHandler(async () => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   return await $fetch<BuildingRow[]>(`${url}/rest/v1/buildings`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       select: 'id,name,logo,description',
       order: 'id.asc'

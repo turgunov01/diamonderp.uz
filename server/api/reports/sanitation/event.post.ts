@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 import type { SanitationEvent } from './index.get'
 
 type IncomingBody = {
@@ -23,24 +23,24 @@ function normalizeList(value?: string[] | string | null): string[] {
 }
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const body = await readBody<IncomingBody>(event)
 
   const type = body.type
   if (!type || !['disinfection', 'deratization'].includes(type)) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле type обязательно (disinfection|deratization).' })
+    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ type РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ (disinfection|deratization).' })
   }
 
   const team = (body.team || '').trim()
   if (!team.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле team обязательно.' })
+    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ team РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
   }
 
   const performedAt = body.performedAt ? new Date(body.performedAt) : new Date()
   if (Number.isNaN(performedAt.getTime())) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле performedAt некорректно.' })
+    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ performedAt РЅРµРєРѕСЂСЂРµРєС‚РЅРѕ.' })
   }
 
   const executors = normalizeList(body.executors)

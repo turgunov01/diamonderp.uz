@@ -9,7 +9,7 @@
 } from '../../documents/documents'
 import { normalizePhone } from '../../../utils/auth'
 import { isFrontlineMobileAccess, requireMobileAccess } from '../../../utils/mobile-access'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 import { getHeader, readBody, readMultipartFormData } from 'h3'
 import type { H3Event } from 'h3'
 
@@ -184,8 +184,8 @@ export default eventHandler(async (event) => {
   }
 
   const payload = await parsePayload(event)
-  const { url, serviceRoleKey, documentSignatureBucket } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey, documentSignatureBucket } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   await ensureStorageBucket({
     url,

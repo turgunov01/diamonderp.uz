@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import { normalizeWorkScheduleType, type WorkScheduleType } from '~~/shared/utils/work-schedules'
 
 type ObjectRow = {
@@ -36,7 +36,7 @@ function mapObjectRow(row: ObjectRow) {
 }
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const buildingIdRaw = getQuery(event).buildingId
   const buildingId = typeof buildingIdRaw === 'string' ? Number(buildingIdRaw) : NaN
 
@@ -51,7 +51,7 @@ export default eventHandler(async (event) => {
 
   try {
     const rows = await $fetch<ObjectRow[]>(`${url}/rest/v1/objects`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query
     })
     return rows.map(mapObjectRow)
@@ -70,7 +70,7 @@ export default eventHandler(async (event) => {
     }
 
     const rows = await $fetch<ObjectRow[]>(`${url}/rest/v1/objects`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query: fallbackQuery
     })
 

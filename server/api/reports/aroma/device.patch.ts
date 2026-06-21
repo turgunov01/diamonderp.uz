@@ -1,8 +1,8 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   const body = await readBody<{
     id?: number
@@ -18,7 +18,7 @@ export default eventHandler(async (event) => {
 
   const id = Number(body.id)
   if (!Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'id обязателен' })
+    throw createError({ statusCode: 400, statusMessage: 'id РѕР±СЏР·Р°С‚РµР»РµРЅ' })
   }
 
   const patch: Record<string, unknown> = {}
@@ -32,7 +32,7 @@ export default eventHandler(async (event) => {
   if (body.object_id !== undefined) patch.object_id = body.object_id ?? null
 
   if (!Object.keys(patch).length) {
-    throw createError({ statusCode: 400, statusMessage: 'Нет данных для обновления' })
+    throw createError({ statusCode: 400, statusMessage: 'РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ' })
   }
 
   const rows = await $fetch<any[]>(`${url}/rest/v1/aroma_devices`, {
@@ -46,7 +46,7 @@ export default eventHandler(async (event) => {
   })
 
   if (!rows.length) {
-    throw createError({ statusCode: 404, statusMessage: 'Устройство не найдено' })
+    throw createError({ statusCode: 404, statusMessage: 'РЈСЃС‚СЂРѕР№СЃС‚РІРѕ РЅРµ РЅР°Р№РґРµРЅРѕ' })
   }
 
   return rows[0]

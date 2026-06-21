@@ -1,9 +1,9 @@
-import type { H3Event } from 'h3'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+﻿import type { H3Event } from 'h3'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 import {
   downloadStorageObject,
   ensureStorageBucket,
-  getSupabaseErrorData,
+  getDataApiErrorData,
   mapTemplateDbRowToRecord,
   parseObjectIdInput,
   uploadStorageObject,
@@ -14,7 +14,7 @@ function parseTemplateId(event: H3Event) {
   const rawId = getRouterParam(event, 'id')
   const templateId = Number(rawId)
   if (!rawId || !Number.isInteger(templateId) || templateId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id шаблона.' })
+    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id С€Р°Р±Р»РѕРЅР°.' })
   }
 
   return templateId
@@ -23,12 +23,12 @@ function parseTemplateId(event: H3Event) {
 export default eventHandler(async (event) => {
   const templateId = parseTemplateId(event)
   const objectId = parseObjectIdInput(getQuery(event).objectId, 'objectId query param is required.')
-  const { url, serviceRoleKey, documentTemplateBucket } = getSupabaseServerConfig()
+  const { url, serviceRoleKey, documentTemplateBucket } = getDataApiServerConfig()
 
   let rows: DocumentTemplateDbRow[]
   try {
     rows = await $fetch<DocumentTemplateDbRow[]>(`${url}/rest/v1/document_templates`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query: {
         select: 'id,object_id,name,description,contract_type,html,css,storage_path,created_at,updated_at',
         id: `eq.${templateId}`,
@@ -37,12 +37,12 @@ export default eventHandler(async (event) => {
       }
     })
   } catch (error: unknown) {
-    const data = getSupabaseErrorData(error)
+    const data = getDataApiErrorData(error)
 
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/supabase/documents.sql.'
+        statusMessage: 'РўР°Р±Р»РёС†Р° "document_templates" РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚. РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ db/postgres/documents.sql.'
       })
     }
 
@@ -51,7 +51,7 @@ export default eventHandler(async (event) => {
 
   const row = rows[0]
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'Шаблон не найден.' })
+    throw createError({ statusCode: 404, statusMessage: 'РЁР°Р±Р»РѕРЅ РЅРµ РЅР°Р№РґРµРЅ.' })
   }
 
   let projectRaw: string | null = null

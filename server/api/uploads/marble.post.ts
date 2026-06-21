@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 const BUCKET = 'marble-photos'
 
@@ -9,11 +9,11 @@ function safeFilename(name?: string) {
 
 export default eventHandler(async (event) => {
   if (!event.node.req.headers['content-type']?.toLowerCase().includes('multipart/form-data')) {
-    throw createError({ statusCode: 400, statusMessage: 'Content-Type должен быть multipart/form-data.' })
+    throw createError({ statusCode: 400, statusMessage: 'Content-Type РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ multipart/form-data.' })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
 
   // ensure bucket exists and is public
   try {
@@ -28,18 +28,18 @@ export default eventHandler(async (event) => {
   } catch (error: any) {
     const status = error?.status
     if (status !== 400 && status !== 409) {
-      throw createError({ statusCode: 500, statusMessage: 'Не удалось подготовить bucket marble-photos.' })
+      throw createError({ statusCode: 500, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРіРѕС‚РѕРІРёС‚СЊ bucket marble-photos.' })
     }
   }
 
   const form = await readMultipartFormData(event)
   if (!form || !form.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Файлы не переданы.' })
+    throw createError({ statusCode: 400, statusMessage: 'Р¤Р°Р№Р»С‹ РЅРµ РїРµСЂРµРґР°РЅС‹.' })
   }
 
   const files = form.filter(f => f.type === 'file' && f.filename && f.data)
   if (!files.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Файлы не переданы.' })
+    throw createError({ statusCode: 400, statusMessage: 'Р¤Р°Р№Р»С‹ РЅРµ РїРµСЂРµРґР°РЅС‹.' })
   }
 
   const urls: string[] = []

@@ -1,5 +1,5 @@
-import ExcelJS from 'exceljs'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+﻿import ExcelJS from 'exceljs'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 
 type SanitationEventRow = {
   id: number
@@ -12,8 +12,8 @@ type SanitationEventRow = {
 }
 
 export default eventHandler(async (event) => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
   const objectIdRaw = getQuery(event).objectId
   const objectId = objectIdRaw ? Number(objectIdRaw) : NaN
 
@@ -28,25 +28,25 @@ export default eventHandler(async (event) => {
   const events = await $fetch<SanitationEventRow[]>(`${url}/rest/v1/sanitation_events`, { headers, query })
 
   const workbook = new ExcelJS.Workbook()
-  const sheet = workbook.addWorksheet('Санобработка')
+  const sheet = workbook.addWorksheet('РЎР°РЅРѕР±СЂР°Р±РѕС‚РєР°')
   sheet.columns = [
     { header: 'ID', key: 'id', width: 8 },
-    { header: 'Объект', key: 'object', width: 10 },
-    { header: 'Тип', key: 'type', width: 16 },
-    { header: 'Дата', key: 'date', width: 18 },
-    { header: 'Бригада', key: 'team', width: 18 },
-    { header: 'Исполнители', key: 'executors', width: 26 },
-    { header: 'Заметки', key: 'notes', width: 32 }
+    { header: 'РћР±СЉРµРєС‚', key: 'object', width: 10 },
+    { header: 'РўРёРї', key: 'type', width: 16 },
+    { header: 'Р”Р°С‚Р°', key: 'date', width: 18 },
+    { header: 'Р‘СЂРёРіР°РґР°', key: 'team', width: 18 },
+    { header: 'РСЃРїРѕР»РЅРёС‚РµР»Рё', key: 'executors', width: 26 },
+    { header: 'Р—Р°РјРµС‚РєРё', key: 'notes', width: 32 }
   ]
 
   events.forEach((e) => {
     sheet.addRow({
       id: e.id,
-      object: e.object_id ?? '—',
-      type: e.type === 'disinfection' ? 'Дезинфекция' : 'Дератизация',
+      object: e.object_id ?? 'вЂ”',
+      type: e.type === 'disinfection' ? 'Р”РµР·РёРЅС„РµРєС†РёСЏ' : 'Р”РµСЂР°С‚РёР·Р°С†РёСЏ',
       date: new Date(e.performed_at).toLocaleDateString('ru-RU'),
       team: e.team,
-      executors: Array.isArray(e.executors) ? e.executors.join(', ') : '—',
+      executors: Array.isArray(e.executors) ? e.executors.join(', ') : 'вЂ”',
       notes: e.notes || ''
     })
   })

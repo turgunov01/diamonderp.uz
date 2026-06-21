@@ -1,6 +1,6 @@
 ﻿import { parseRequestedObjectId, requireMobileAccess, resolveScopedObjectIds } from '../../../utils/mobile-access'
 import { buildEqOrInFilter } from '../../../utils/postgrest'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 
 type AromaDeviceRow = {
   id: number
@@ -32,8 +32,8 @@ export default eventHandler(async (event) => {
     return { devices: [], refills: [] }
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
   const objectFilter = buildEqOrInFilter(objectIds)
 
   const [devicesRows, refillsRows] = await Promise.all([

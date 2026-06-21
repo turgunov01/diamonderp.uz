@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   mapWarehouseItemDbRowToRecord,
   type WarehouseCalculationType,
@@ -18,7 +18,7 @@ interface WarehouseResponse {
 }
 
 export default eventHandler(async (event): Promise<WarehouseResponse> => {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const activeOnly = getQuery(event).activeOnly === 'true'
 
   const query: Record<string, string> = {
@@ -31,7 +31,7 @@ export default eventHandler(async (event): Promise<WarehouseResponse> => {
   }
 
   const rows = await $fetch<WarehouseItemDbRow[]>(`${url}/rest/v1/warehouse_items`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query
   })
 

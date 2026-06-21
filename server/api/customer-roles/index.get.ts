@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   DEFAULT_CUSTOMER_ROLES,
   dedupeRolesByCode,
@@ -25,7 +25,7 @@ export default eventHandler(async (event) => {
   const buildingIdRaw = getQuery(event).buildingId
   const buildingId = typeof buildingIdRaw === 'string' ? Number(buildingIdRaw) : NaN
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const query: Record<string, string> = {
     select: 'id,building_id,code,label,is_active,created_at',
     order: 'label.asc,code.asc'
@@ -39,7 +39,7 @@ export default eventHandler(async (event) => {
 
   try {
     const rows = await $fetch<CustomerRoleDbRow[]>(`${url}/rest/v1/customer_roles`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query
     })
 

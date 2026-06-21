@@ -1,5 +1,5 @@
-import type { H3Event } from 'h3'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import type { H3Event } from 'h3'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   isReservedCustomerRoleCode,
   mapCustomerRoleRow,
@@ -20,7 +20,7 @@ function parseRoleId(event: H3Event) {
   if (!rawId || !Number.isInteger(roleId) || roleId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Некорректный идентификатор роли.'
+      statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ СЂРѕР»Рё.'
     })
   }
 
@@ -28,9 +28,9 @@ function parseRoleId(event: H3Event) {
 }
 
 async function fetchRoleById(roleId: number) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const rows = await $fetch<CustomerRoleDbRow[]>(`${url}/rest/v1/customer_roles`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       select: 'id,building_id,code,label,is_active,created_at',
       id: `eq.${roleId}`,
@@ -49,7 +49,7 @@ export default eventHandler(async (event) => {
   if (!existing) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Роль не найдена.'
+      statusMessage: 'Р РѕР»СЊ РЅРµ РЅР°Р№РґРµРЅР°.'
     })
   }
 
@@ -60,7 +60,7 @@ export default eventHandler(async (event) => {
   if (label !== undefined && !label) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле label не может быть пустым.'
+      statusMessage: 'РџРѕР»Рµ label РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСѓСЃС‚С‹Рј.'
     })
   }
 
@@ -68,28 +68,28 @@ export default eventHandler(async (event) => {
     if (!nextCode) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле code не может быть пустым.'
+        statusMessage: 'РџРѕР»Рµ code РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСѓСЃС‚С‹Рј.'
       })
     }
 
     if (!existing.building_id) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Нельзя менять code у глобальной роли. Создайте новую роль с нужным кодом.'
+        statusMessage: 'РќРµР»СЊР·СЏ РјРµРЅСЏС‚СЊ code Сѓ РіР»РѕР±Р°Р»СЊРЅРѕР№ СЂРѕР»Рё. РЎРѕР·РґР°Р№С‚Рµ РЅРѕРІСѓСЋ СЂРѕР»СЊ СЃ РЅСѓР¶РЅС‹Рј РєРѕРґРѕРј.'
       })
     }
 
     if (isReservedCustomerRoleCode(existing.code)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Нельзя менять code у системной роли.'
+        statusMessage: 'РќРµР»СЊР·СЏ РјРµРЅСЏС‚СЊ code Сѓ СЃРёСЃС‚РµРјРЅРѕР№ СЂРѕР»Рё.'
       })
     }
 
     if (isReservedCustomerRoleCode(nextCode) && nextCode !== existing.code) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Нельзя менять code на системное значение.'
+        statusMessage: 'РќРµР»СЊР·СЏ РјРµРЅСЏС‚СЊ code РЅР° СЃРёСЃС‚РµРјРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ.'
       })
     }
   }
@@ -109,12 +109,12 @@ export default eventHandler(async (event) => {
     return mapCustomerRoleRow(existing)
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   if (update.code && existing.building_id) {
     await $fetch(`${url}/rest/v1/customers`, {
       method: 'PATCH',
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query: {
         building_id: `eq.${existing.building_id}`,
         role: `eq.${existing.code}`
@@ -128,7 +128,7 @@ export default eventHandler(async (event) => {
   const [updated] = await $fetch<CustomerRoleDbRow[]>(`${url}/rest/v1/customer_roles`, {
     method: 'PATCH',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=representation'
     },
     query: {
@@ -140,7 +140,7 @@ export default eventHandler(async (event) => {
   if (!updated) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Не удалось обновить роль.'
+      statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ СЂРѕР»СЊ.'
     })
   }
 

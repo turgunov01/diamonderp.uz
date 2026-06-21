@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 export default eventHandler(async (event) => {
     const id = getRouterParam(event, 'id')
@@ -6,11 +6,11 @@ export default eventHandler(async (event) => {
     if (!id) {
         throw createError({
             statusCode: 400,
-            statusMessage: 'ID зоны обязателен.'
+            statusMessage: 'ID Р·РѕРЅС‹ РѕР±СЏР·Р°С‚РµР»РµРЅ.'
         })
     }
 
-    const { url, serviceRoleKey } = getSupabaseServerConfig()
+    const { url, serviceRoleKey } = getDataApiServerConfig()
 
     try {
         await $fetch(
@@ -18,7 +18,7 @@ export default eventHandler(async (event) => {
             {
                 method: 'DELETE',
                 headers: {
-                    ...getSupabaseServerHeaders(serviceRoleKey),
+                    ...getDataApiServerHeaders(serviceRoleKey),
                     Prefer: 'return=minimal'
                 }
             }
@@ -32,7 +32,7 @@ export default eventHandler(async (event) => {
 
         throw createError({
             statusCode: 500,
-            statusMessage: 'Не удалось удалить зону.'
+            statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ Р·РѕРЅСѓ.'
         })
     }
 })

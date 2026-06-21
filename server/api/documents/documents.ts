@@ -6,7 +6,7 @@ export interface DispatchRecipient {
   phoneNumber: string
 }
 
-export interface SupabaseErrorData {
+export interface DataApiErrorData {
   code?: string
   message?: string
 }
@@ -174,7 +174,7 @@ function getErrorStatusCode(error: unknown) {
   return typeof error.statusCode === 'number' ? error.statusCode : undefined
 }
 
-export function getSupabaseErrorData(error: unknown): SupabaseErrorData | undefined {
+export function getDataApiErrorData(error: unknown): DataApiErrorData | undefined {
   if (!error || typeof error !== 'object') {
     return undefined
   }
@@ -183,7 +183,7 @@ export function getSupabaseErrorData(error: unknown): SupabaseErrorData | undefi
     return undefined
   }
 
-  return error.data as SupabaseErrorData
+  return error.data as DataApiErrorData
 }
 
 export async function ensureStorageBucket(options: {
@@ -213,7 +213,7 @@ export async function ensureStorageBucket(options: {
       return
     }
 
-    const data = getSupabaseErrorData(error)
+    const data = getDataApiErrorData(error)
     if (data?.message?.toLowerCase().includes('already exists')) {
       return
     }
@@ -268,7 +268,12 @@ export async function downloadStorageObject(options: {
       }
     })
 
-    return response._data as string
+    const data = response._data
+    if (typeof data === 'string') return data
+    if (Buffer.isBuffer(data)) return data.toString('utf8')
+    if (data instanceof ArrayBuffer) return Buffer.from(data).toString('utf8')
+
+    return String(data ?? '')
   } catch {
     throw createError({
       statusCode: 404,

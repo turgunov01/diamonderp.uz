@@ -1,8 +1,8 @@
--- Supabase SQL: mobile role setup for employees in building_id = 1
+﻿-- Postgres SQL: mobile role setup for employees in building_id = 1
 -- Usage:
 -- 1. Review the preview SELECT.
 -- 2. Replace placeholder usernames in role_map if needed.
--- 3. Run the script in Supabase SQL editor.
+-- 3. Run the script in Postgres SQL editor.
 
 begin;
 

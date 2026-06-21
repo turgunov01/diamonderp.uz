@@ -1,4 +1,4 @@
--- Supabase SQL: employee route location points.
+﻿-- Postgres SQL: employee route location points.
 
 create table if not exists public.employee_location_points (
   id bigint generated always as identity primary key,

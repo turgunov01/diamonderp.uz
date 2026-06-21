@@ -1,6 +1,6 @@
 ﻿import type { H3Event } from 'h3'
 import type { AuthRole, AuthSession } from '~~/shared/types/auth'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from './supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from './data-api'
 import { randomUUID } from 'node:crypto'
 
 interface TaskObjectRow {
@@ -241,7 +241,7 @@ function parsePositiveInteger(value: unknown, field: string) {
   return parsed
 }
 
-function getSupabaseErrorCode(error: unknown) {
+function getDataApiErrorCode(error: unknown) {
   if (!error || typeof error !== 'object') {
     return undefined
   }
@@ -293,15 +293,15 @@ function getConnectionErrorCode(error: unknown) {
 }
 
 function isMissingTableError(error: unknown) {
-  const code = getSupabaseErrorCode(error)
+  const code = getDataApiErrorCode(error)
   const status = getErrorStatusCode(error)
 
   return code === '42P01' // Postgres undefined_table
     || code === 'PGRST302' // PostgREST: relation not found
-    || status === 404 // Fallback: Supabase may return plain 404 with message "Not Found"
+    || status === 404 // Fallback: Postgres may return plain 404 with message "Not Found"
 }
 
-function isSupabaseConnectionError(error: unknown) {
+function isDataApiConnectionError(error: unknown) {
   const message = getErrorMessage(error).toLowerCase()
   const cause = getErrorCause(error)
   const causeMessage = getErrorMessage(cause).toLowerCase()
@@ -317,11 +317,11 @@ function isSupabaseConnectionError(error: unknown) {
     || code === 'ETIMEDOUT'
 }
 
-function throwSupabaseRequestError(error: unknown): never {
-  if (isSupabaseConnectionError(error)) {
+function throwDataApiRequestError(error: unknown): never {
+  if (isDataApiConnectionError(error)) {
     throw createError({
       statusCode: 503,
-      statusMessage: 'Supabase недоступен: не удалось выполнить сетевой запрос. Проверьте интернет/DNS и SUPABASE_URL.'
+      statusMessage: 'База данных недоступна: не удалось выполнить сетевой запрос. Проверьте интернет/DNS и POSTGRES_HOST.'
     })
   }
 
@@ -331,7 +331,7 @@ function throwSupabaseRequestError(error: unknown): never {
 function throwMissingTaskTablesError() {
   throw createError({
     statusCode: 500,
-    statusMessage: 'Таблицы object_task_lists/object_task_items не найдены. Примените миграцию db/supabase/object_tasks.sql в Supabase.'
+    statusMessage: 'Таблицы object_task_lists/object_task_items не найдены. Примените миграцию db/postgres/object_tasks.sql в базе данных.'
   })
 }
 
@@ -356,7 +356,7 @@ async function ensureStorageBucket(options: {
     await $fetch(`${options.url}/storage/v1/bucket`, {
       method: 'POST',
       headers: {
-        ...getSupabaseServerHeaders(options.serviceRoleKey),
+        ...getDataApiServerHeaders(options.serviceRoleKey),
         'Content-Type': 'application/json'
       },
       body: {
@@ -395,7 +395,7 @@ async function uploadStorageObject(options: {
     await $fetch(`${options.url}/storage/v1/object/${options.bucket}/${encodeStoragePath(options.path)}`, {
       method: 'POST',
       headers: {
-        ...getSupabaseServerHeaders(options.serviceRoleKey),
+        ...getDataApiServerHeaders(options.serviceRoleKey),
         'Content-Type': options.contentType,
         'x-upsert': 'true'
       },
@@ -413,7 +413,7 @@ async function fetchRows<T>(request: () => Promise<T[]>) {
   try {
     return await request()
   } catch (error: unknown) {
-    throwSupabaseRequestError(error)
+    throwDataApiRequestError(error)
   }
 }
 
@@ -425,7 +425,7 @@ async function fetchRowsOrEmpty<T>(request: () => Promise<T[]>) {
       return []
     }
 
-    throwSupabaseRequestError(error)
+    throwDataApiRequestError(error)
   }
 }
 
@@ -485,7 +485,7 @@ function mapEmployeeRow(row: TaskCustomerRow): ObjectTaskEmployeeRecord {
 }
 
 function mapTaskItemRow(row: ObjectTaskItemDbRow): ObjectTaskItemRecord {
-  const { url, taskPhotoBucket } = getSupabaseServerConfig()
+  const { url, taskPhotoBucket } = getDataApiServerConfig()
   const base = url.replace(/\/+$/, '')
   const raw = row.proof_photo_path || null
   let paths: string[] = []
@@ -565,7 +565,7 @@ function isAssignableEmployee(customer: TaskCustomerRow, objectName: string) {
 }
 
 async function fetchObjects(options: FetchObjectOptions = {}) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const query: Record<string, string> = {
     select: 'id,building_id,name,description,address,code,is_active',
     order: 'name.asc'
@@ -580,7 +580,7 @@ async function fetchObjects(options: FetchObjectOptions = {}) {
   }
 
   const rows = await fetchRows<TaskObjectRow>(() => $fetch<TaskObjectRow[]>(`${url}/rest/v1/objects`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query
   }))
 
@@ -588,7 +588,7 @@ async function fetchObjects(options: FetchObjectOptions = {}) {
 }
 
 async function fetchCustomers(options: FetchCustomerOptions = {}) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const query: Record<string, string> = {
     select: 'id,building_id,full_name,username,phone_number,work_shift,status,role,object_pinned,object_positions',
     order: 'full_name.asc'
@@ -601,7 +601,7 @@ async function fetchCustomers(options: FetchCustomerOptions = {}) {
   }
 
   return await fetchRows<TaskCustomerRow>(() => $fetch<TaskCustomerRow[]>(`${url}/rest/v1/customers`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query
   }))
 }
@@ -623,7 +623,7 @@ async function fetchTaskLists(options: FetchTaskListOptions = {}) {
     return []
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const query: Record<string, string> = {
     select: 'id,object_id,employee_id,group_id,title,note,due_date,status,review_status,reviewer_id,review_requested_at,reviewed_at,review_comment,review_photo_path,created_by_id,created_by_name,created_by_role,created_at,updated_at',
     order: 'updated_at.desc'
@@ -654,7 +654,7 @@ async function fetchTaskLists(options: FetchTaskListOptions = {}) {
   }
 
   return await fetchRowsOrEmpty<ObjectTaskListDbRow>(() => $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query
   }))
 }
@@ -664,10 +664,10 @@ async function fetchTaskItems(taskListIds: number[]) {
     return []
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   return await fetchRowsOrEmpty<ObjectTaskItemDbRow>(() => $fetch<ObjectTaskItemDbRow[]>(`${url}/rest/v1/object_task_items`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       select: 'id,task_list_id,title,is_done,completed_at,proof_photo_path,sort_order,created_at,updated_at',
       task_list_id: `in.(${taskListIds.join(',')})`,
@@ -682,7 +682,7 @@ function buildTaskRecord(
   objectById: Map<number, ReturnType<typeof mapObjectRow>>,
   employeeById: Map<number, TaskCustomerRow>
 ): ObjectTaskRecord {
-  const { url, taskPhotoBucket } = getSupabaseServerConfig()
+  const { url, taskPhotoBucket } = getDataApiServerConfig()
   const base = url.replace(/\/+$/, '')
   const object = typeof row.object_id === 'number' ? objectById.get(row.object_id) : undefined
   const employee = typeof row.employee_id === 'number' ? employeeById.get(row.employee_id) : undefined
@@ -936,11 +936,11 @@ function buildGroupedTaskRecords(pairs: { row: ObjectTaskListDbRow, record: Obje
 }
 
 async function deleteTaskList(taskListId: number) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   await $fetch(`${url}/rest/v1/object_task_lists`, {
     method: 'DELETE',
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       id: `eq.${taskListId}`
     }
@@ -1014,8 +1014,8 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
     })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
   const now = new Date().toISOString()
   const groupId = randomUUID()
 
@@ -1391,9 +1391,9 @@ async function fetchTaskListById(taskId: number) {
 }
 
 async function fetchTaskItem(taskId: number, itemId: number) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const rows = await fetchRowsOrEmpty<ObjectTaskItemDbRow>(() => $fetch<ObjectTaskItemDbRow[]>(`${url}/rest/v1/object_task_items`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       select: 'id,task_list_id,title,is_done,completed_at,proof_photo_path,sort_order,created_at,updated_at',
       id: `eq.${itemId}`,
@@ -1441,8 +1441,8 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
   const now = new Date().toISOString()
 
   const existingPaths = (() => {
@@ -1467,7 +1467,7 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   const proofPhotoPaths = [...existingPaths]
 
   if (input.photoFiles?.length) {
-    const { taskPhotoBucket } = getSupabaseServerConfig()
+    const { taskPhotoBucket } = getDataApiServerConfig()
     await ensureStorageBucket({
       url,
       serviceRoleKey,
@@ -1687,14 +1687,14 @@ export async function reviewObjectTaskList(input: {
     })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
   const now = new Date().toISOString()
 
   const reviewPhotoPaths = [...existingReviewPhotoPaths]
 
   if (input.decision === 'approved' && input.photoFiles?.length) {
-    const { taskPhotoBucket } = getSupabaseServerConfig()
+    const { taskPhotoBucket } = getDataApiServerConfig()
     await ensureStorageBucket({
       url,
       serviceRoleKey,

@@ -1,7 +1,7 @@
 ﻿import { compare } from 'bcryptjs'
 import crypto from 'node:crypto'
 import type { AuthRole, AuthSession, LoginRequestBody } from '~~/shared/types/auth'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from './supabase'
+import { postgresQuery } from './postgres'
 
 export interface ErpUserAuthRow {
   id: number
@@ -214,19 +214,16 @@ export function verifyAuthToken(token: string): VerifiedAuthTokenPayload {
 }
 
 export async function fetchUserByEmail(email: string) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-
   try {
-    const rows = await $fetch<ErpUserAuthRow[]>(`${url}/rest/v1/erp_users`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
-      query: {
-        select: 'id,name,email,password_hash,role,avatar,is_active',
-        email: `eq.${email}`,
-        limit: '1'
-      }
-    })
+    const result = await postgresQuery<ErpUserAuthRow>(
+      `select id, name, email, password_hash, role, avatar, is_active
+       from public.erp_users
+       where lower(email) = lower($1)
+       limit 1`,
+      [email]
+    )
 
-    return rows[0] || null
+    return result.rows[0] || null
   } catch (error) {
     throw createError({
       statusCode: 500,
@@ -237,72 +234,50 @@ export async function fetchUserByEmail(email: string) {
 }
 
 export async function fetchCustomerByLogin(login: string) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
   const normalized = normalizePhoneOrUsername(login)
   const digits = normalized.replace(/\D/g, '')
   const plusDigits = digits ? `+${digits}` : ''
 
-  const rows = await $fetch<CustomerLoginRow[]>(`${url}/rest/v1/customers`, {
-    headers,
-    query: {
-      select: 'id,full_name,username,password,phone_number,avatar,status,must_change_password,role',
-      or: `(${[
-        `phone_number.eq.${normalized}`,
-        `phone_number.eq.${login}`,
-        digits ? `phone_number.eq.${digits}` : null,
-        plusDigits ? `phone_number.eq.${plusDigits}` : null,
-        digits ? `phone_number.ilike.%${digits}%` : null,
-        `username.eq.${normalized}`,
-        `username.eq.${login}`
-      ].filter(Boolean).join(',')})`
-    }
-  })
+  const result = await postgresQuery<CustomerLoginRow>(
+    `select id, full_name, username, password, phone_number, avatar, status, must_change_password, role
+     from public.customers
+     where phone_number = $1
+        or phone_number = $2
+        or phone_number = $3
+        or phone_number = $4
+        or phone_number ilike $5
+        or username = $1
+        or username = $2
+     limit 1`,
+    [normalized, login, digits, plusDigits, digits ? `%${digits}%` : '']
+  )
 
-  return rows[0] || null
+  return result.rows[0] || null
 }
 
 export async function fetchErpUserById(id: number) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const rows = await $fetch<ErpUserAuthRow[]>(`${url}/rest/v1/erp_users`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
-    query: {
-      select: 'id,name,email,password_hash,role,avatar,is_active',
-      id: `eq.${id}`,
-      limit: '1'
-    }
-  })
+  const result = await postgresQuery<ErpUserAuthRow>(
+    `select id, name, email, password_hash, role, avatar, is_active
+     from public.erp_users
+     where id = $1
+     limit 1`,
+    [id]
+  )
 
-  return rows[0] || null
+  return result.rows[0] || null
 }
 
 export async function fetchCustomerProfileById(id: number) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const result = await postgresQuery<CustomerProfileRow>(
+    `select id, full_name, username, phone_number, avatar, role, status, must_change_password,
+            work_shift, building_id, object_pinned, object_positions
+     from public.customers
+     where id = $1
+     limit 1`,
+    [id]
+  )
 
-  try {
-    const rows = await $fetch<CustomerProfileRow[]>(`${url}/rest/v1/customers`, {
-      headers,
-      query: {
-        select: 'id,full_name,username,phone_number,avatar,role,status,must_change_password,work_shift,building_id,object_pinned,object_positions',
-        id: `eq.${id}`,
-        limit: '1'
-      }
-    })
-
-    return rows[0] || null
-  } catch {
-    const rows = await $fetch<CustomerProfileRow[]>(`${url}/rest/v1/customers`, {
-      headers,
-      query: {
-        select: 'id,full_name,username,phone_number,avatar,role,status,must_change_password,work_shift,object_pinned,object_positions',
-        id: `eq.${id}`,
-        limit: '1'
-      }
-    })
-
-    return rows[0] || null
-  }
+  return result.rows[0] || null
 }
 
 export async function authenticateLogin(body: Partial<LoginRequestBody> | null | undefined): Promise<AuthenticatedLoginResult> {

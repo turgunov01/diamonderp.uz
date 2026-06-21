@@ -31,22 +31,31 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
   runtimeConfig: {
-    supabase: {
-      url: import.meta.env.SUPABASE_URL || '',
-      serviceRoleKey: import.meta.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      avatarBucket: import.meta.env.SUPABASE_AVATAR_BUCKET || 'customer-avatars',
-      passportBucket: import.meta.env.SUPABASE_PASSPORT_BUCKET || 'customer-passports',
-      documentTemplateBucket: import.meta.env.SUPABASE_DOCUMENT_TEMPLATE_BUCKET || 'document-templates',
-      documentTemplateUploadBucket: import.meta.env.SUPABASE_DOCUMENT_TEMPLATE_UPLOAD_BUCKET || 'document-template-uploads',
-      documentSignatureBucket: import.meta.env.SUPABASE_DOCUMENT_SIGNATURE_BUCKET || 'document-signatures',
-      taskPhotoBucket: import.meta.env.SUPABASE_TASK_PHOTO_BUCKET || 'object-task-photos'
+    internalApiSecret: process.env.APP_INTERNAL_API_SECRET || '',
+    database: {
+      url: process.env.DATABASE_URL || '',
+      host: process.env.POSTGRES_HOST || '',
+      port: process.env.POSTGRES_PORT || '5432',
+      name: process.env.POSTGRES_DATABASE || '',
+      user: process.env.POSTGRES_USER || '',
+      password: process.env.POSTGRES_PASSWORD || '',
+      ssl: process.env.POSTGRES_SSL || ''
+    },
+    storage: {
+      root: process.env.STORAGE_ROOT || '.data/storage',
+      baseUrl: process.env.STORAGE_BASE_URL || '',
+      avatarBucket: process.env.STORAGE_AVATAR_BUCKET || 'customer-avatars',
+      passportBucket: process.env.STORAGE_PASSPORT_BUCKET || 'customer-passports',
+      documentTemplateBucket: process.env.STORAGE_DOCUMENT_TEMPLATE_BUCKET || 'document-templates',
+      documentTemplateUploadBucket: process.env.STORAGE_DOCUMENT_TEMPLATE_UPLOAD_BUCKET || 'document-template-uploads',
+      documentSignatureBucket: process.env.STORAGE_DOCUMENT_SIGNATURE_BUCKET || 'document-signatures',
+      taskPhotoBucket: process.env.STORAGE_TASK_PHOTO_BUCKET || 'object-task-photos'
     },
     public: {
-      supabaseUrl: import.meta.env.NUXT_PUBLIC_SUPABASE_URL || import.meta.env.SUPABASE_URL || '',
-      supabaseAnonKey: import.meta.env.NUXT_PUBLIC_SUPABASE_ANON_KEY || '',
-      supabasePassportBucket:
-        import.meta.env.NUXT_PUBLIC_SUPABASE_PASSPORT_BUCKET
-        || import.meta.env.SUPABASE_PASSPORT_BUCKET
+      storageBaseUrl: process.env.NUXT_PUBLIC_STORAGE_BASE_URL || process.env.STORAGE_BASE_URL || '',
+      storagePassportBucket:
+        process.env.NUXT_PUBLIC_STORAGE_PASSPORT_BUCKET
+        || process.env.STORAGE_PASSPORT_BUCKET
         || 'customer-passports'
     }
   },

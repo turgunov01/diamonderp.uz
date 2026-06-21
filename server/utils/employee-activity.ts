@@ -1,4 +1,4 @@
-﻿import { getSupabaseServerConfig, getSupabaseServerHeaders } from './supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from './data-api'
 import {
   getLegacyWorkScheduleType,
   getWorkScheduleDefinition,
@@ -144,14 +144,14 @@ async function fetchCustomersByIds(employeeIds: number[]) {
     return new Map<number, ActivityCustomerRow>()
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const params = new URLSearchParams()
 
   params.set('select', 'id,building_id,username,work_shift,object_pinned,object_positions,salary_type')
   params.set('id', `in.(${employeeIds.join(',')})`)
 
   const rows = await $fetch<ActivityCustomerRow[]>(`${url}/rest/v1/customers?${params.toString()}`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey)
+    headers: getDataApiServerHeaders(serviceRoleKey)
   })
 
   return new Map(rows.map(row => [row.id, row]))
@@ -394,9 +394,9 @@ function buildInitialActivityStatus(
 }
 
 async function fetchActivityCustomer(employeeId: number) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const rows = await $fetch<ActivityCustomerRow[]>(`${url}/rest/v1/customers`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       select: 'id,building_id,username,work_shift,object_pinned,object_positions,salary_type',
       id: `eq.${employeeId}`,
@@ -424,12 +424,12 @@ async function fetchActivityCustomer(employeeId: number) {
 }
 
 async function fetchExistingActivity(employeeId: number, activityDate: string) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   let rows: EmployeeActivityDbRow[]
 
   try {
     rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
-      headers: getSupabaseServerHeaders(serviceRoleKey),
+      headers: getDataApiServerHeaders(serviceRoleKey),
       query: {
         select: EMPLOYEE_ACTIVITY_SELECT_WITH_LOCATIONS,
         employee_id: `eq.${employeeId}`,
@@ -444,7 +444,7 @@ async function fetchExistingActivity(employeeId: number, activityDate: string) {
 
     try {
       rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
-        headers: getSupabaseServerHeaders(serviceRoleKey),
+        headers: getDataApiServerHeaders(serviceRoleKey),
         query: {
           select: EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES,
           employee_id: `eq.${employeeId}`,
@@ -458,7 +458,7 @@ async function fetchExistingActivity(employeeId: number, activityDate: string) {
       }
 
       rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
-        headers: getSupabaseServerHeaders(serviceRoleKey),
+        headers: getDataApiServerHeaders(serviceRoleKey),
         query: {
           select: EMPLOYEE_ACTIVITY_SELECT_LEGACY,
           employee_id: `eq.${employeeId}`,
@@ -480,14 +480,14 @@ async function createActivity(
   startedLocation: EmployeeActivityLocation | null,
   initialStatus: { status: EmployeeActivityStatus, lateMinutes: number }
 ) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   let rows: EmployeeActivityDbRow[]
 
   try {
     rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
       method: 'POST',
       headers: {
-        ...getSupabaseServerHeaders(serviceRoleKey),
+        ...getDataApiServerHeaders(serviceRoleKey),
         Prefer: 'return=representation'
       },
       body: {
@@ -510,7 +510,7 @@ async function createActivity(
       rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
         method: 'POST',
         headers: {
-          ...getSupabaseServerHeaders(serviceRoleKey),
+          ...getDataApiServerHeaders(serviceRoleKey),
           Prefer: 'return=representation'
         },
         body: {
@@ -531,7 +531,7 @@ async function createActivity(
       rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
         method: 'POST',
         headers: {
-          ...getSupabaseServerHeaders(serviceRoleKey),
+          ...getDataApiServerHeaders(serviceRoleKey),
           Prefer: 'return=representation'
         },
         body: {
@@ -558,11 +558,11 @@ async function createActivity(
 }
 
 async function updateActivity(activityId: number, body: Record<string, unknown>) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   const rows = await $fetch<EmployeeActivityDbRow[]>(`${url}/rest/v1/employee_activity`, {
     method: 'PATCH',
     headers: {
-      ...getSupabaseServerHeaders(serviceRoleKey),
+      ...getDataApiServerHeaders(serviceRoleKey),
       Prefer: 'return=representation'
     },
     query: {
@@ -583,12 +583,12 @@ async function updateActivity(activityId: number, body: Record<string, unknown>)
 }
 
 export async function listEmployeeActivities(options: ListEmployeeActivitiesOptions = {}) {
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
   let rows: EmployeeActivityDbRow[]
 
   try {
     rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options, EMPLOYEE_ACTIVITY_SELECT_WITH_LOCATIONS), {
-      headers: getSupabaseServerHeaders(serviceRoleKey)
+      headers: getDataApiServerHeaders(serviceRoleKey)
     })
   } catch (error) {
     if (!isMissingEmployeeActivityLocationColumns(error) && !isMissingEmployeeActivityTimeColumns(error)) {
@@ -597,7 +597,7 @@ export async function listEmployeeActivities(options: ListEmployeeActivitiesOpti
 
     try {
       rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options, EMPLOYEE_ACTIVITY_SELECT_WITH_TIMES), {
-        headers: getSupabaseServerHeaders(serviceRoleKey)
+        headers: getDataApiServerHeaders(serviceRoleKey)
       })
     } catch (fallbackError) {
       if (!isMissingEmployeeActivityTimeColumns(fallbackError)) {
@@ -605,7 +605,7 @@ export async function listEmployeeActivities(options: ListEmployeeActivitiesOpti
       }
 
       rows = await $fetch<EmployeeActivityDbRow[]>(buildEmployeeActivityUrl(url, options, EMPLOYEE_ACTIVITY_SELECT_LEGACY), {
-        headers: getSupabaseServerHeaders(serviceRoleKey)
+        headers: getDataApiServerHeaders(serviceRoleKey)
       })
     }
   }
@@ -870,11 +870,11 @@ export async function deleteEmployeeActivitiesByEmployeeId(employeeId: number) {
     return
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   await $fetch(`${url}/rest/v1/employee_activity`, {
     method: 'DELETE',
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       employee_id: `eq.${employeeId}`
     }

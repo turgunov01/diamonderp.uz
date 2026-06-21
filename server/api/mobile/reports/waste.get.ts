@@ -1,6 +1,6 @@
 ﻿import { parseRequestedObjectId, requireMobileAccess, resolveScopedObjectIds } from '../../../utils/mobile-access'
 import { buildEqOrInFilter } from '../../../utils/postgrest'
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../../utils/supabase'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 import { mapBinRow, mapReportRow, type WasteBinRow, type WasteReportRow } from '../../waste/waste'
 
 export default eventHandler(async (event) => {
@@ -12,8 +12,8 @@ export default eventHandler(async (event) => {
     return { bins: [], reports: [] }
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
-  const headers = getSupabaseServerHeaders(serviceRoleKey)
+  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const headers = getDataApiServerHeaders(serviceRoleKey)
   const objectFilter = buildEqOrInFilter(objectIds)
 
   const [binsRows, reportRows] = await Promise.all([

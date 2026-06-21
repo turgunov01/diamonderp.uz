@@ -1,4 +1,4 @@
-import { getSupabaseServerConfig, getSupabaseServerHeaders } from '../../utils/supabase'
+﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 
 type BindingRow = {
   id: number
@@ -14,13 +14,13 @@ export default eventHandler(async (event) => {
   const objectId = objectIdRaw ? Number(objectIdRaw) : NaN
 
   if (!Number.isInteger(objectId) || objectId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле objectId обязательно для привязок.' })
+    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ objectId РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ РґР»СЏ РїСЂРёРІСЏР·РѕРє.' })
   }
 
-  const { url, serviceRoleKey } = getSupabaseServerConfig()
+  const { url, serviceRoleKey } = getDataApiServerConfig()
 
   const rows = await $fetch<BindingRow[]>(`${url}/rest/v1/telegram_group_bindings`, {
-    headers: getSupabaseServerHeaders(serviceRoleKey),
+    headers: getDataApiServerHeaders(serviceRoleKey),
     query: {
       select: 'id,tg_chat_id,object_id,title,is_active,updated_at',
       object_id: `eq.${objectId}`,

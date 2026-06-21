@@ -14,7 +14,7 @@ type MessageRow = {
 export default eventHandler(async (event) => {
   const chatId = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(chatId) || chatId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id С‡Р°С‚Р°.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id чата.' })
   }
 
   // SSE headers
@@ -92,6 +92,5 @@ export default eventHandler(async (event) => {
 
   event.node.req.on('close', close)
   // Prevent handler from finishing
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   await new Promise(() => {})
 })

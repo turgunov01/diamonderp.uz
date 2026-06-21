@@ -36,7 +36,7 @@ export default eventHandler(async (event) => {
   const idRaw = getRouterParam(event, 'id')
   const id = Number(idRaw)
   if (!idRaw || !Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id РѕР±СЉРµРєС‚Р°.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id объекта.' })
   }
 
   const body = await readBody<UpdateObjectBody>(event)
@@ -44,14 +44,14 @@ export default eventHandler(async (event) => {
 
   if (body.isActive !== undefined) {
     if (typeof body.isActive !== 'boolean') {
-      throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ isActive РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ true/false.' })
+      throw createError({ statusCode: 400, statusMessage: 'Поле isActive должно быть true/false.' })
     }
     patchBody.is_active = body.isActive
   }
 
   if (body.name !== undefined) {
     if (typeof body.name !== 'string' || !body.name.trim()) {
-      throw createError({ statusCode: 400, statusMessage: 'РќР°Р·РІР°РЅРёРµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
+      throw createError({ statusCode: 400, statusMessage: 'Название обязательно.' })
     }
     patchBody.name = body.name.trim()
   }
@@ -80,7 +80,7 @@ export default eventHandler(async (event) => {
   }
 
   if (!Object.keys(patchBody).length) {
-    throw createError({ statusCode: 400, statusMessage: 'РќСѓР¶РЅРѕ РїРµСЂРµРґР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕ РїРѕР»Рµ РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Нужно передать хотя бы одно поле для обновления.' })
   }
 
   let rows: ObjectPatchRow[]
@@ -115,7 +115,7 @@ export default eventHandler(async (event) => {
 
   const row = rows[0]
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'РћР±СЉРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ.' })
+    throw createError({ statusCode: 404, statusMessage: 'Объект не найден.' })
   }
 
   return row

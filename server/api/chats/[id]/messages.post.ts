@@ -29,12 +29,12 @@ type InsertedRow = {
 export default eventHandler(async (event) => {
   const chatId = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(chatId) || chatId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id С‡Р°С‚Р°.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id чата.' })
   }
 
   const body = await readBody<Body>(event)
   if (!body?.authorId || !body?.content) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»СЏ authorId Рё content РѕР±СЏР·Р°С‚РµР»СЊРЅС‹.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поля authorId и content обязательны.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()
@@ -51,7 +51,7 @@ export default eventHandler(async (event) => {
   })
 
   if (!chat) {
-    throw createError({ statusCode: 404, statusMessage: 'Р§Р°С‚ РЅРµ РЅР°Р№РґРµРЅ.' })
+    throw createError({ statusCode: 404, statusMessage: 'Чат не найден.' })
   }
 
   const insertedRows = await $fetch<Array<InsertedRow>>(`${url}/rest/v1/chat_messages`, {
@@ -72,7 +72,7 @@ export default eventHandler(async (event) => {
 
   const inserted = insertedRows[0]
   if (!inserted?.id) {
-    throw createError({ statusCode: 500, statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» id СЃРѕР·РґР°РЅРЅРѕРіРѕ СЃРѕРѕР±С‰РµРЅРёСЏ.' })
+    throw createError({ statusCode: 500, statusMessage: 'Postgres не вернул id созданного сообщения.' })
   }
 
   let finalStatus: 'sent' | 'delivered' | 'error' = 'sent'
@@ -110,7 +110,7 @@ export default eventHandler(async (event) => {
         query: { id: `eq.${inserted.id}` },
         body: { status: finalStatus }
       })
-      throw createError({ statusCode: 502, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ СЃРѕРѕР±С‰РµРЅРёРµ РІ Telegram.' })
+      throw createError({ statusCode: 502, statusMessage: 'Не удалось отправить сообщение в Telegram.' })
     }
   }
 

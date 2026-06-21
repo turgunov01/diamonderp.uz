@@ -16,7 +16,7 @@ function parseBuildingId(value: unknown) {
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ buildingId РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј С†РµР»С‹Рј С‡РёСЃР»РѕРј РёР»Рё null.'
+      statusMessage: 'Поле buildingId должно быть положительным целым числом или null.'
     })
   }
 
@@ -32,14 +32,14 @@ export default eventHandler(async (event) => {
   if (!code) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ code РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ (Р»Р°С‚РёРЅРёС†Р°/С†РёС„СЂС‹/._-).'
+      statusMessage: 'Поле code обязательно (латиница/цифры/._-).'
     })
   }
 
   if (!label) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ label РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.'
+      statusMessage: 'Поле label обязательно.'
     })
   }
 
@@ -61,7 +61,7 @@ export default eventHandler(async (event) => {
   if (!created) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ СЂРѕР»СЊ.'
+      statusMessage: 'Не удалось создать роль.'
     })
   }
 

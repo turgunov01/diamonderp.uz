@@ -30,17 +30,17 @@ export default eventHandler(async (event) => {
 
   const type = body.type
   if (!type || !['disinfection', 'deratization'].includes(type)) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ type РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ (disinfection|deratization).' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле type обязательно (disinfection|deratization).' })
   }
 
   const team = (body.team || '').trim()
   if (!team.length) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ team РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле team обязательно.' })
   }
 
   const performedAt = body.performedAt ? new Date(body.performedAt) : new Date()
   if (Number.isNaN(performedAt.getTime())) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ performedAt РЅРµРєРѕСЂСЂРµРєС‚РЅРѕ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле performedAt некорректно.' })
   }
 
   const executors = normalizeList(body.executors)

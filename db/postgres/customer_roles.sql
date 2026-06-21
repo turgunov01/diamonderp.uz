@@ -59,13 +59,13 @@ using (true);
 -- Seed global defaults (can be overridden per-building by inserting the same `code` with `building_id`).
 insert into public.customer_roles (building_id, code, label)
 values
-  (null, 'customer', 'РЎРѕС‚СЂСѓРґРЅРёРє'),
-  (null, 'cleaner', 'РљР»РёРЅРµСЂ'),
-  (null, 'manager', 'РњРµРЅРµРґР¶РµСЂ'),
-  (null, 'supervisor', 'РЎСѓРїРµСЂРІР°Р№Р·РµСЂ'),
-  (null, 'procurement', 'Р—Р°РєСѓРїС‰РёРє'),
+  (null, 'customer', 'Сотрудник'),
+  (null, 'cleaner', 'Клинер'),
+  (null, 'manager', 'Менеджер'),
+  (null, 'supervisor', 'Супервайзер'),
+  (null, 'procurement', 'Закупщик'),
   (null, 'hr', 'HR'),
-  (null, 'admin', 'РђРґРјРёРЅ')
+  (null, 'admin', 'Админ')
 on conflict (code) where building_id is null do nothing;
 
 commit;

@@ -38,7 +38,7 @@ function isNonEmptyString(value: unknown): value is string {
 
 function getRequiredString(value: unknown, fieldName: string) {
   if (!isNonEmptyString(value)) {
-    throw createError({ statusCode: 400, statusMessage: `РџРѕР»Рµ ${fieldName} РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.` })
+    throw createError({ statusCode: 400, statusMessage: `Поле ${fieldName} обязательно.` })
   }
 
   return value.trim()
@@ -63,7 +63,7 @@ function getDataApiErrorData(error: unknown): DataApiErrorData | undefined {
 function parseAge(value: unknown) {
   const age = typeof value === 'number' ? value : Number(value)
   if (!Number.isInteger(age) || age < 18) {
-    throw createError({ statusCode: 400, statusMessage: 'Р’РѕР·СЂР°СЃС‚ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ С†РµР»С‹Рј С‡РёСЃР»РѕРј РЅРµ РјРµРЅСЊС€Рµ 18.' })
+    throw createError({ statusCode: 400, statusMessage: 'Возраст должен быть целым числом не меньше 18.' })
   }
 
   return age
@@ -79,7 +79,7 @@ function parseOptionalBuildingId(value: unknown) {
   if (!Number.isInteger(buildingId) || buildingId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ buildingId РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј С†РµР»С‹Рј С‡РёСЃР»РѕРј.'
+      statusMessage: 'Поле buildingId должно быть положительным целым числом.'
     })
   }
 
@@ -95,7 +95,7 @@ function parseOptionalMoney(value: unknown, fieldName: string) {
   if (!Number.isInteger(amount) || amount < 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: `РџРѕР»Рµ ${fieldName} РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ С†РµР»С‹Рј С‡РёСЃР»РѕРј РЅРµ РјРµРЅСЊС€Рµ 0.`
+      statusMessage: `Поле ${fieldName} должно быть целым числом не меньше 0.`
     })
   }
 
@@ -106,7 +106,7 @@ function parseObjectPositions(value: unknown) {
   if (!isNonEmptyString(value)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ objectPositions РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.'
+      statusMessage: 'Поле objectPositions обязательно.'
     })
   }
 
@@ -131,7 +131,7 @@ function parseObjectPositions(value: unknown) {
   if (!objectPositions.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ objectPositions РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РЅРµРїСѓСЃС‚С‹Рј РјР°СЃСЃРёРІРѕРј СЃС‚СЂРѕРє.'
+      statusMessage: 'Поле objectPositions должно быть непустым массивом строк.'
     })
   }
 
@@ -142,7 +142,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј JSON-РѕР±СЉРµРєС‚РѕРј.'
+      statusMessage: 'Тело запроса должно быть корректным JSON-объектом.'
     })
   }
 
@@ -151,7 +151,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   const username = getOptionalString(input.username) || generateUsername(fullName)
 
   if (!input.avatar || typeof input.avatar !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ avatar.src РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле avatar.src обязательно.' })
   }
 
   const avatarSrc = getRequiredString(input.avatar.src, 'avatar.src')
@@ -161,7 +161,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   const age = parseAge(input.age)
 
   if (!isWorkShift(input.workShift)) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ workShift РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ \'day\' РёР»Рё \'night\'.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле workShift должно быть \'day\' или \'night\'.' })
   }
 
   const objectPinned = getOptionalString(input.objectPinned)
@@ -172,7 +172,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   let salaryType: SalaryType | undefined
   if (salaryTypeValue !== undefined) {
     if (!isSalaryType(salaryTypeValue)) {
-      throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ salaryType РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ fixed РёР»Рё hourly.' })
+      throw createError({ statusCode: 400, statusMessage: 'Поле salaryType должно быть fixed или hourly.' })
     }
     salaryType = salaryTypeValue
   }
@@ -184,11 +184,11 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   const role = (getOptionalString((input as any).role) || 'customer').toLowerCase()
 
   if (!isAuthRole(role) || role.length > 64) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ role СЃРѕРґРµСЂР¶РёС‚ РЅРµРґРѕРїСѓСЃС‚РёРјСѓСЋ СЂРѕР»СЊ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле role содержит недопустимую роль.' })
   }
 
   if (!Array.isArray(input.objectPositions) || !input.objectPositions.length || input.objectPositions.some(position => !isNonEmptyString(position))) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ objectPositions РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РЅРµРїСѓСЃС‚С‹Рј РјР°СЃСЃРёРІРѕРј СЃС‚СЂРѕРє.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле objectPositions должно быть непустым массивом строк.' })
   }
 
   return {
@@ -280,7 +280,7 @@ async function ensureStorageBucket(options: {
 
     throw createError({
       statusCode: 500,
-      statusMessage: `РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРіРѕС‚РѕРІРёС‚СЊ Р±Р°РєРµС‚ С…СЂР°РЅРёР»РёС‰Р° "${options.bucket}".`
+      statusMessage: `Не удалось подготовить бакет хранилища "${options.bucket}".`
     })
   }
 }
@@ -306,17 +306,17 @@ async function uploadStorageObject(options: {
   } catch {
     throw createError({
       statusCode: 400,
-      statusMessage: `РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ С„Р°Р№Р» РІ Р±Р°РєРµС‚ "${options.bucket}".`
+      statusMessage: `Не удалось загрузить файл в бакет "${options.bucket}".`
     })
   }
 }
 
 function transliterateToLatin(value: string) {
   const map: Record<string, string> = {
-    'Р°': 'a', 'Р±': 'b', 'РІ': 'v', 'Рі': 'g', 'Т“': 'g', 'Рґ': 'd', 'Рµ': 'e', 'С‘': 'e', 'Р¶': 'zh', 'Р·': 'z', 'Рё': 'i', 'Р№': 'y',
-    'Рє': 'k', 'Т›': 'q', 'Р»': 'l', 'Рј': 'm', 'РЅ': 'n', 'ТЈ': 'ng', 'Рѕ': 'o', 'У©': 'o', 'Рї': 'p', 'СЂ': 'r', 'СЃ': 's', 'С‚': 't',
-    'Сѓ': 'u', 'Т±': 'u', 'ТЇ': 'u', 'С„': 'f', 'С…': 'h', 'Ті': 'h', 'С†': 'ts', 'С‡': 'ch', 'С€': 'sh', 'С‰': 'sch', 'С‹': 'y', 'СЌ': 'e',
-    'СЋ': 'yu', 'СЏ': 'ya', 'СЊ': '', 'СЉ': '', 'Сћ': 'o', 'УЇ': 'o', 'Р№Рѕ': 'yo'
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'ғ': 'g', 'д': 'd', 'е': 'e', 'ё': 'e', 'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y',
+    'к': 'k', 'қ': 'q', 'л': 'l', 'м': 'm', 'н': 'n', 'ң': 'ng', 'о': 'o', 'ө': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
+    'у': 'u', 'ұ': 'u', 'ү': 'u', 'ф': 'f', 'х': 'h', 'ҳ': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ы': 'y', 'э': 'e',
+    'ю': 'yu', 'я': 'ya', 'ь': '', 'ъ': '', 'ў': 'o', 'ӯ': 'o', 'йо': 'yo'
   }
 
   return value
@@ -335,7 +335,7 @@ function generateUsername(fullName: string) {
     .toLowerCase()
 
   if (!normalized) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРіРµРЅРµСЂРёСЂРѕРІР°С‚СЊ РЅРёРєРЅРµР№Рј РёР· Р¤РРћ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Не удалось сгенерировать никнейм из ФИО.' })
   }
 
   const parts = normalized.split(' ')
@@ -354,7 +354,7 @@ function ensurePasswordSafe(password: string, fullName: string, username: string
   if (normalizedPassword === normalizedName || normalizedPassword === normalizedUsername) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџР°СЂРѕР»СЊ РЅРµ РјРѕР¶РµС‚ СЃРѕРІРїР°РґР°С‚СЊ СЃ Р¤РРћ РёР»Рё РЅРёРєРЅРµР№РјРѕРј.'
+      statusMessage: 'Пароль не может совпадать с ФИО или никнеймом.'
     })
   }
 }
@@ -364,7 +364,7 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
   if (!form || !form.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Р”Р°РЅРЅС‹Рµ multipart/form-data РїСѓСЃС‚С‹.'
+      statusMessage: 'Данные multipart/form-data пусты.'
     })
   }
 
@@ -416,7 +416,7 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
   let salaryType: SalaryType | undefined
   if (salaryTypeRaw) {
     if (!isSalaryType(salaryTypeRaw)) {
-      throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ salaryType РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ fixed РёР»Рё hourly.' })
+      throw createError({ statusCode: 400, statusMessage: 'Поле salaryType должно быть fixed или hourly.' })
     }
     salaryType = salaryTypeRaw
   }
@@ -425,30 +425,30 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
   ensurePasswordSafe(password, fullName, username)
 
   if (!isAuthRole(role) || role.length > 64) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ role РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РЅРµРїСѓСЃС‚РѕР№ СЃС‚СЂРѕРєРѕР№.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле role должно быть непустой строкой.' })
   }
 
   if (!isWorkShift(workShiftRaw)) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ workShift РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ \'day\' РёР»Рё \'night\'.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле workShift должно быть \'day\' или \'night\'.' })
   }
 
   if (!avatarFile) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ avatarFile РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле avatarFile обязательно.' })
   }
   if (!avatarFile.type?.startsWith('image/')) {
-    throw createError({ statusCode: 400, statusMessage: 'Р¤Р°Р№Р» avatarFile РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РёР·РѕР±СЂР°Р¶РµРЅРёРµРј.' })
+    throw createError({ statusCode: 400, statusMessage: 'Файл avatarFile должен быть изображением.' })
   }
 
   if (passportFrontFile && !passportBackFile) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ passportBackFile РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле passportBackFile обязательно.' })
   }
   if (passportBackFile && !passportFrontFile) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ passportFrontFile РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле passportFrontFile обязательно.' })
   }
   if (!legacyPassportFile && !(passportFrontFile && passportBackFile)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ passportFile РёР»Рё РѕР±Р° passportFrontFile/passportBackFile РѕР±СЏР·Р°С‚РµР»СЊРЅС‹.'
+      statusMessage: 'Поле passportFile или оба passportFrontFile/passportBackFile обязательны.'
     })
   }
 
@@ -582,7 +582,7 @@ export default eventHandler(async (event) => {
     if (!createdRow) {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» СЃРѕР·РґР°РЅРЅРѕРіРѕ РєР»РёРµРЅС‚Р°.'
+        statusMessage: 'Postgres не вернул созданного клиента.'
       })
     }
 
@@ -594,7 +594,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '23505') {
       throw createError({
         statusCode: 409,
-        statusMessage: 'РљР»РёРµРЅС‚ СЃ С‚Р°РєРёРј РёРјРµРЅРµРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.'
+        statusMessage: 'Клиент с таким именем пользователя уже существует.'
       })
     }
 

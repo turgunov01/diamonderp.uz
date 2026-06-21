@@ -1,7 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
-    '@nuxt/eslint',
     '@nuxt/ui',
     '@pinia/nuxt',
     '@vueuse/nuxt'
@@ -32,6 +31,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   runtimeConfig: {
     internalApiSecret: process.env.APP_INTERNAL_API_SECRET || '',
+    internalApiBaseUrl: process.env.INTERNAL_API_BASE_URL || '',
     database: {
       url: process.env.DATABASE_URL || '',
       host: process.env.POSTGRES_HOST || '',
@@ -66,14 +66,5 @@ export default defineNuxtConfig({
     }
   },
 
-  compatibilityDate: '2024-07-11',
-
-  eslint: {
-    config: {
-      stylistic: {
-        commaDangle: 'never',
-        braceStyle: '1tbs'
-      }
-    }
-  }
+  compatibilityDate: '2024-07-11'
 })

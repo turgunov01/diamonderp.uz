@@ -14,7 +14,7 @@ export default eventHandler(async (event) => {
   const objectId = objectIdRaw ? Number(objectIdRaw) : NaN
 
   if (!Number.isInteger(objectId) || objectId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ objectId РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ РґР»СЏ РїСЂРёРІСЏР·РѕРє.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле objectId обязательно для привязок.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()

@@ -24,14 +24,14 @@ interface SignBody {
 function parseNumberField(value: unknown, field: string) {
   const num = Number(value)
   if (!Number.isInteger(num) || num <= 0) {
-    throw createError({ statusCode: 400, statusMessage: `${field} РѕР±СЏР·Р°С‚РµР»РµРЅ.` })
+    throw createError({ statusCode: 400, statusMessage: `${field} обязателен.` })
   }
   return num
 }
 
 function parseBody(body: unknown): SignBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РѕР±СЉРµРєС‚РѕРј.' })
+    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть объектом.' })
   }
 
   const input = body as Record<string, unknown>
@@ -40,13 +40,13 @@ function parseBody(body: unknown): SignBody {
   const signatureImage = typeof input.signatureImage === 'string' ? input.signatureImage.trim() : ''
 
   if (!employeeName) {
-    throw createError({ statusCode: 400, statusMessage: 'employeeName РѕР±СЏР·Р°С‚РµР»РµРЅ.' })
+    throw createError({ statusCode: 400, statusMessage: 'employeeName обязателен.' })
   }
   if (!phoneNumber) {
-    throw createError({ statusCode: 400, statusMessage: 'phoneNumber РѕР±СЏР·Р°С‚РµР»РµРЅ.' })
+    throw createError({ statusCode: 400, statusMessage: 'phoneNumber обязателен.' })
   }
   if (!signatureImage) {
-    throw createError({ statusCode: 400, statusMessage: 'signatureImage РѕР±СЏР·Р°С‚РµР»РµРЅ.' })
+    throw createError({ statusCode: 400, statusMessage: 'signatureImage обязателен.' })
   }
 
   return {
@@ -86,7 +86,7 @@ export default eventHandler(async (event) => {
     serviceRoleKey,
     bucket: documentSignatureBucket,
     isPublic: false,
-    missingErrorMessage: `РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРіРѕС‚РѕРІРёС‚СЊ Р±Р°РєРµС‚ "${documentSignatureBucket}".`
+    missingErrorMessage: `Не удалось подготовить бакет "${documentSignatureBucket}".`
   })
 
   const dispatchRows = await $fetch<DocumentDispatchDbRow[]>(`${url}/rest/v1/document_dispatches`, {
@@ -101,7 +101,7 @@ export default eventHandler(async (event) => {
 
   const dispatch = dispatchRows[0]
   if (!dispatch) {
-    throw createError({ statusCode: 404, statusMessage: 'РћС‚РїСЂР°РІРєР° РґРѕРіРѕРІРѕСЂР° РЅРµ РЅР°Р№РґРµРЅР°.' })
+    throw createError({ statusCode: 404, statusMessage: 'Отправка договора не найдена.' })
   }
 
   const { buffer, contentType } = toBuffer(payload.signatureImage)
@@ -116,7 +116,7 @@ export default eventHandler(async (event) => {
     path: signaturePath,
     data: buffer,
     contentType: contentType || 'image/jpeg',
-    uploadErrorMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РїРѕРґРїРёСЃСЊ.'
+    uploadErrorMessage: 'Не удалось сохранить подпись.'
   })
 
   const signatureUrl = `${url}/storage/v1/object/${documentSignatureBucket}/${encodeStoragePath(signaturePath)}`
@@ -144,7 +144,7 @@ export default eventHandler(async (event) => {
 
   const signed = inserted[0]
   if (!signed) {
-    throw createError({ statusCode: 500, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РїРѕРґРїРёСЃСЊ.' })
+    throw createError({ statusCode: 500, statusMessage: 'Не удалось сохранить подпись.' })
   }
 
   const newSignedCount = (dispatch.signed_count || 0) + 1

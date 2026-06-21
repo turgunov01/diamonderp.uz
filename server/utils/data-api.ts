@@ -18,7 +18,9 @@ function normalizeUrl(value: string) {
 export function getDataApiServerConfig(): DataApiServerConfig {
   const config = useRuntimeConfig()
   const storage = config.storage || {}
-  const url = typeof storage.baseUrl === 'string' ? storage.baseUrl : ''
+  const internalApiBaseUrl = typeof config.internalApiBaseUrl === 'string' && config.internalApiBaseUrl.length
+    ? config.internalApiBaseUrl
+    : '/api'
   const serviceRoleKey = getInternalApiSecret()
   const avatarBucket = storage.avatarBucket
   const passportBucket = storage.passportBucket
@@ -28,7 +30,7 @@ export function getDataApiServerConfig(): DataApiServerConfig {
   const taskPhotoBucket = storage.taskPhotoBucket
 
   return {
-    url: normalizeUrl(url),
+    url: normalizeUrl(internalApiBaseUrl),
     serviceRoleKey,
     avatarBucket: typeof avatarBucket === 'string' && avatarBucket.length ? avatarBucket : 'customer-avatars',
     passportBucket: typeof passportBucket === 'string' && passportBucket.length ? passportBucket : 'customer-passports',

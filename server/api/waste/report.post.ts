@@ -18,7 +18,7 @@ export default eventHandler(async (event) => {
 
   const binId = Number(body.binId)
   if (!Number.isInteger(binId) || binId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ binId РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле binId обязательно.' })
   }
 
   const amountM3 = Number(body.amountM3 ?? 0)
@@ -37,7 +37,7 @@ export default eventHandler(async (event) => {
 
   const bin = binRows[0]
   if (!bin) {
-    throw createError({ statusCode: 404, statusMessage: 'Р‘Р°Рє РЅРµ РЅР°Р№РґРµРЅ' })
+    throw createError({ statusCode: 404, statusMessage: 'Бак не найден' })
   }
 
   const fromObjectId = body.fromObjectId ?? bin.object_id ?? null

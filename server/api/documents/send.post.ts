@@ -32,18 +32,18 @@ interface ObjectLiteRow {
 
 function parseSendBody(body: unknown): SendDocumentBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј РѕР±СЉРµРєС‚РѕРј.' })
+    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
   }
 
   const input = body as Partial<SendDocumentBody>
   const templateId = Number(input.templateId)
 
   if (!Number.isInteger(templateId) || templateId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ templateId РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј С†РµР»С‹Рј С‡РёСЃР»РѕРј.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле templateId должно быть положительным целым числом.' })
   }
 
   if (!Array.isArray(input.recipientIds) || !input.recipientIds.length) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ recipientIds РґРѕР»Р¶РЅРѕ СЃРѕРґРµСЂР¶Р°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРёРЅ id РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле recipientIds должно содержать хотя бы один id пользователя.' })
   }
 
   const recipientIds = input.recipientIds
@@ -51,7 +51,7 @@ function parseSendBody(body: unknown): SendDocumentBody {
     .filter(id => Number.isInteger(id) && id > 0)
 
   if (!recipientIds.length) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ recipientIds РґРѕР»Р¶РЅРѕ СЃРѕРґРµСЂР¶Р°С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рµ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рµ С†РµР»С‹Рµ С‡РёСЃР»Р°.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле recipientIds должно содержать корректные положительные целые числа.' })
   }
 
   return {
@@ -88,7 +88,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'РўР°Р±Р»РёС†Р° "document_templates" РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚. РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ db/postgres/documents.sql.'
+        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/postgres/documents.sql.'
       })
     }
 
@@ -97,7 +97,7 @@ export default eventHandler(async (event) => {
 
   const template = templateRows[0]
   if (!template) {
-    throw createError({ statusCode: 404, statusMessage: 'РЁР°Р±Р»РѕРЅ РЅРµ РЅР°Р№РґРµРЅ.' })
+    throw createError({ statusCode: 404, statusMessage: 'Шаблон не найден.' })
   }
 
   const objectRows = await $fetch<ObjectLiteRow[]>(`${url}/rest/v1/objects`, {
@@ -111,7 +111,7 @@ export default eventHandler(async (event) => {
 
   const currentObject = objectRows[0]
   if (!currentObject) {
-    throw createError({ statusCode: 404, statusMessage: 'РћР±СЉРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ.' })
+    throw createError({ statusCode: 404, statusMessage: 'Объект не найден.' })
   }
 
   const customers = await $fetch<CustomerLiteRow[]>(`${url}/rest/v1/customers`, {
@@ -129,7 +129,7 @@ export default eventHandler(async (event) => {
   const selectedCustomers = customers
 
   if (!selectedCustomers.length) {
-    throw createError({ statusCode: 404, statusMessage: 'РџРѕР»СѓС‡Р°С‚РµР»Рё РґР»СЏ СЌС‚РѕРіРѕ РѕР±СЉРµРєС‚Р° РЅРµ РЅР°Р№РґРµРЅС‹.' })
+    throw createError({ statusCode: 404, statusMessage: 'Получатели для этого объекта не найдены.' })
   }
 
   const foundIds = new Set(selectedCustomers.map(customer => customer.id))
@@ -137,7 +137,7 @@ export default eventHandler(async (event) => {
   if (missingIds.length) {
     throw createError({
       statusCode: 404,
-      statusMessage: `РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°Р№С‚Рё РІСЃРµС… РїРѕР»СѓС‡Р°С‚РµР»РµР№: ${missingIds.join(', ')}.`
+      statusMessage: `Не удалось найти всех получателей: ${missingIds.join(', ')}.`
     })
   }
 
@@ -166,7 +166,7 @@ export default eventHandler(async (event) => {
 
   const dispatch = insertedDispatchRows[0]
   if (!dispatch) {
-    throw createError({ statusCode: 500, statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» Р·Р°РїРёСЃСЊ РѕС‚РїСЂР°РІРєРё.' })
+    throw createError({ statusCode: 500, statusMessage: 'Postgres не вернул запись отправки.' })
   }
 
   return {

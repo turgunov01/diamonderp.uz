@@ -58,28 +58,28 @@ type ObjectItem = {
 const DEFAULT_PASSWORD = '12345678'
 const NOT_PINNED_VALUE = '__not_pinned__'
 const DEFAULT_ROLE_OPTIONS = [
-  { label: 'РЎРѕС‚СЂСѓРґРЅРёРє', value: 'customer' },
-  { label: 'РљР»РёРЅРµСЂ', value: 'cleaner' },
-  { label: 'РњРµРЅРµРґР¶РµСЂ', value: 'manager' },
-  { label: 'РЎСѓРїРµСЂРІР°Р№Р·РµСЂ', value: 'supervisor' },
-  { label: 'Р—Р°РєСѓРїС‰РёРє', value: 'procurement' },
+  { label: 'Сотрудник', value: 'customer' },
+  { label: 'Клинер', value: 'cleaner' },
+  { label: 'Менеджер', value: 'manager' },
+  { label: 'Супервайзер', value: 'supervisor' },
+  { label: 'Закупщик', value: 'procurement' },
   { label: 'HR', value: 'hr' },
-  { label: 'РђРґРјРёРЅ', value: 'admin' }
+  { label: 'Админ', value: 'admin' }
 ] as const
 
 const createSchema = z.object({
-  fullName: z.string().min(3, 'Р¤РРћ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ'),
-  username: z.string().min(3, 'РРјСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃР»РёС€РєРѕРј РєРѕСЂРѕС‚РєРѕРµ'),
-  phoneNumber: z.string().min(7, 'РќРѕРјРµСЂ С‚РµР»РµС„РѕРЅР° СЃР»РёС€РєРѕРј РєРѕСЂРѕС‚РєРёР№'),
-  role: z.string().min(1, 'Р РѕР»СЊ РѕР±СЏР·Р°С‚РµР»СЊРЅР°').max(64, 'Р РѕР»СЊ СЃР»РёС€РєРѕРј РґР»РёРЅРЅР°СЏ'),
+  fullName: z.string().min(3, 'ФИО обязательно'),
+  username: z.string().min(3, 'Имя пользователя слишком короткое'),
+  phoneNumber: z.string().min(7, 'Номер телефона слишком короткий'),
+  role: z.string().min(1, 'Роль обязательна').max(64, 'Роль слишком длинная'),
   age: z.coerce
     .number()
-    .int('Р’РѕР·СЂР°СЃС‚ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ С†РµР»С‹Рј С‡РёСЃР»РѕРј')
-    .min(18, 'Р’РѕР·СЂР°СЃС‚ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РЅРµ РјРµРЅРµРµ 18'),
+    .int('Возраст должен быть целым числом')
+    .min(18, 'Возраст должен быть не менее 18'),
   workShift: z.enum(['day', 'night']),
   salaryType: z.enum(['fixed', 'hourly']),
   objectPinned: z.string().optional(),
-  objectPositions: z.array(z.string()).min(1, 'Р’С‹Р±РµСЂРёС‚Рµ С…РѕС‚СЏ Р±С‹ РѕРґРёРЅ РѕР±СЉРµРєС‚')
+  objectPositions: z.array(z.string()).min(1, 'Выберите хотя бы один объект')
 })
 
 type FormState = {
@@ -193,7 +193,7 @@ const objectScheduleByName = computed(() => {
 })
 
 const pinnedObjectOptions = computed(() => [
-  { label: 'РќРµ Р·Р°РєСЂРµРїР»РµРЅ', value: NOT_PINNED_VALUE },
+  { label: 'Не закреплен', value: NOT_PINNED_VALUE },
   ...objectOptions.value
 ])
 
@@ -321,7 +321,7 @@ async function downloadTemplate(format: 'xlsx' | 'csv' = 'xlsx') {
   try {
     const response = await fetch(`/api/customers/import-template?format=${format}&mode=draft`)
     if (!response.ok) {
-      throw new Error('РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ С€Р°Р±Р»РѕРЅ')
+      throw new Error('Не удалось скачать шаблон')
     }
 
     const blob = await response.blob()
@@ -335,8 +335,8 @@ async function downloadTemplate(format: 'xlsx' | 'csv' = 'xlsx') {
     URL.revokeObjectURL(url)
   } catch (error: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ С€Р°Р±Р»РѕРЅ',
-      description: getErrorMessage(error) || 'РџСЂРѕРІРµСЂСЊС‚Рµ API Рё РїРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ.',
+      title: 'Не удалось скачать шаблон',
+      description: getErrorMessage(error) || 'Проверьте API и повторите попытку.',
       color: 'error'
     })
   } finally {
@@ -356,7 +356,7 @@ async function onFileSelected(event: Event) {
 
   try {
     if (!activeBuilding.value?.id) {
-      throw new Error('Р’С‹Р±РµСЂРёС‚Рµ Р·РґР°РЅРёРµ РїРµСЂРµРґ РёРјРїРѕСЂС‚РѕРј.')
+      throw new Error('Выберите здание перед импортом.')
     }
 
     const formData = new FormData()
@@ -406,16 +406,16 @@ async function onFileSelected(event: Event) {
     const errorCount = result.errors.length
 
     toast.add({
-      title: 'Р¤Р°Р№Р» РѕР±СЂР°Р±РѕС‚Р°РЅ',
-      description: `Р’ С‡РµСЂРЅРѕРІРёРєРё РґРѕР±Р°РІР»РµРЅРѕ: ${addedToCache}. РџСЂРѕРїСѓС‰РµРЅРѕ: ${result.skipped + skippedAlreadyCached}.`,
+      title: 'Файл обработан',
+      description: `В черновики добавлено: ${addedToCache}. Пропущено: ${result.skipped + skippedAlreadyCached}.`,
       color: errorCount ? 'warning' : 'success'
     })
 
     if (errorCount) {
       const firstErrors = result.errors.slice(0, 3)
       toast.add({
-        title: 'РћС€РёР±РєРё РІ СЃС‚СЂРѕРєР°С… С„Р°Р№Р»Р°',
-        description: firstErrors.map(item => `РЎС‚СЂРѕРєР° ${item.row}: ${item.message}`).join(' | '),
+        title: 'Ошибки в строках файла',
+        description: firstErrors.map(item => `Строка ${item.row}: ${item.message}`).join(' | '),
         color: 'warning'
       })
     }
@@ -423,8 +423,8 @@ async function onFileSelected(event: Event) {
     draftsOpen.value = true
   } catch (error: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±СЂР°Р±РѕС‚Р°С‚СЊ С„Р°Р№Р»',
-      description: getErrorMessage(error) || 'РџСЂРѕРІРµСЂСЊС‚Рµ С„Р°Р№Р» Рё РїРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ.',
+      title: 'Не удалось обработать файл',
+      description: getErrorMessage(error) || 'Проверьте файл и повторите попытку.',
       color: 'error'
     })
   } finally {
@@ -493,16 +493,16 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
     await refreshNuxtData('/api/customers')
 
     toast.add({
-      title: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃРѕР·РґР°РЅ',
-      description: `@${username} РґРѕР±Р°РІР»РµРЅ РІ Postgres`,
+      title: 'Пользователь создан',
+      description: `@${username} добавлен в Postgres`,
       color: 'success'
     })
 
     closeEditor()
   } catch (error: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ',
-      description: getErrorMessage(error) || 'РџСЂРѕРІРµСЂСЊС‚Рµ РґР°РЅРЅС‹Рµ Рё РїРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ.',
+      title: 'Не удалось создать пользователя',
+      description: getErrorMessage(error) || 'Проверьте данные и повторите попытку.',
       color: 'error'
     })
   } finally {
@@ -514,7 +514,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
 <template>
   <div class="flex items-center gap-2">
     <UButton
-      label="РЁР°Р±Р»РѕРЅ XLSX"
+      label="Шаблон XLSX"
       icon="i-lucide-file-spreadsheet"
       color="neutral"
       variant="outline"
@@ -523,7 +523,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
     />
 
     <UButton
-      label="Р—Р°РіСЂСѓР·РёС‚СЊ Excel"
+      label="Загрузить Excel"
       icon="i-lucide-upload"
       color="primary"
       variant="subtle"
@@ -532,7 +532,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
     />
 
     <UButton
-      :label="`Р§РµСЂРЅРѕРІРёРєРё (${activeBuildingDraftCount})`"
+      :label="`Черновики (${activeBuildingDraftCount})`"
       icon="i-lucide-list"
       color="neutral"
       variant="ghost"
@@ -550,17 +550,17 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
     <UModal
       v-model:open="draftsOpen"
       fullscreen
-      title="Р§РµСЂРЅРѕРІРёРєРё РјР°СЃСЃРѕРІРѕР№ Р·Р°РіСЂСѓР·РєРё"
-      description="РЎС‚СЂРѕРєРё РёР· Excel СЃРѕС…СЂР°РЅРµРЅС‹ Р»РѕРєР°Р»СЊРЅРѕ. Р—Р°РїРѕР»РЅРёС‚Рµ РѕР±СЉРµРєС‚С‹ Рё СЃРѕР·РґР°Р№С‚Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РїРѕ РѕРґРЅРѕРјСѓ."
+      title="Черновики массовой загрузки"
+      description="Строки из Excel сохранены локально. Заполните объекты и создайте пользователей по одному."
     >
       <template #body>
         <div class="flex h-full min-h-0 flex-col gap-3">
           <div class="flex items-center justify-between gap-2">
             <p class="text-sm text-muted">
-              Р—РґР°РЅРёРµ: <span class="font-medium text-highlighted">{{ activeBuilding?.name || 'вЂ”' }}</span>
+              Здание: <span class="font-medium text-highlighted">{{ activeBuilding?.name || '—' }}</span>
             </p>
             <UButton
-              label="РћС‡РёСЃС‚РёС‚СЊ"
+              label="Очистить"
               color="warning"
               variant="outline"
               :disabled="!activeBuildingDraftCount"
@@ -569,7 +569,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
           </div>
 
           <div v-if="!activeBuildingDraftCount" class="rounded-md border border-dashed border-default p-4 text-sm text-muted">
-            Р§РµСЂРЅРѕРІРёРєРѕРІ РґР»СЏ СЌС‚РѕРіРѕ Р·РґР°РЅРёСЏ РїРѕРєР° РЅРµС‚.
+            Черновиков для этого здания пока нет.
           </div>
 
           <div v-else class="min-h-0 flex-1 space-y-2 overflow-auto pr-1">
@@ -583,11 +583,11 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
                   {{ draft.fullName }}
                 </p>
                 <p class="truncate text-sm text-muted">
-                  {{ draft.phoneNumber }} В· @{{ draft.username }}
+                  {{ draft.phoneNumber }} · @{{ draft.username }}
                 </p>
                 <div v-if="draft.issues?.length" class="mt-2">
                   <UBadge color="warning" variant="soft">
-                    Р•СЃС‚СЊ Р·Р°РјРµС‡Р°РЅРёСЏ ({{ draft.issues.length }})
+                    Есть замечания ({{ draft.issues.length }})
                   </UBadge>
                   <ul class="mt-1 list-disc space-y-1 pl-5 text-xs text-warning-900 dark:text-warning-100">
                     <li v-for="issue in draft.issues" :key="issue" class="break-words">
@@ -599,7 +599,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
 
               <div class="flex shrink-0 items-center gap-2">
                 <UButton
-                  label="Р—Р°РїРѕР»РЅРёС‚СЊ"
+                  label="Заполнить"
                   icon="i-lucide-pencil"
                   color="primary"
                   variant="solid"
@@ -620,8 +620,8 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
 
     <UModal
       v-model:open="editorOpen"
-      title="Р—Р°РїРѕР»РЅРёС‚СЊ РґР°РЅРЅС‹Рµ СЃРѕС‚СЂСѓРґРЅРёРєР°"
-      :description="editingDraft ? `РЎС‚СЂРѕРєР° ${editingDraft.sourceRow} В· С‡РµСЂРЅРѕРІРёРє СЃРѕС…СЂР°РЅС‘РЅ Р»РѕРєР°Р»СЊРЅРѕ` : 'Р§РµСЂРЅРѕРІРёРє РЅРµ РІС‹Р±СЂР°РЅ'"
+      title="Заполнить данные сотрудника"
+      :description="editingDraft ? `Строка ${editingDraft.sourceRow} · черновик сохранён локально` : 'Черновик не выбран'"
     >
       <template #body>
         <UForm
@@ -630,23 +630,23 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
           :on-submit="onCreateSubmit"
           class="space-y-4"
         >
-          <UFormField label="Р¤РРћ" name="fullName">
-            <UInput v-model="state.fullName" class="w-full" placeholder="РЎР°СЂРґРѕСЂ РўСѓСЂРіСѓРЅРѕРІ" />
+          <UFormField label="ФИО" name="fullName">
+            <UInput v-model="state.fullName" class="w-full" placeholder="Сардор Тургунов" />
           </UFormField>
 
-          <UFormField label="РРјСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ" name="username">
+          <UFormField label="Имя пользователя" name="username">
             <UInput v-model="state.username" class="w-full" placeholder="alex.smith" />
           </UFormField>
 
-          <UFormField label="РќРѕРјРµСЂ С‚РµР»РµС„РѕРЅР°" name="phoneNumber">
+          <UFormField label="Номер телефона" name="phoneNumber">
             <UInput v-model="state.phoneNumber" class="w-full" placeholder="+998901112233" />
           </UFormField>
 
-          <UFormField label="Р РѕР»СЊ" name="role">
+          <UFormField label="Роль" name="role">
             <USelect v-model="state.role" :items="roleOptions" class="w-full" />
           </UFormField>
 
-          <UFormField label="Р’РѕР·СЂР°СЃС‚" name="age">
+          <UFormField label="Возраст" name="age">
             <UInput
               v-model="state.age"
               class="w-full"
@@ -656,7 +656,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
             />
           </UFormField>
 
-          <UFormField label="Р“СЂР°С„РёРє РѕР±СЉРµРєС‚Р°">
+          <UFormField label="График объекта">
             <UInput
               :model-value="selectedSchedule.label"
               class="w-full"
@@ -664,7 +664,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
             />
           </UFormField>
 
-          <UFormField label="Р—Р°РєСЂРµРїР»РµРЅРЅС‹Р№ РѕР±СЉРµРєС‚" name="objectPinned">
+          <UFormField label="Закрепленный объект" name="objectPinned">
             <USelect
               v-model="pinnedObjectModel"
               :items="pinnedObjectOptions"
@@ -674,21 +674,21 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
             />
           </UFormField>
 
-          <UFormField label="РџРѕР·РёС†РёРё РѕР±СЉРµРєС‚Р°" name="objectPositions">
+          <UFormField label="Позиции объекта" name="objectPositions">
             <USelectMenu
               v-model="state.objectPositions"
               :items="objectOptions"
               value-key="value"
               label-key="label"
               multiple
-              placeholder="Р’С‹Р±РµСЂРёС‚Рµ РѕР±СЉРµРєС‚С‹"
+              placeholder="Выберите объекты"
               class="w-full"
             />
           </UFormField>
 
           <div v-if="editingDraft?.issues?.length" class="rounded-md border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900 dark:border-warning-800 dark:bg-warning-950 dark:text-warning-100">
             <p class="font-medium">
-              Р—Р°РјРµС‡Р°РЅРёСЏ РёР· РёРјРїРѕСЂС‚Р°:
+              Замечания из импорта:
             </p>
             <ul class="mt-1 list-disc space-y-1 pl-5">
               <li v-for="issue in editingDraft.issues" :key="issue">
@@ -699,14 +699,14 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
 
           <div class="flex justify-end gap-2">
             <UButton
-              label="РћС‚РјРµРЅР°"
+              label="Отмена"
               color="neutral"
               variant="subtle"
               :disabled="saving"
               @click="closeEditor"
             />
             <UButton
-              label="РЎРѕР·РґР°С‚СЊ РІ Р±Р°Р·Рµ"
+              label="Создать в базе"
               color="primary"
               variant="solid"
               type="submit"

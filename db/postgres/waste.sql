@@ -48,16 +48,16 @@ alter table public.waste_reports add constraint waste_reports_category_check
 -- Normalize previously stored mojibake values
 update public.waste_bins
 set category = case
-  when category = 'РњР°РєСѓР»Р°С‚СѓСЂР°' then 'Макулатура'
-  when category = 'РџР»Р°СЃС‚РёРє' then 'Пластик'
-  when category = 'РћР±С‰РµРµ' then 'Общее'
+  when category = 'Макулатура' then 'Макулатура'
+  when category = 'Пластик' then 'Пластик'
+  when category = 'Общее' then 'Общее'
   else category end;
 
 update public.waste_reports
 set category = case
-  when category = 'РњР°РєСѓР»Р°С‚СѓСЂР°' then 'Макулатура'
-  when category = 'РџР»Р°СЃС‚РёРє' then 'Пластик'
-  when category = 'РћР±С‰РµРµ' then 'Общее'
+  when category = 'Макулатура' then 'Макулатура'
+  when category = 'Пластик' then 'Пластик'
+  when category = 'Общее' then 'Общее'
   else category end;
 
 create index if not exists waste_reports_bin_id_idx on public.waste_reports(bin_id);

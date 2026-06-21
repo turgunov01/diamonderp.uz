@@ -19,7 +19,7 @@ export default eventHandler(async (event) => {
   if (!body?.name?.trim()) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РќР°Р·РІР°РЅРёРµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.'
+      statusMessage: 'Название обязательно.'
     })
   }
 
@@ -41,7 +41,7 @@ export default eventHandler(async (event) => {
   if (!created) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ Р·РґР°РЅРёРµ.'
+      statusMessage: 'Не удалось создать здание.'
     })
   }
 

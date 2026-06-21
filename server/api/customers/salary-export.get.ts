@@ -128,10 +128,10 @@ function formatWorkMinutes(totalMinutes: number) {
   const minutesPart = minutes % 60
 
   if (!minutesPart) {
-    return `${hoursPart} С‡`
+    return `${hoursPart} ч`
   }
 
-  return `${hoursPart} С‡ ${minutesPart} РјРёРЅ`
+  return `${hoursPart} ч ${minutesPart} мин`
 }
 
 export default eventHandler(async (event) => {
@@ -199,7 +199,7 @@ export default eventHandler(async (event) => {
   }, {})
 
   const workbook = new ExcelJS.Workbook()
-  const sheet = workbook.addWorksheet('Р—Р°СЂРїР»Р°С‚С‹')
+  const sheet = workbook.addWorksheet('Зарплаты')
 
   const cookieConfig = readSalaryFormulaCookie(event)
   const effectiveSalaryMonthDays = getMonthDays(rangeFrom) ?? getInclusiveDays(rangeFrom, rangeTo) ?? 0
@@ -209,30 +209,30 @@ export default eventHandler(async (event) => {
 
   sheet.columns = [
     { header: 'ID', key: 'id', width: 8 },
-    { header: 'Р¤РРћ', key: 'fullName', width: 22 },
-    { header: 'Р›РѕРіРёРЅ', key: 'username', width: 18 },
-    { header: 'РўРµР»РµС„РѕРЅ', key: 'phoneNumber', width: 16 },
-    { header: 'РЎРјРµРЅР°', key: 'workShift', width: 10 },
-    { header: 'РћР±СЉРµРєС‚', key: 'objectPinned', width: 18 },
-    { header: 'РџРѕР·РёС†РёРё', key: 'objectPositions', width: 28 },
-    { header: 'Р“СЂР°С„РёРє РѕР±СЉРµРєС‚Р°', key: 'schedule', width: 24 },
-    { header: 'РўРёРї', key: 'salaryType', width: 12 },
-    { header: 'РЎС‚Р°РІРєР°/С‡Р°СЃ', key: 'hourlyRate', width: 12 },
-    { header: 'Р‘Р°Р·РѕРІР°СЏ', key: 'baseSalary', width: 14 },
-    { header: 'РќР°РґР±Р°РІРєР°', key: 'positionBonus', width: 12 },
-    { header: 'РћС‚СЂР°Р±РѕС‚Р°РЅРѕ', key: 'worked', width: 14 },
-    { header: 'РћРїРѕР·РґР°РЅРёРµ (РјРёРЅ)', key: 'lateMinutes', width: 14 },
-    { header: 'РЁС‚СЂР°С„', key: 'latePenalty', width: 12 },
-    { header: 'РќР° РєР°СЂС‚Сѓ', key: 'cardPayout', width: 14 },
-    { header: 'РќР°Р»РёС‡РЅС‹РјРё', key: 'cashPayout', width: 14 },
-    { header: 'РќР°С‡РёСЃР»РµРЅРѕ', key: 'totalSalary', width: 14 },
-    { header: 'РђРІР°РЅСЃС‹ (РІС‹РґР°РЅРѕ)', key: 'advances', width: 14 },
-    { header: 'Рљ РІС‹РїР»Р°С‚Рµ', key: 'netSalary', width: 16 },
-    { header: 'Р’Р°Р»СЋС‚Р°', key: 'salaryCurrency', width: 8 },
-    { header: 'РЎС‚Р°С‚СѓСЃ', key: 'status', width: 12 },
-    { header: 'РџР°СЃРїРѕСЂС‚ (С„СЂРѕРЅС‚)', key: 'passportFront', width: 30 },
-    { header: 'РџР°СЃРїРѕСЂС‚ (С‚С‹Р»)', key: 'passportBack', width: 30 },
-    { header: 'РђСЂС…РёРІ/РєРѕРјРјРµРЅС‚', key: 'deactivationComment', width: 24 }
+    { header: 'ФИО', key: 'fullName', width: 22 },
+    { header: 'Логин', key: 'username', width: 18 },
+    { header: 'Телефон', key: 'phoneNumber', width: 16 },
+    { header: 'Смена', key: 'workShift', width: 10 },
+    { header: 'Объект', key: 'objectPinned', width: 18 },
+    { header: 'Позиции', key: 'objectPositions', width: 28 },
+    { header: 'График объекта', key: 'schedule', width: 24 },
+    { header: 'Тип', key: 'salaryType', width: 12 },
+    { header: 'Ставка/час', key: 'hourlyRate', width: 12 },
+    { header: 'Базовая', key: 'baseSalary', width: 14 },
+    { header: 'Надбавка', key: 'positionBonus', width: 12 },
+    { header: 'Отработано', key: 'worked', width: 14 },
+    { header: 'Опоздание (мин)', key: 'lateMinutes', width: 14 },
+    { header: 'Штраф', key: 'latePenalty', width: 12 },
+    { header: 'На карту', key: 'cardPayout', width: 14 },
+    { header: 'Наличными', key: 'cashPayout', width: 14 },
+    { header: 'Начислено', key: 'totalSalary', width: 14 },
+    { header: 'Авансы (выдано)', key: 'advances', width: 14 },
+    { header: 'К выплате', key: 'netSalary', width: 16 },
+    { header: 'Валюта', key: 'salaryCurrency', width: 8 },
+    { header: 'Статус', key: 'status', width: 12 },
+    { header: 'Паспорт (фронт)', key: 'passportFront', width: 30 },
+    { header: 'Паспорт (тыл)', key: 'passportBack', width: 30 },
+    { header: 'Архив/коммент', key: 'deactivationComment', width: 24 }
   ]
 
   const parsePassport = (value?: string | null) => {
@@ -295,7 +295,7 @@ export default eventHandler(async (event) => {
     const scheduleType = resolveWorkScheduleTypeFromObjects(c, objectSchedules)
     const schedule = getWorkScheduleDefinition(scheduleType)
 
-    const salaryTypeLabel = schedule.salaryType === 'hourly' ? 'РџРѕС‡Р°СЃРѕРІР°СЏ' : 'РћРєР»Р°Рґ'
+    const salaryTypeLabel = schedule.salaryType === 'hourly' ? 'Почасовая' : 'Оклад'
     const hourlySalary = schedule.salaryType === 'hourly'
       ? computeHourlySalary(c.hourlyRate || 0, workMinutes)
       : 0
@@ -314,7 +314,7 @@ export default eventHandler(async (event) => {
       fullName: c.fullName || '',
       username: c.username,
       phoneNumber: c.phoneNumber,
-      workShift: c.workShift === 'day' ? 'Р”РµРЅСЊ' : 'РќРѕС‡СЊ',
+      workShift: c.workShift === 'day' ? 'День' : 'Ночь',
       objectPinned: c.objectPinned,
       objectPositions: (c.objectPositions || []).join(', '),
       schedule: schedule.label,

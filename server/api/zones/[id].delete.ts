@@ -6,7 +6,7 @@ export default eventHandler(async (event) => {
     if (!id) {
         throw createError({
             statusCode: 400,
-            statusMessage: 'ID Р·РѕРЅС‹ РѕР±СЏР·Р°С‚РµР»РµРЅ.'
+            statusMessage: 'ID зоны обязателен.'
         })
     }
 
@@ -32,7 +32,7 @@ export default eventHandler(async (event) => {
 
         throw createError({
             statusCode: 500,
-            statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ Р·РѕРЅСѓ.'
+            statusMessage: 'Не удалось удалить зону.'
         })
     }
 })

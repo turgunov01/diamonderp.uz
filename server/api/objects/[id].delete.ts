@@ -14,7 +14,7 @@ type ObjectRow = {
 function parseObjectId(idRaw: string | undefined) {
   const id = Number(idRaw)
   if (!idRaw || !Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id РѕР±СЉРµРєС‚Р°.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id объекта.' })
   }
 
   return id
@@ -37,7 +37,7 @@ export default eventHandler(async (event) => {
 
     const deleted = rows[0]
     if (!deleted) {
-      throw createError({ statusCode: 404, statusMessage: 'РћР±СЉРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ.' })
+      throw createError({ statusCode: 404, statusMessage: 'Объект не найден.' })
     }
 
     return deleted
@@ -49,7 +49,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '23503') {
       throw createError({
         statusCode: 409,
-        statusMessage: 'РќРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ РѕР±СЉРµРєС‚: РµСЃС‚СЊ СЃРІСЏР·Р°РЅРЅС‹Рµ Р·Р°РїРёСЃРё (РґРѕРєСѓРјРµРЅС‚С‹/СЃРѕС‚СЂСѓРґРЅРёРєРё/РѕС‚С‡С‘С‚С‹). РЎРЅР°С‡Р°Р»Р° СѓРґР°Р»РёС‚Рµ РёР»Рё РѕС‚РІСЏР¶РёС‚Рµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё.'
+        statusMessage: 'Нельзя удалить объект: есть связанные записи (документы/сотрудники/отчёты). Сначала удалите или отвяжите зависимости.'
       })
     }
 

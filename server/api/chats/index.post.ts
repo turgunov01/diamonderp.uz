@@ -10,7 +10,7 @@ interface Body {
 export default eventHandler(async (event) => {
   const body = await readBody<Body>(event)
   if (!body?.title) {
-    throw createError({ statusCode: 400, statusMessage: 'РќР°Р·РІР°РЅРёРµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Название обязательно.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()
@@ -31,7 +31,7 @@ export default eventHandler(async (event) => {
 
   const chat = insertedChats[0]
   if (!chat?.id) {
-    throw createError({ statusCode: 500, statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» id СЃРѕР·РґР°РЅРЅРѕРіРѕ С‡Р°С‚Р°.' })
+    throw createError({ statusCode: 500, statusMessage: 'Postgres не вернул id созданного чата.' })
   }
 
   if (body.memberIds?.length) {

@@ -45,7 +45,7 @@ function requiredTrimmedString(value: unknown, fieldName: string) {
 
 function parseCreateBody(body: unknown): ParsedCreateExpenseBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј РѕР±СЉРµРєС‚РѕРј.' })
+    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
   }
 
   const input = body as Partial<CreateExpenseBody>
@@ -76,7 +76,7 @@ function parseCreateBody(body: unknown): ParsedCreateExpenseBody {
   let status: ExpenseStatus = 'draft'
   if (input.status !== undefined) {
     if (!isExpenseStatus(input.status)) {
-      throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ СЃС‚Р°С‚СѓСЃ.' })
+      throw createError({ statusCode: 400, statusMessage: 'Некорректный статус.' })
     }
     status = input.status
   }
@@ -113,7 +113,7 @@ async function fetchWarehouseItem(url: string, serviceRoleKey: string, id: numbe
 
   const row = rows[0]
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'РџРѕР·РёС†РёСЏ СЃРєР»Р°РґР° РЅРµ РЅР°Р№РґРµРЅР°.' })
+    throw createError({ statusCode: 404, statusMessage: 'Позиция склада не найдена.' })
   }
 
   return mapWarehouseItemDbRowToRecord(row)
@@ -137,7 +137,7 @@ export default eventHandler(async (event) => {
     },
     body: {
       title: warehouseItem?.name || payload.title,
-      category: warehouseItem ? 'РЎРєР»Р°Рґ' : payload.category,
+      category: warehouseItem ? 'Склад' : payload.category,
       vendor: warehouseItem?.manufacturer || payload.vendor,
       planned_amount: plannedAmount,
       actual_amount: payload.actualAmount ?? null,
@@ -153,7 +153,7 @@ export default eventHandler(async (event) => {
 
   const created = rows[0]
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» СЃРѕР·РґР°РЅРЅС‹Р№ СЂР°СЃС…РѕРґ.' })
+    throw createError({ statusCode: 500, statusMessage: 'Postgres не вернул созданный расход.' })
   }
 
   setResponseStatus(event, 201)

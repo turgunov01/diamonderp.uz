@@ -29,7 +29,7 @@ function parseCustomerId(event: H3Event) {
   if (!rawId || !Number.isInteger(customerId) || customerId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.'
+      statusMessage: 'Некорректный идентификатор пользователя.'
     })
   }
 
@@ -45,8 +45,8 @@ function parseMoney(value: unknown, fieldName: string, allowNegative = false) {
     throw createError({
       statusCode: 400,
       statusMessage: allowNegative
-        ? `РџРѕР»Рµ ${fieldName} РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ С†РµР»С‹Рј С‡РёСЃР»РѕРј.`
-        : `РџРѕР»Рµ ${fieldName} РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ С†РµР»С‹Рј С‡РёСЃР»РѕРј РЅРµ РјРµРЅСЊС€Рµ 0.`
+        ? `Поле ${fieldName} должно быть целым числом.`
+        : `Поле ${fieldName} должно быть целым числом не меньше 0.`
     })
   }
 
@@ -58,7 +58,7 @@ function parseAge(value: unknown) {
   if (!Number.isInteger(age) || age < 18) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ age РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ С†РµР»С‹Рј С‡РёСЃР»РѕРј РЅРµ РјРµРЅСЊС€Рµ 18.'
+      statusMessage: 'Поле age должно быть целым числом не меньше 18.'
     })
   }
 
@@ -75,7 +75,7 @@ function parseOptionalBuildingId(value: unknown) {
   if (!Number.isInteger(buildingId) || buildingId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ buildingId РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј С†РµР»С‹Рј С‡РёСЃР»РѕРј.'
+      statusMessage: 'Поле buildingId должно быть положительным целым числом.'
     })
   }
 
@@ -86,7 +86,7 @@ function parseObjectPositions(value: unknown) {
   if (!Array.isArray(value)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ objectPositions РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РјР°СЃСЃРёРІРѕРј СЃС‚СЂРѕРє.'
+      statusMessage: 'Поле objectPositions должно быть массивом строк.'
     })
   }
 
@@ -101,7 +101,7 @@ function normalizePhone(value: unknown) {
   if (typeof value !== 'string' && typeof value !== 'number') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ phoneNumber РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.'
+      statusMessage: 'Поле phoneNumber обязательно.'
     })
   }
 
@@ -109,7 +109,7 @@ function normalizePhone(value: unknown) {
   if (digits.length < 9) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ phoneNumber РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РІР°Р»РёРґРЅС‹Рј РЅРѕРјРµСЂРѕРј.'
+      statusMessage: 'Поле phoneNumber должно быть валидным номером.'
     })
   }
 
@@ -120,7 +120,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј JSON-РѕР±СЉРµРєС‚РѕРј.'
+      statusMessage: 'Тело запроса должно быть корректным JSON-объектом.'
     })
   }
 
@@ -131,7 +131,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isNonEmptyString(input.fullName)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ fullName РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.'
+        statusMessage: 'Поле fullName обязательно.'
       })
     }
     update.fullName = input.fullName.trim()
@@ -141,7 +141,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isNonEmptyString(input.username) || input.username.trim().length < 3) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ username РґРѕР»Р¶РЅРѕ СЃРѕРґРµСЂР¶Р°С‚СЊ РјРёРЅРёРјСѓРј 3 СЃРёРјРІРѕР»Р°.'
+        statusMessage: 'Поле username должно содержать минимум 3 символа.'
       })
     }
     update.username = input.username.trim()
@@ -151,7 +151,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isNonEmptyString(input.password) || input.password.trim().length < 6) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ password РґРѕР»Р¶РЅРѕ СЃРѕРґРµСЂР¶Р°С‚СЊ РјРёРЅРёРјСѓРј 6 СЃРёРјРІРѕР»РѕРІ.'
+        statusMessage: 'Поле password должно содержать минимум 6 символов.'
       })
     }
     update.password = input.password
@@ -173,7 +173,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isWorkShift(input.workShift)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ workShift РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ \'day\' РёР»Рё \'night\'.'
+        statusMessage: 'Поле workShift должно быть \'day\' или \'night\'.'
       })
     }
     update.workShift = input.workShift
@@ -191,7 +191,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isNonEmptyString(input.role) || !isAuthRole(input.role.trim()) || input.role.trim().length > 64) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ role СЃРѕРґРµСЂР¶РёС‚ РЅРµРґРѕРїСѓСЃС‚РёРјСѓСЋ СЂРѕР»СЊ.'
+        statusMessage: 'Поле role содержит недопустимую роль.'
       })
     }
     update.role = input.role.trim().toLowerCase()
@@ -210,7 +210,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isSalaryType(salaryTypeValue)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ salaryType РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ fixed РёР»Рё hourly.'
+        statusMessage: 'Поле salaryType должно быть fixed или hourly.'
       })
     }
     update.salaryType = salaryTypeValue
@@ -228,7 +228,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (typeof input.status !== 'string' || !allowed.includes(input.status)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ status РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ pending, active, inactive РёР»Рё archived.'
+        statusMessage: 'Поле status должно быть pending, active, inactive или archived.'
       })
     }
     requestedStatus = input.status as UpdateCustomerBody['status']
@@ -239,7 +239,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (typeof input.mustChangePassword !== 'boolean') {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ mustChangePassword РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ true/false.'
+        statusMessage: 'Поле mustChangePassword должно быть true/false.'
       })
     }
     update.mustChangePassword = input.mustChangePassword
@@ -249,7 +249,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (input.deactivationComment !== null && typeof input.deactivationComment !== 'string') {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ deactivationComment РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ СЃС‚СЂРѕРєРѕР№.'
+        statusMessage: 'Поле deactivationComment должно быть строкой.'
       })
     }
     update.deactivationComment = input.deactivationComment as string | undefined
@@ -259,7 +259,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (input.archivedAt !== null && typeof input.archivedAt !== 'string') {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ archivedAt РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ ISO-РґР°С‚РѕР№ РёР»Рё null.'
+        statusMessage: 'Поле archivedAt должно быть ISO-датой или null.'
       })
     }
     update.archivedAt = input.archivedAt as string | null
@@ -270,7 +270,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (typeof comment !== 'string' || !comment.trim()) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Р”Р»СЏ Р°СЂС…РёРІР°С†РёРё РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ Р·Р°РїРѕР»РЅРёС‚Рµ РєРѕРјРјРµРЅС‚Р°СЂРёР№ deactivationComment.'
+        statusMessage: 'Для архивации обязательно заполните комментарий deactivationComment.'
       })
     }
     update.deactivationComment = comment.trim()
@@ -282,7 +282,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
   if (Object.keys(update).length === 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РќСѓР¶РЅРѕ РїРµСЂРµРґР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕ РїРѕР»Рµ РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ.'
+      statusMessage: 'Нужно передать хотя бы одно поле для обновления.'
     })
   }
 
@@ -315,7 +315,7 @@ export default eventHandler(async (event) => {
     if (!updatedRow) {
       throw createError({
         statusCode: 404,
-        statusMessage: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ.'
+        statusMessage: 'Пользователь не найден.'
       })
     }
 
@@ -336,7 +336,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '23505') {
       throw createError({
         statusCode: 409,
-        statusMessage: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј username РёР»Рё phoneNumber СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.'
+        statusMessage: 'Пользователь с таким username или phoneNumber уже существует.'
       })
     }
 

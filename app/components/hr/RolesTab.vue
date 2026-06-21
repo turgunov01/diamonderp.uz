@@ -52,16 +52,16 @@ function isReadonlyRole(role: CustomerRole) {
 }
 
 function scopeLabel(role: CustomerRole) {
-  if (role.scope === 'fallback') return 'Р”РµС„РѕР»С‚'
-  return role.scope === 'building' ? 'Р—РґР°РЅРёРµ' : 'Р“Р»РѕР±Р°Р»СЊРЅР°СЏ'
+  if (role.scope === 'fallback') return 'Дефолт'
+  return role.scope === 'building' ? 'Здание' : 'Глобальная'
 }
 
 const createOpen = ref(false)
 const createSubmitting = ref(false)
 const createSchema = z.object({
   scope: z.enum(['building', 'global']),
-  code: z.string().min(2, 'РљРѕРґ РѕР±СЏР·Р°С‚РµР»РµРЅ').regex(/^[a-z0-9._-]+$/i, 'РўРѕР»СЊРєРѕ Р»Р°С‚РёРЅРёС†Р°/С†РёС„СЂС‹/._-'),
-  label: z.string().min(2, 'РќР°Р·РІР°РЅРёРµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ')
+  code: z.string().min(2, 'Код обязателен').regex(/^[a-z0-9._-]+$/i, 'Только латиница/цифры/._-'),
+  label: z.string().min(2, 'Название обязательно')
 })
 type CreateState = z.infer<typeof createSchema>
 const createState = reactive<CreateState>({
@@ -71,9 +71,9 @@ const createState = reactive<CreateState>({
 })
 
 const createScopeItems = computed(() => {
-  const items = [{ label: 'Р“Р»РѕР±Р°Р»СЊРЅР°СЏ', value: 'global' as const }]
+  const items = [{ label: 'Глобальная', value: 'global' as const }]
   if (buildingId.value) {
-    items.unshift({ label: 'РўРµРєСѓС‰РµРµ Р·РґР°РЅРёРµ', value: 'building' as const })
+    items.unshift({ label: 'Текущее здание', value: 'building' as const })
   }
   return items
 })
@@ -98,7 +98,7 @@ async function submitCreate(event?: FormSubmitEvent<CreateState>) {
   const resolvedBuildingId = scope === 'building' ? buildingId.value : null
 
   if (scope === 'building' && !resolvedBuildingId) {
-    toast.add({ title: 'Р’С‹Р±РµСЂРёС‚Рµ Р·РґР°РЅРёРµ', description: 'Р”Р»СЏ СЂРѕР»Рё СѓСЂРѕРІРЅСЏ "Р—РґР°РЅРёРµ" РІС‹Р±РµСЂРёС‚Рµ Р°РєС‚РёРІРЅРѕРµ Р·РґР°РЅРёРµ.', color: 'warning' })
+    toast.add({ title: 'Выберите здание', description: 'Для роли уровня "Здание" выберите активное здание.', color: 'warning' })
     return
   }
 
@@ -113,13 +113,13 @@ async function submitCreate(event?: FormSubmitEvent<CreateState>) {
       }
     })
 
-    toast.add({ title: 'Р РѕР»СЊ СЃРѕР·РґР°РЅР°', color: 'success' })
+    toast.add({ title: 'Роль создана', color: 'success' })
     createOpen.value = false
     await refresh()
   } catch (err: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ СЂРѕР»СЊ',
-      description: getErrorMessage(err) || 'РџСЂРѕРІРµСЂСЊС‚Рµ РґР°РЅРЅС‹Рµ Рё РїРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ.',
+      title: 'Не удалось создать роль',
+      description: getErrorMessage(err) || 'Проверьте данные и повторите попытку.',
       color: 'error'
     })
   } finally {
@@ -131,8 +131,8 @@ const editOpen = ref(false)
 const editSubmitting = ref(false)
 const editingRole = ref<CustomerRole | null>(null)
 const editSchema = z.object({
-  code: z.string().min(2, 'РљРѕРґ РѕР±СЏР·Р°С‚РµР»РµРЅ').regex(/^[a-z0-9._-]+$/i, 'РўРѕР»СЊРєРѕ Р»Р°С‚РёРЅРёС†Р°/С†РёС„СЂС‹/._-'),
-  label: z.string().min(2, 'РќР°Р·РІР°РЅРёРµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ')
+  code: z.string().min(2, 'Код обязателен').regex(/^[a-z0-9._-]+$/i, 'Только латиница/цифры/._-'),
+  label: z.string().min(2, 'Название обязательно')
 })
 type EditState = z.infer<typeof editSchema>
 const editState = reactive<EditState>({
@@ -173,14 +173,14 @@ async function submitEdit(event?: FormSubmitEvent<EditState>) {
       body: payload
     })
 
-    toast.add({ title: 'Р РѕР»СЊ РѕР±РЅРѕРІР»РµРЅР°', color: 'success' })
+    toast.add({ title: 'Роль обновлена', color: 'success' })
     editOpen.value = false
     editingRole.value = null
     await refresh()
   } catch (err: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ СЂРѕР»СЊ',
-      description: getErrorMessage(err) || 'РџСЂРѕРІРµСЂСЊС‚Рµ РґР°РЅРЅС‹Рµ Рё РїРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ.',
+      title: 'Не удалось обновить роль',
+      description: getErrorMessage(err) || 'Проверьте данные и повторите попытку.',
       color: 'error'
     })
   } finally {
@@ -206,14 +206,14 @@ async function confirmDelete() {
     await $fetch(`/api/customer-roles/${deletingRole.value.id}`, {
       method: 'DELETE'
     })
-    toast.add({ title: 'Р РѕР»СЊ СѓРґР°Р»РµРЅР°', color: 'success' })
+    toast.add({ title: 'Роль удалена', color: 'success' })
     deleteOpen.value = false
     deletingRole.value = null
     await refresh()
   } catch (err: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ СЂРѕР»СЊ',
-      description: getErrorMessage(err) || 'РџСЂРѕРІРµСЂСЊС‚Рµ РґР°РЅРЅС‹Рµ Рё РїРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ.',
+      title: 'Не удалось удалить роль',
+      description: getErrorMessage(err) || 'Проверьте данные и повторите попытку.',
       color: 'error'
     })
   } finally {
@@ -225,19 +225,19 @@ async function confirmDelete() {
 <template>
   <div class="space-y-4">
     <div class="text-sm text-muted">
-      {{ activeBuilding?.name ? `Р—РґР°РЅРёРµ: ${activeBuilding.name}` : 'Р—РґР°РЅРёРµ РЅРµ РІС‹Р±СЂР°РЅРѕ' }}
+      {{ activeBuilding?.name ? `Здание: ${activeBuilding.name}` : 'Здание не выбрано' }}
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-2">
       <UInput
         v-model="q"
         icon="i-lucide-search"
-        placeholder="РџРѕРёСЃРє СЂРѕР»РµР№..."
+        placeholder="Поиск ролей..."
         class="max-w-sm"
       />
 
       <UButton
-        label="Р”РѕР±Р°РІРёС‚СЊ СЂРѕР»СЊ"
+        label="Добавить роль"
         icon="i-lucide-plus"
         color="primary"
         @click="openCreate"
@@ -249,10 +249,10 @@ async function confirmDelete() {
       class="rounded-lg border border-error/40 bg-error/5 p-3 text-sm"
     >
       <p class="font-medium text-highlighted">
-        РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЂРѕР»Рё
+        Не удалось загрузить роли
       </p>
       <p class="text-muted">
-        {{ getErrorMessage(error) || 'РџСЂРѕРІРµСЂСЊС‚Рµ API /api/customer-roles Рё РЅР°Р»РёС‡РёРµ С‚Р°Р±Р»РёС†С‹ customer_roles РІ Postgres.' }}
+        {{ getErrorMessage(error) || 'Проверьте API /api/customer-roles и наличие таблицы customer_roles в Postgres.' }}
       </p>
     </div>
 
@@ -261,13 +261,13 @@ async function confirmDelete() {
         <thead>
           <tr class="bg-elevated/50">
             <th class="px-3 py-2 text-left">
-              РќР°Р·РІР°РЅРёРµ
+              Название
             </th>
             <th class="px-3 py-2 text-left">
-              РљРѕРґ
+              Код
             </th>
             <th class="px-3 py-2 text-left">
-              РСЃС‚РѕС‡РЅРёРє
+              Источник
             </th>
             <th class="px-3 py-2 text-right" />
           </tr>
@@ -275,13 +275,13 @@ async function confirmDelete() {
         <tbody>
           <tr v-if="isLoading">
             <td class="px-3 py-3 text-muted" colspan="4">
-              Р—Р°РіСЂСѓР·РєР°...
+              Загрузка...
             </td>
           </tr>
 
           <tr v-else-if="!filteredRoles.length">
             <td class="px-3 py-3 text-muted" colspan="4">
-              Р РѕР»Рё РЅРµ РЅР°Р№РґРµРЅС‹.
+              Роли не найдены.
             </td>
           </tr>
 
@@ -298,7 +298,7 @@ async function confirmDelete() {
                 </span>
                 <UBadge
                   v-if="role.isSystem"
-                  label="РЎРёСЃС‚РµРјРЅР°СЏ"
+                  label="Системная"
                   color="neutral"
                   variant="subtle"
                 />
@@ -317,7 +317,7 @@ async function confirmDelete() {
             <td class="px-3 py-2 text-right">
               <div class="flex justify-end gap-2">
                 <UButton
-                  label="РР·РјРµРЅРёС‚СЊ"
+                  label="Изменить"
                   size="sm"
                   color="neutral"
                   variant="outline"
@@ -325,7 +325,7 @@ async function confirmDelete() {
                   @click="openEdit(role)"
                 />
                 <UButton
-                  label="РЈРґР°Р»РёС‚СЊ"
+                  label="Удалить"
                   size="sm"
                   color="error"
                   variant="outline"
@@ -341,8 +341,8 @@ async function confirmDelete() {
 
     <UModal
       v-model:open="createOpen"
-      title="РќРѕРІР°СЏ СЂРѕР»СЊ"
-      description="РЎРѕР·РґР°Р№С‚Рµ СЂРѕР»СЊ РґР»СЏ РІС‹Р±СЂР°РЅРЅРѕРіРѕ Р·РґР°РЅРёСЏ."
+      title="Новая роль"
+      description="Создайте роль для выбранного здания."
     >
       <template #body>
         <UForm
@@ -351,7 +351,7 @@ async function confirmDelete() {
           :on-submit="submitCreate"
           class="space-y-4"
         >
-          <UFormField label="РСЃС‚РѕС‡РЅРёРє" name="scope">
+          <UFormField label="Источник" name="scope">
             <USelect
               v-model="createState.scope"
               :items="createScopeItems"
@@ -359,27 +359,27 @@ async function confirmDelete() {
           </UFormField>
 
           <UFormField
-            label="РљРѕРґ"
+            label="Код"
             name="code"
-            help="РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РєР°Рє Р·РЅР°С‡РµРЅРёРµ РІ РїРѕР»Рµ role Сѓ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ."
+            help="Используется как значение в поле role у сотрудников."
           >
             <UInput v-model="createState.code" placeholder="security" />
           </UFormField>
 
-          <UFormField label="РќР°Р·РІР°РЅРёРµ" name="label">
-            <UInput v-model="createState.label" placeholder="РћС…СЂР°РЅР°" />
+          <UFormField label="Название" name="label">
+            <UInput v-model="createState.label" placeholder="Охрана" />
           </UFormField>
 
           <div class="flex justify-end gap-2">
             <UButton
-              label="РћС‚РјРµРЅР°"
+              label="Отмена"
               color="neutral"
               variant="subtle"
               :disabled="createSubmitting"
               @click="createOpen = false"
             />
             <UButton
-              label="РЎРѕР·РґР°С‚СЊ"
+              label="Создать"
               color="primary"
               type="submit"
               :loading="createSubmitting"
@@ -391,8 +391,8 @@ async function confirmDelete() {
 
     <UModal
       v-model:open="editOpen"
-      title="Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ СЂРѕР»СЊ"
-      description="РР·РјРµРЅРёС‚Рµ РЅР°Р·РІР°РЅРёРµ СЂРѕР»Рё."
+      title="Редактировать роль"
+      description="Измените название роли."
     >
       <template #body>
         <UForm
@@ -401,27 +401,27 @@ async function confirmDelete() {
           :on-submit="submitEdit"
           class="space-y-4"
         >
-          <UFormField label="РљРѕРґ" name="code">
+          <UFormField label="Код" name="code">
             <UInput
               v-model="editState.code"
               :disabled="editingRole ? !canEditCode(editingRole) : true"
             />
           </UFormField>
 
-          <UFormField label="РќР°Р·РІР°РЅРёРµ" name="label">
+          <UFormField label="Название" name="label">
             <UInput v-model="editState.label" />
           </UFormField>
 
           <div class="flex justify-end gap-2">
             <UButton
-              label="РћС‚РјРµРЅР°"
+              label="Отмена"
               color="neutral"
               variant="subtle"
               :disabled="editSubmitting"
               @click="editOpen = false; editingRole = null"
             />
             <UButton
-              label="РЎРѕС…СЂР°РЅРёС‚СЊ"
+              label="Сохранить"
               color="primary"
               type="submit"
               :loading="editSubmitting"
@@ -433,20 +433,20 @@ async function confirmDelete() {
 
     <UModal
       v-model:open="deleteOpen"
-      :title="deletingRole ? `РЈРґР°Р»РёС‚СЊ СЂРѕР»СЊ В«${deletingRole.label}В»` : 'РЈРґР°Р»РёС‚СЊ СЂРѕР»СЊ'"
-      description="Р”РµР№СЃС‚РІРёРµ РЅРµР»СЊР·СЏ РѕС‚РјРµРЅРёС‚СЊ."
+      :title="deletingRole ? `Удалить роль «${deletingRole.label}»` : 'Удалить роль'"
+      description="Действие нельзя отменить."
     >
       <template #body>
         <div class="flex justify-end gap-2">
           <UButton
-            label="РћС‚РјРµРЅР°"
+            label="Отмена"
             color="neutral"
             variant="subtle"
             :disabled="deleteSubmitting"
             @click="deleteOpen = false"
           />
           <UButton
-            label="РЈРґР°Р»РёС‚СЊ"
+            label="Удалить"
             color="error"
             variant="solid"
             :loading="deleteSubmitting"

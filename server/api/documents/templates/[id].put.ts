@@ -22,7 +22,7 @@ function parseTemplateId(event: H3Event) {
   const rawId = getRouterParam(event, 'id')
   const templateId = Number(rawId)
   if (!rawId || !Number.isInteger(templateId) || templateId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id С€Р°Р±Р»РѕРЅР°.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id шаблона.' })
   }
 
   return templateId
@@ -30,7 +30,7 @@ function parseTemplateId(event: H3Event) {
 
 function parseUpdateBody(body: unknown): UpdateTemplateBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј РѕР±СЉРµРєС‚РѕРј.' })
+    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
   }
 
   const input = body as UpdateTemplateBody
@@ -64,7 +64,7 @@ export default eventHandler(async (event) => {
 
   const existing = rows[0]
   if (!existing) {
-    throw createError({ statusCode: 404, statusMessage: 'РЁР°Р±Р»РѕРЅ РЅРµ РЅР°Р№РґРµРЅ.' })
+    throw createError({ statusCode: 404, statusMessage: 'Шаблон не найден.' })
   }
 
   const nextName = payload.name || existing.name
@@ -117,7 +117,7 @@ export default eventHandler(async (event) => {
 
     const updated = updatedRows[0]
     if (!updated) {
-      throw createError({ statusCode: 500, statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» РѕР±РЅРѕРІР»РµРЅРЅС‹Р№ С€Р°Р±Р»РѕРЅ.' })
+      throw createError({ statusCode: 500, statusMessage: 'Postgres не вернул обновленный шаблон.' })
     }
 
     return {
@@ -130,7 +130,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'РўР°Р±Р»РёС†Р° "document_templates" РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚. РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ db/postgres/documents.sql.'
+        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/postgres/documents.sql.'
       })
     }
 

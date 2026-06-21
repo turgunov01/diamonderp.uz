@@ -51,7 +51,7 @@ export default eventHandler(async (event) => {
     id: d.id,
     objectId: d.object_id,
     name: d.name,
-    location: d.location || 'вЂ”',
+    location: d.location || '—',
     refillEveryDays: d.refill_every_days,
     volumeMl: d.volume_ml,
     pricePerRefill: Number(d.price_per_refill || 0),

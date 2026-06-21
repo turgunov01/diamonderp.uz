@@ -82,7 +82,7 @@ const deletingId = ref<number | null>(null)
 const deletingSentId = ref<number | null>(null)
 const deletingSignedId = ref<number | null>(null)
 const miniOpen = ref(false)
-const miniContent = ref('<h1>Р§РµСЂРЅРѕРІРёРє РґРѕРіРѕРІРѕСЂР°</h1><p>Р’СЃС‚Р°РІСЊС‚Рµ С‚РµРєСЃС‚ РёР»Рё РїРµСЂРµРјРµРЅРЅС‹Рµ.</p>')
+const miniContent = ref('<h1>Черновик договора</h1><p>Вставьте текст или переменные.</p>')
 const miniEditor = ref<HTMLElement | null>(null)
 const detailsOpen = ref(false)
 const selectedDispatchId = ref<number | null>(null)
@@ -96,12 +96,12 @@ const buildingId = computed(() => activeBuilding.value?.id ?? activeBuildingIdCo
 const objectName = computed(() => activeObject.value?.name?.trim() || '')
 const hasObjectScope = computed(() => Boolean(objectId.value))
 const miniTokens = [
-  { label: 'РРјСЏ', token: '{{employee_name}}' },
-  { label: 'РўРµР»РµС„РѕРЅ', token: '{{phone}}' },
-  { label: 'Р”РѕР»Р¶РЅРѕСЃС‚СЊ', token: '{{position}}' },
-  { label: 'РћР±СЉРµРєС‚', token: '{{object_name}}' },
-  { label: 'РЎСѓРјРјР°', token: '{{amount}}' },
-  { label: 'Р”Р°С‚Р°', token: '{{date}}' }
+  { label: 'Имя', token: '{{employee_name}}' },
+  { label: 'Телефон', token: '{{phone}}' },
+  { label: 'Должность', token: '{{position}}' },
+  { label: 'Объект', token: '{{object_name}}' },
+  { label: 'Сумма', token: '{{amount}}' },
+  { label: 'Дата', token: '{{date}}' }
 ]
 
 function focusMini() {
@@ -133,7 +133,7 @@ async function copyMini() {
   if (!process.client) return
   const html = miniEditor.value?.innerHTML || ''
   await navigator.clipboard.writeText(html)
-  toast.add({ title: 'РЎРєРѕРїРёСЂРѕРІР°РЅРѕ', color: 'success' })
+  toast.add({ title: 'Скопировано', color: 'success' })
 }
 
 function downloadMini() {
@@ -148,9 +148,9 @@ function downloadMini() {
 }
 
 const tabs = [
-  { label: 'РЁР°Р±Р»РѕРЅС‹', value: 'templates' },
-  { label: 'РћС‚РїСЂР°РІР»РµРЅРЅС‹Рµ', value: 'sent' },
-  { label: 'РџРѕРґРїРёСЃР°РЅРЅС‹Рµ', value: 'signed' }
+  { label: 'Шаблоны', value: 'templates' },
+  { label: 'Отправленные', value: 'sent' },
+  { label: 'Подписанные', value: 'signed' }
 ]
 
 const emptyDocuments = () => ({
@@ -226,8 +226,8 @@ watch(error, (value) => {
   }
 
   toast.add({
-    title: 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РґРѕРєСѓРјРµРЅС‚С‹',
-    description: value.statusMessage || 'РџСЂРѕРІРµСЂСЊС‚Рµ API РґРѕРєСѓРјРµРЅС‚РѕРІ Рё РїРѕРґРєР»СЋС‡РµРЅРёРµ Рє Postgres.',
+    title: 'Не удалось загрузить документы',
+    description: value.statusMessage || 'Проверьте API документов и подключение к Postgres.',
     color: 'error'
   })
 }, { immediate: true })
@@ -302,14 +302,14 @@ function formatDate(value: string) {
 
 function statusLabel(statusValue: DispatchStatus) {
   if (statusValue === 'sent') {
-    return 'Р’ РѕР¶РёРґР°РЅРёРё РїРѕРґРїРёСЃРё'
+    return 'В ожидании подписи'
   }
 
   if (statusValue === 'partially_signed') {
-    return 'Р§Р°СЃС‚РёС‡РЅРѕ РїРѕРґРїРёСЃР°РЅРѕ'
+    return 'Частично подписано'
   }
 
-  return 'РџРѕРґРїРёСЃР°РЅРѕ'
+  return 'Подписано'
 }
 
 function statusColor(statusValue: DispatchStatus) {
@@ -327,7 +327,7 @@ function statusColor(statusValue: DispatchStatus) {
 function openSendModal(templateId?: number) {
   if (!objectId.value) {
     toast.add({
-      title: 'РЎРЅР°С‡Р°Р»Р° РІС‹Р±РµСЂРёС‚Рµ РѕР±СЉРµРєС‚',
+      title: 'Сначала выберите объект',
       color: 'warning'
     })
     return
@@ -359,7 +359,7 @@ async function sendDocument() {
 
   if (!selectedTemplateId.value) {
     toast.add({
-      title: 'Р’С‹Р±РµСЂРёС‚Рµ С€Р°Р±Р»РѕРЅ',
+      title: 'Выберите шаблон',
       color: 'warning'
     })
     return
@@ -367,7 +367,7 @@ async function sendDocument() {
 
   if (!selectedRecipientIds.value.length) {
     toast.add({
-      title: 'Р’С‹Р±РµСЂРёС‚Рµ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ',
+      title: 'Выберите сотрудников',
       color: 'warning'
     })
     return
@@ -386,8 +386,8 @@ async function sendDocument() {
     })
 
     toast.add({
-      title: 'Р”РѕРєСѓРјРµРЅС‚ РѕС‚РїСЂР°РІР»РµРЅ',
-      description: `РЎРѕС‚СЂСѓРґРЅРёРєРѕРІ РІ РѕС‚РїСЂР°РІРєРµ: ${selectedRecipientIds.value.length}`,
+      title: 'Документ отправлен',
+      description: `Сотрудников в отправке: ${selectedRecipientIds.value.length}`,
       color: 'success'
     })
 
@@ -395,8 +395,8 @@ async function sendDocument() {
     await Promise.all([refresh(), refreshCustomers()])
   } catch (fetchError: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ РґРѕРєСѓРјРµРЅС‚',
-      description: getErrorMessage(fetchError) || 'РџРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ.',
+      title: 'Не удалось отправить документ',
+      description: getErrorMessage(fetchError) || 'Повторите попытку.',
       color: 'error'
     })
   } finally {
@@ -407,7 +407,7 @@ async function sendDocument() {
 function createTemplate() {
   if (!objectId.value) {
     toast.add({
-      title: 'РЎРЅР°С‡Р°Р»Р° РІС‹Р±РµСЂРёС‚Рµ РѕР±СЉРµРєС‚',
+      title: 'Сначала выберите объект',
       color: 'warning'
     })
     return
@@ -436,15 +436,15 @@ async function deleteTemplate(templateId: number) {
     })
 
     toast.add({
-      title: 'РЁР°Р±Р»РѕРЅ СѓРґР°Р»РµРЅ',
+      title: 'Шаблон удален',
       color: 'success'
     })
 
     await refresh()
   } catch (fetchError: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ С€Р°Р±Р»РѕРЅ',
-      description: getErrorMessage(fetchError) || 'РџРѕРїСЂРѕР±СѓР№С‚Рµ РїРѕР·Р¶Рµ.',
+      title: 'Не удалось удалить шаблон',
+      description: getErrorMessage(fetchError) || 'Попробуйте позже.',
       color: 'error'
     })
   } finally {
@@ -459,7 +459,7 @@ function openSignatureExternal() {
 
 async function openSignature(item: SignedDocument) {
   if (!objectId.value) {
-    toast.add({ title: 'РЎРЅР°С‡Р°Р»Р° РІС‹Р±РµСЂРёС‚Рµ РѕР±СЉРµРєС‚', color: 'warning' })
+    toast.add({ title: 'Сначала выберите объект', color: 'warning' })
     return
   }
 
@@ -480,8 +480,8 @@ async function openSignature(item: SignedDocument) {
     signatureUrl.value = response.url
   } catch (fetchError: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РїРѕРґРїРёСЃСЊ',
-      description: getErrorMessage(fetchError) || 'РџСЂРѕРІРµСЂСЊС‚Рµ API РїРѕРґРїРёСЃРµР№ Рё РїРѕРґРєР»СЋС‡РµРЅРёРµ Рє Postgres.',
+      title: 'Не удалось загрузить подпись',
+      description: getErrorMessage(fetchError) || 'Проверьте API подписей и подключение к Postgres.',
       color: 'error'
     })
     signatureOpen.value = false
@@ -498,12 +498,12 @@ async function deleteDispatch(id: number) {
       method: 'DELETE',
       query: { objectId: objectId.value }
     })
-    toast.add({ title: 'РћС‚РїСЂР°РІРєР° СѓРґР°Р»РµРЅР°', color: 'success' })
+    toast.add({ title: 'Отправка удалена', color: 'success' })
     await refresh()
   } catch (fetchError: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РѕС‚РїСЂР°РІРєСѓ',
-      description: getErrorMessage(fetchError) || 'РџРѕРїСЂРѕР±СѓР№С‚Рµ РїРѕР·Р¶Рµ.',
+      title: 'Не удалось удалить отправку',
+      description: getErrorMessage(fetchError) || 'Попробуйте позже.',
       color: 'error'
     })
   } finally {
@@ -519,12 +519,12 @@ async function deleteSignedDoc(id: number) {
       method: 'DELETE',
       query: { objectId: objectId.value }
     })
-    toast.add({ title: 'РџРѕРґРїРёСЃР°РЅРЅС‹Р№ РґРѕРєСѓРјРµРЅС‚ СѓРґР°Р»С‘РЅ', color: 'success' })
+    toast.add({ title: 'Подписанный документ удалён', color: 'success' })
     await refresh()
   } catch (fetchError: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ Р·Р°РїРёСЃСЊ',
-      description: getErrorMessage(fetchError) || 'РџРѕРїСЂРѕР±СѓР№С‚Рµ РїРѕР·Р¶Рµ.',
+      title: 'Не удалось удалить запись',
+      description: getErrorMessage(fetchError) || 'Попробуйте позже.',
       color: 'error'
     })
   } finally {
@@ -556,8 +556,8 @@ async function exportSigned(format: 'pdf' | 'xlsx' | 'csv') {
     URL.revokeObjectURL(url)
   } catch (fetchError: unknown) {
     toast.add({
-      title: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ С„Р°Р№Р»',
-      description: getErrorMessage(fetchError) || 'РџСЂРѕРІРµСЂСЊС‚Рµ API СЌРєСЃРїРѕСЂС‚Р°.',
+      title: 'Не удалось скачать файл',
+      description: getErrorMessage(fetchError) || 'Проверьте API экспорта.',
       color: 'error'
     })
   } finally {
@@ -580,7 +580,7 @@ watch(miniOpen, (open) => {
 <template>
   <UDashboardPanel id="documents">
     <template #header>
-      <UDashboardNavbar title="Р”РѕРєСѓРјРµРЅС‚С‹">
+      <UDashboardNavbar title="Документы">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -594,7 +594,7 @@ watch(miniOpen, (open) => {
           />
           <UButton
             icon="i-lucide-file-text"
-            label="РњРёРЅРё Word"
+            label="Мини Word"
             color="neutral"
             variant="ghost"
             @click="miniOpen = true"
@@ -609,8 +609,8 @@ watch(miniOpen, (open) => {
           v-if="!hasObjectScope"
           color="warning"
           variant="subtle"
-          title="РћР±СЉРµРєС‚ РЅРµ РІС‹Р±СЂР°РЅ"
-          description="Р’С‹Р±РµСЂРёС‚Рµ РѕР±СЉРµРєС‚ РІ РІРµСЂС…РЅРµРј РјРµРЅСЋ, С‡С‚РѕР±С‹ СЂР°Р±РѕС‚Р°С‚СЊ СЃ С€Р°Р±Р»РѕРЅР°РјРё Рё РѕС‚РїСЂР°РІРєР°РјРё."
+          title="Объект не выбран"
+          description="Выберите объект в верхнем меню, чтобы работать с шаблонами и отправками."
         />
 
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -625,7 +625,7 @@ watch(miniOpen, (open) => {
           <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <UButton
               v-if="activeTab === 'templates'"
-              label="РЎРѕР·РґР°С‚СЊ С€Р°Р±Р»РѕРЅ"
+              label="Создать шаблон"
               icon="i-lucide-file-plus"
               class="flex-1 sm:flex-none"
               :disabled="!hasObjectScope"
@@ -633,7 +633,7 @@ watch(miniOpen, (open) => {
             />
             <UButton
               v-if="activeTab === 'sent'"
-              label="РќРѕРІР°СЏ РѕС‚РїСЂР°РІРєР°"
+              label="Новая отправка"
               icon="i-lucide-send"
               class="flex-1 sm:flex-none"
               :disabled="!hasObjectScope"
@@ -683,19 +683,19 @@ watch(miniOpen, (open) => {
                   {{ template.name }}
                 </p>
                 <p class="text-sm text-muted">
-                  {{ template.description || 'Р‘РµР· РѕРїРёСЃР°РЅРёСЏ' }}
+                  {{ template.description || 'Без описания' }}
                 </p>
               </div>
               <UBadge :label="template.contractType.toUpperCase()" color="neutral" variant="subtle" />
             </div>
 
             <p class="text-xs text-muted">
-              РћР±РЅРѕРІР»РµРЅ: {{ formatDate(template.updatedAt) }}
+              Обновлен: {{ formatDate(template.updatedAt) }}
             </p>
 
             <div class="flex flex-wrap items-center gap-2">
               <UButton
-                label="Р РµРґР°РєС‚РѕСЂ"
+                label="Редактор"
                 size="sm"
                 color="neutral"
                 variant="outline"
@@ -703,13 +703,13 @@ watch(miniOpen, (open) => {
                 @click="editTemplate(template.id)"
               />
               <UButton
-                label="РћС‚РїСЂР°РІРёС‚СЊ"
+                label="Отправить"
                 size="sm"
                 icon="i-lucide-send"
                 @click="openSendModal(template.id)"
               />
               <UButton
-                label="РЈРґР°Р»РёС‚СЊ"
+                label="Удалить"
                 size="sm"
                 color="error"
                 variant="outline"
@@ -724,7 +724,7 @@ watch(miniOpen, (open) => {
             v-if="!documentsData.templates.length"
             class="rounded-lg border border-dashed border-default p-6 text-center text-sm text-muted md:col-span-2"
           >
-            РЁР°Р±Р»РѕРЅРѕРІ РїРѕРєР° РЅРµС‚ РґР»СЏ РІС‹Р±СЂР°РЅРЅРѕРіРѕ РѕР±СЉРµРєС‚Р°.
+            Шаблонов пока нет для выбранного объекта.
           </div>
         </div>
 
@@ -737,25 +737,25 @@ watch(miniOpen, (open) => {
                     ID
                   </th>
                   <th class="px-3 py-2 text-left">
-                    Р—Р°РіРѕР»РѕРІРѕРє
+                    Заголовок
                   </th>
                   <th class="px-3 py-2 text-left">
-                    РЁР°Р±Р»РѕРЅ
+                    Шаблон
                   </th>
                   <th class="px-3 py-2 text-left">
-                    РЎРѕС‚СЂСѓРґРЅРёРєРё
+                    Сотрудники
                   </th>
                   <th class="px-3 py-2 text-left">
-                    РџРѕРґРїРёСЃР°РЅРѕ
+                    Подписано
                   </th>
                   <th class="px-3 py-2 text-left">
-                    РЎС‚Р°С‚СѓСЃ
+                    Статус
                   </th>
                   <th class="px-3 py-2 text-left">
-                    Р”Р°С‚Р°
+                    Дата
                   </th>
                   <th class="px-3 py-2 text-left">
-                    Р”РµР№СЃС‚РІРёСЏ
+                    Действия
                   </th>
                 </tr>
               </thead>
@@ -777,7 +777,7 @@ watch(miniOpen, (open) => {
                   </td>
                   <td class="px-3 py-2">
                     <UBadge
-                      :label="dispatch.recipientCount ? `${dispatch.recipientCount} С‡РµР».` : 'вЂ”'"
+                      :label="dispatch.recipientCount ? `${dispatch.recipientCount} чел.` : '—'"
                       variant="subtle"
                       color="neutral"
                     />
@@ -808,7 +808,7 @@ watch(miniOpen, (open) => {
                 </tr>
                 <tr v-if="!documentsData.sent.length">
                   <td class="px-3 py-4 text-muted" colspan="8">
-                    РћС‚РїСЂР°РІР»РµРЅРЅС‹С… РґРѕРєСѓРјРµРЅС‚РѕРІ РїРѕРєР° РЅРµС‚.
+                    Отправленных документов пока нет.
                   </td>
                 </tr>
               </tbody>
@@ -824,24 +824,24 @@ watch(miniOpen, (open) => {
             >
               <div class="flex items-center justify-between gap-2">
                 <p class="font-semibold text-highlighted">
-                  #{{ dispatch.id }} В· {{ dispatch.title }}
+                  #{{ dispatch.id }} · {{ dispatch.title }}
                 </p>
                 <UBadge :label="statusLabel(dispatch.status)" :color="statusColor(dispatch.status)" variant="subtle" />
               </div>
               <p class="text-xs text-muted">
-                РЁР°Р±Р»РѕРЅ: {{ dispatch.templateName || '-' }}
+                Шаблон: {{ dispatch.templateName || '-' }}
               </p>
               <div class="flex items-center gap-3 text-sm">
                 <div>
-                  <span class="font-medium">РЎРѕС‚СЂСѓРґРЅРёРєРё:</span>
-                  <span class="text-muted">{{ dispatch.recipientCount ? `${dispatch.recipientCount} С‡РµР».` : 'вЂ”' }}</span>
+                  <span class="font-medium">Сотрудники:</span>
+                  <span class="text-muted">{{ dispatch.recipientCount ? `${dispatch.recipientCount} чел.` : '—' }}</span>
                 </div>
               </div>
               <div class="text-xs text-muted">
-                РџРѕРґРїРёСЃР°РЅРѕ: {{ dispatch.signedCount }} / {{ dispatch.recipientCount }}
+                Подписано: {{ dispatch.signedCount }} / {{ dispatch.recipientCount }}
               </div>
               <p class="text-xs text-muted">
-                РћС‚РїСЂР°РІР»РµРЅРѕ: {{ formatDate(dispatch.sentAt) }}
+                Отправлено: {{ formatDate(dispatch.sentAt) }}
               </p>
               <div class="flex justify-end">
                 <UButton
@@ -857,7 +857,7 @@ watch(miniOpen, (open) => {
           </div>
 
           <p v-else class="text-sm text-muted md:hidden">
-            РћС‚РїСЂР°РІР»РµРЅРЅС‹С… РґРѕРєСѓРјРµРЅС‚РѕРІ РїРѕРєР° РЅРµС‚.
+            Отправленных документов пока нет.
           </p>
         </div>
 
@@ -870,22 +870,22 @@ watch(miniOpen, (open) => {
                     ID
                   </th>
                   <th class="px-3 py-2 text-left">
-                    РЎРѕС‚СЂСѓРґРЅРёРє
+                    Сотрудник
                   </th>
                   <th class="px-3 py-2 text-left">
-                    РўРµР»РµС„РѕРЅ
+                    Телефон
                   </th>
                   <th class="px-3 py-2 text-left">
-                    РЁР°Р±Р»РѕРЅ
+                    Шаблон
                   </th>
                   <th class="px-3 py-2 text-left">
-                    РџРѕРґРїРёСЃР°РЅРѕ С‡РµСЂРµР·
+                    Подписано через
                   </th>
                   <th class="px-3 py-2 text-left">
-                    Р”Р°С‚Р° РїРѕРґРїРёСЃРё
+                    Дата подписи
                   </th>
                   <th class="px-3 py-2 text-left">
-                    Р”РµР№СЃС‚РІРёСЏ
+                    Действия
                   </th>
                 </tr>
               </thead>
@@ -936,7 +936,7 @@ watch(miniOpen, (open) => {
                 </tr>
                 <tr v-if="!documentsData.signed.length">
                   <td class="px-3 py-4 text-muted" colspan="7">
-                    РџРѕРґРїРёСЃР°РЅРЅС‹С… РґРѕРєСѓРјРµРЅС‚РѕРІ РїРѕРєР° РЅРµС‚.
+                    Подписанных документов пока нет.
                   </td>
                 </tr>
               </tbody>
@@ -951,18 +951,18 @@ watch(miniOpen, (open) => {
             >
               <div class="flex items-center justify-between gap-2">
                 <p class="font-semibold text-highlighted">
-                  #{{ item.id }} В· {{ item.employeeName }}
+                  #{{ item.id }} · {{ item.employeeName }}
                 </p>
                 <span class="text-xs text-muted">{{ formatDate(item.signedAt) }}</span>
               </div>
               <p class="text-sm text-muted">
-                РўРµР»РµС„РѕРЅ: {{ item.phoneNumber }}
+                Телефон: {{ item.phoneNumber }}
               </p>
               <p class="text-sm">
-                РЁР°Р±Р»РѕРЅ: {{ item.templateName || '-' }}
+                Шаблон: {{ item.templateName || '-' }}
               </p>
               <p class="text-sm text-muted">
-                РџРѕРґРїРёСЃР°РЅРѕ С‡РµСЂРµР·: {{ item.signedVia }}
+                Подписано через: {{ item.signedVia }}
               </p>
               <div class="flex justify-end gap-1">
                 <UButton
@@ -986,19 +986,19 @@ watch(miniOpen, (open) => {
           </div>
 
           <p v-else class="text-sm text-muted md:hidden">
-            РџРѕРґРїРёСЃР°РЅРЅС‹С… РґРѕРєСѓРјРµРЅС‚РѕРІ РїРѕРєР° РЅРµС‚.
+            Подписанных документов пока нет.
           </p>
         </div>
 
         <p v-if="status === 'pending'" class="text-sm text-muted">
-          Р—Р°РіСЂСѓР·РєР° РґРѕРєСѓРјРµРЅС‚РѕРІ...
+          Загрузка документов...
         </p>
       </div>
 
       <UModal
         v-model:open="miniOpen"
-        title="РњРёРЅРё Word"
-        description="Р‘С‹СЃС‚СЂС‹Р№ С‡РµСЂРЅРѕРІРёРє Р±РµР· РёРґРµР№."
+        title="Мини Word"
+        description="Быстрый черновик без идей."
         size="xl"
       >
         <template #body>
@@ -1015,7 +1015,7 @@ watch(miniOpen, (open) => {
                 size="xs"
                 icon="i-lucide-link"
                 variant="ghost"
-                @click="() => { const url = prompt('РЎСЃС‹Р»РєР°'); if (url) runMiniCommand('createLink', url) }"
+                @click="() => { const url = prompt('Ссылка'); if (url) runMiniCommand('createLink', url) }"
               />
               <UButton size="xs" icon="i-lucide-eraser" color="warning" variant="ghost" @click="clearMini" />
               <UButton size="xs" icon="i-lucide-copy" color="neutral" variant="ghost" @click="copyMini" />
@@ -1048,22 +1048,22 @@ watch(miniOpen, (open) => {
 
       <UModal
         v-model:open="sendModalOpen"
-        title="РћС‚РїСЂР°РІРєР° РґРѕРєСѓРјРµРЅС‚Р°"
-        description="Р’С‹Р±РµСЂРёС‚Рµ С€Р°Р±Р»РѕРЅ Рё СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ, РєРѕС‚РѕСЂС‹Рµ РїРѕРґРїРёС€СѓС‚ РґРѕРєСѓРјРµРЅС‚ РІ РјРѕР±РёР»СЊРЅРѕРј РїСЂРёР»РѕР¶РµРЅРёРё"
+        title="Отправка документа"
+        description="Выберите шаблон и сотрудников, которые подпишут документ в мобильном приложении"
       >
         <template #body>
           <div class="space-y-4">
-            <UFormField label="РЁР°Р±Р»РѕРЅ">
+            <UFormField label="Шаблон">
               <USelect
                 v-model="selectedTemplateId"
                 :items="templateSelectItems"
                 value-key="value"
                 class="w-full"
-                placeholder="Р’С‹Р±РµСЂРёС‚Рµ С€Р°Р±Р»РѕРЅ"
+                placeholder="Выберите шаблон"
               />
             </UFormField>
 
-            <UFormField label="РЎРѕС‚СЂСѓРґРЅРёРєРё">
+            <UFormField label="Сотрудники">
               <USelectMenu
                 v-model="selectedRecipientIds"
                 :items="customerSelectItems"
@@ -1072,24 +1072,24 @@ watch(miniOpen, (open) => {
                 multiple
                 searchable
                 class="w-full"
-                placeholder="Р’С‹Р±РµСЂРёС‚Рµ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ"
+                placeholder="Выберите сотрудников"
               />
             </UFormField>
 
             <p v-if="!customerSelectItems.length" class="text-xs text-muted">
-              Р”Р»СЏ С‚РµРєСѓС‰РµРіРѕ РѕР±СЉРµРєС‚Р° РЅРµС‚ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ СЃ РїСЂРёРІСЏР·РєРѕР№ РїРѕ "РџРѕР·РёС†РёРё РѕР±СЉРµРєС‚Р°" РёР»Рё "Р—Р°РєСЂРµРїР»РµРЅРЅРѕРјСѓ РѕР±СЉРµРєС‚Сѓ".
+              Для текущего объекта нет сотрудников с привязкой по "Позиции объекта" или "Закрепленному объекту".
             </p>
 
             <div class="flex items-center justify-end gap-2">
               <UButton
-                label="РћС‚РјРµРЅР°"
+                label="Отмена"
                 color="neutral"
                 variant="subtle"
                 :disabled="sending"
                 @click="sendModalOpen = false"
               />
               <UButton
-                label="РћС‚РїСЂР°РІРёС‚СЊ"
+                label="Отправить"
                 icon="i-lucide-send"
                 :loading="sending"
                 @click="sendDocument"
@@ -1098,11 +1098,11 @@ watch(miniOpen, (open) => {
           </div>
         </template>
       </UModal>
- 
+
       <UModal
         v-model:open="detailsOpen"
-        title="Р”РµС‚Р°Р»Рё РѕС‚РїСЂР°РІРєРё"
-        :description="selectedDispatch ? selectedDispatch.title : 'РЎРІРµРґРµРЅРёСЏ Рѕ РїРѕР»СѓС‡Р°С‚РµР»СЏС… Рё С…РѕРґРµ РїРѕРґРїРёСЃР°РЅРёСЏ.'"
+        title="Детали отправки"
+        :description="selectedDispatch ? selectedDispatch.title : 'Сведения о получателях и ходе подписания.'"
         class="!max-w-6xl !max-h-[calc(100dvh-1rem)] sm:!max-h-[calc(100dvh-2rem)]"
       >
         <template #body>
@@ -1110,12 +1110,12 @@ watch(miniOpen, (open) => {
             <div class="flex flex-wrap items-center gap-2 text-sm">
               <UBadge :label="statusLabel(selectedDispatch.status)" :color="statusColor(selectedDispatch.status)" variant="subtle" />
               <span class="text-muted">ID: {{ selectedDispatch.id }}</span>
-              <span class="text-muted">РЁР°Р±Р»РѕРЅ: {{ selectedDispatch.templateName || 'вЂ”' }}</span>
-              <span class="text-muted">РћС‚РїСЂР°РІР»РµРЅРѕ: {{ formatDate(selectedDispatch.sentAt) }}</span>
+              <span class="text-muted">Шаблон: {{ selectedDispatch.templateName || '—' }}</span>
+              <span class="text-muted">Отправлено: {{ formatDate(selectedDispatch.sentAt) }}</span>
             </div>
 
             <div class="space-y-2">
-              <h4 class="font-semibold text-highlighted">РЎРѕС‚СЂСѓРґРЅРёРєРё</h4>
+              <h4 class="font-semibold text-highlighted">Сотрудники</h4>
               <div v-if="selectedDispatch.recipients?.length" class="flex flex-wrap gap-2">
                 <UBadge
                   v-for="rec in selectedDispatch.recipients"
@@ -1125,21 +1125,21 @@ watch(miniOpen, (open) => {
                   variant="subtle"
                 />
               </div>
-              <p v-else class="text-sm text-muted">РџРѕР»СѓС‡Р°С‚РµР»Рё РЅРµ РЅР°Р№РґРµРЅС‹.</p>
-              <p class="text-xs text-muted">РџРѕРґРїРёСЃР°РЅРѕ: {{ selectedDispatch.signedCount }} / {{ selectedDispatch.recipientCount }}</p>
+              <p v-else class="text-sm text-muted">Получатели не найдены.</p>
+              <p class="text-xs text-muted">Подписано: {{ selectedDispatch.signedCount }} / {{ selectedDispatch.recipientCount }}</p>
             </div>
 
             <div class="space-y-2">
-              <h4 class="font-semibold text-highlighted">РСЃС‚РѕСЂРёСЏ РґРµР№СЃС‚РІРёР№</h4>
+              <h4 class="font-semibold text-highlighted">История действий</h4>
               <div v-if="selectedDispatchHistory.length" class="rounded-lg border border-default overflow-x-auto">
                 <table class="min-w-full text-sm">
                   <thead>
                     <tr class="bg-elevated/50">
-                      <th class="px-3 py-2 text-left">РЎРѕС‚СЂСѓРґРЅРёРє</th>
-                      <th class="px-3 py-2 text-left">РўРµР»РµС„РѕРЅ</th>
-                      <th class="px-3 py-2 text-left">РџРѕРґРїРёСЃР°РЅРѕ</th>
-                      <th class="px-3 py-2 text-left">РЎРїРѕСЃРѕР±</th>
-                      <th class="px-3 py-2 text-left">РџРѕРґРїРёСЃСЊ</th>
+                      <th class="px-3 py-2 text-left">Сотрудник</th>
+                      <th class="px-3 py-2 text-left">Телефон</th>
+                      <th class="px-3 py-2 text-left">Подписано</th>
+                      <th class="px-3 py-2 text-left">Способ</th>
+                      <th class="px-3 py-2 text-left">Подпись</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1166,47 +1166,47 @@ watch(miniOpen, (open) => {
                   </tbody>
                 </table>
               </div>
-              <p v-else class="text-sm text-muted">РџРѕРґРїРёСЃРµР№ РїРѕ СЌС‚РѕР№ РѕС‚РїСЂР°РІРєРµ РїРѕРєР° РЅРµС‚.</p>
+              <p v-else class="text-sm text-muted">Подписей по этой отправке пока нет.</p>
             </div>
           </div>
-          <div v-else class="text-sm text-muted">Р’С‹Р±РµСЂРёС‚Рµ РѕС‚РїСЂР°РІРєСѓ, С‡С‚РѕР±С‹ СѓРІРёРґРµС‚СЊ РґРµС‚Р°Р»Рё.</div>
+          <div v-else class="text-sm text-muted">Выберите отправку, чтобы увидеть детали.</div>
         </template>
       </UModal>
 
       <UModal
         v-model:open="signatureOpen"
-        title="РџРѕРґРїРёСЃСЊ СЃРѕС‚СЂСѓРґРЅРёРєР°"
-        :description="signatureDocument ? `${signatureDocument.employeeName} В· ${formatDate(signatureDocument.signedAt)}` : 'РџСЂРѕСЃРјРѕС‚СЂ РїРѕРґРїРёСЃРё.'"
+        title="Подпись сотрудника"
+        :description="signatureDocument ? `${signatureDocument.employeeName} · ${formatDate(signatureDocument.signedAt)}` : 'Просмотр подписи.'"
       >
         <template #body>
           <div class="space-y-4">
             <p v-if="signatureLoading" class="text-sm text-muted">
-              Р—Р°РіСЂСѓР·РєР° РїРѕРґРїРёСЃРё...
+              Загрузка подписи...
             </p>
 
             <div v-else-if="signatureUrl" class="rounded-lg border border-default bg-white p-3">
               <img
                 :src="signatureUrl"
-                alt="РџРѕРґРїРёСЃСЊ СЃРѕС‚СЂСѓРґРЅРёРєР°"
+                alt="Подпись сотрудника"
                 class="max-h-[360px] w-full object-contain"
                 loading="lazy"
               >
             </div>
 
             <p v-else class="text-sm text-muted">
-              РџРѕРґРїРёСЃСЊ РЅРµ РЅР°Р№РґРµРЅР°.
+              Подпись не найдена.
             </p>
 
             <div class="flex items-center justify-end gap-2">
               <UButton
-                label="Р—Р°РєСЂС‹С‚СЊ"
+                label="Закрыть"
                 color="neutral"
                 variant="subtle"
                 @click="signatureOpen = false"
               />
               <UButton
                 v-if="signatureUrl"
-                label="РћС‚РєСЂС‹С‚СЊ"
+                label="Открыть"
                 icon="i-lucide-external-link"
                 color="neutral"
                 variant="ghost"

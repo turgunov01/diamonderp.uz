@@ -17,14 +17,14 @@ interface CreateWarehouseItemBody {
 
 function parseCreateBody(body: unknown): CreateWarehouseItemBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј РѕР±СЉРµРєС‚РѕРј.' })
+    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
   }
 
   const input = body as Partial<CreateWarehouseItemBody>
   const calculationType = input.calculationType
 
   if (!isWarehouseCalculationType(calculationType)) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ С‚РёРї СЂР°СЃС‡РµС‚Р°.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный тип расчета.' })
   }
 
   return {
@@ -56,7 +56,7 @@ export default eventHandler(async (event) => {
 
   const created = rows[0]
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» СЃРѕР·РґР°РЅРЅСѓСЋ РїРѕР·РёС†РёСЋ.' })
+    throw createError({ statusCode: 500, statusMessage: 'Postgres не вернул созданную позицию.' })
   }
 
   setResponseStatus(event, 201)

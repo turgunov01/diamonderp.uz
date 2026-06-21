@@ -6,7 +6,7 @@ function parseCustomerId(event: H3Event) {
   const rawId = getRouterParam(event, 'id')
   const id = Number(rawId)
   if (!rawId || !Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный идентификатор пользователя.' })
   }
   return id
 }
@@ -32,7 +32,7 @@ export default eventHandler(async (event) => {
 
   const restored = rows[0]
   if (!restored) {
-    throw createError({ statusCode: 404, statusMessage: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ.' })
+    throw createError({ statusCode: 404, statusMessage: 'Пользователь не найден.' })
   }
 
   return mapCustomerDbRowToRecord(restored)

@@ -29,7 +29,7 @@ function parseJsonCreateTemplateBody(body: unknown): Required<Pick<CreateTemplat
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј РѕР±СЉРµРєС‚РѕРј.'
+      statusMessage: 'Тело запроса должно быть корректным объектом.'
     })
   }
 
@@ -39,7 +39,7 @@ function parseJsonCreateTemplateBody(body: unknown): Required<Pick<CreateTemplat
   if (!name) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РќР°Р·РІР°РЅРёРµ С€Р°Р±Р»РѕРЅР° РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.'
+      statusMessage: 'Название шаблона обязательно.'
     })
   }
 
@@ -59,7 +59,7 @@ function parseJsonCreateTemplateBody(body: unknown): Required<Pick<CreateTemplat
 async function parseMultipartCreateTemplateBody(event: H3Event): Promise<CreateTemplateBody> {
   const form = await readMultipartFormData(event)
   if (!form?.length) {
-    throw createError({ statusCode: 400, statusMessage: 'РџСѓСЃС‚Р°СЏ С„РѕСЂРјР°.' })
+    throw createError({ statusCode: 400, statusMessage: 'Пустая форма.' })
   }
 
   const fields = new Map<string, string>()
@@ -128,12 +128,12 @@ export default eventHandler(async (event) => {
       path: uploadPath,
       data: payload.uploadFile.data,
       contentType: payload.uploadFile.contentType || 'application/octet-stream',
-      uploadErrorMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РѕСЂРёРіРёРЅР°Р»СЊРЅС‹Р№ С„Р°Р№Р» С€Р°Р±Р»РѕРЅР°.'
+      uploadErrorMessage: 'Не удалось загрузить оригинальный файл шаблона.'
     })
     originalFilePath = `${documentTemplateUploadBucket}/${uploadPath}`
 
     if (!payload.html?.trim()) {
-      payload.html = `<p>Р—Р°РіСЂСѓР¶РµРЅ С„Р°Р№Р» ${payload.uploadFile.filename}. РћС‚РєСЂРѕР№С‚Рµ РµРіРѕ РІ СЂРµРґР°РєС‚РѕСЂРµ Рё РѕС‚СЂРµРґР°РєС‚РёСЂСѓР№С‚Рµ.</p>`
+      payload.html = `<p>Загружен файл ${payload.uploadFile.filename}. Откройте его в редакторе и отредактируйте.</p>`
     }
   }
 
@@ -183,7 +183,7 @@ export default eventHandler(async (event) => {
     if (!createdRow) {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Postgres РЅРµ РІРµСЂРЅСѓР» СЃРѕР·РґР°РЅРЅСѓСЋ Р·Р°РїРёСЃСЊ С€Р°Р±Р»РѕРЅР°.'
+        statusMessage: 'Postgres не вернул созданную запись шаблона.'
       })
     }
 
@@ -198,7 +198,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'РўР°Р±Р»РёС†Р° "document_templates" РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚. РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ db/postgres/documents.sql.'
+        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/postgres/documents.sql.'
       })
     }
 

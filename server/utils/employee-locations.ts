@@ -179,7 +179,7 @@ function isMissingEmployeeLocationPointsTable(error: unknown) {
 function createMissingEmployeeLocationPointsTableError() {
   return createError({
     statusCode: 409,
-    statusMessage: 'РўР°Р±Р»РёС†Р° employee_location_points РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚. РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ db/postgres/employee_location_points.sql.'
+    statusMessage: 'Таблица employee_location_points отсутствует. Сначала выполните db/postgres/employee_location_points.sql.'
   })
 }
 

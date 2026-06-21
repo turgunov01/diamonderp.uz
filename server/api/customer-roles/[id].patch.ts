@@ -20,7 +20,7 @@ function parseRoleId(event: H3Event) {
   if (!rawId || !Number.isInteger(roleId) || roleId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ СЂРѕР»Рё.'
+      statusMessage: 'Некорректный идентификатор роли.'
     })
   }
 
@@ -49,7 +49,7 @@ export default eventHandler(async (event) => {
   if (!existing) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Р РѕР»СЊ РЅРµ РЅР°Р№РґРµРЅР°.'
+      statusMessage: 'Роль не найдена.'
     })
   }
 
@@ -60,7 +60,7 @@ export default eventHandler(async (event) => {
   if (label !== undefined && !label) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ label РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСѓСЃС‚С‹Рј.'
+      statusMessage: 'Поле label не может быть пустым.'
     })
   }
 
@@ -68,28 +68,28 @@ export default eventHandler(async (event) => {
     if (!nextCode) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ code РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСѓСЃС‚С‹Рј.'
+        statusMessage: 'Поле code не может быть пустым.'
       })
     }
 
     if (!existing.building_id) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РќРµР»СЊР·СЏ РјРµРЅСЏС‚СЊ code Сѓ РіР»РѕР±Р°Р»СЊРЅРѕР№ СЂРѕР»Рё. РЎРѕР·РґР°Р№С‚Рµ РЅРѕРІСѓСЋ СЂРѕР»СЊ СЃ РЅСѓР¶РЅС‹Рј РєРѕРґРѕРј.'
+        statusMessage: 'Нельзя менять code у глобальной роли. Создайте новую роль с нужным кодом.'
       })
     }
 
     if (isReservedCustomerRoleCode(existing.code)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РќРµР»СЊР·СЏ РјРµРЅСЏС‚СЊ code Сѓ СЃРёСЃС‚РµРјРЅРѕР№ СЂРѕР»Рё.'
+        statusMessage: 'Нельзя менять code у системной роли.'
       })
     }
 
     if (isReservedCustomerRoleCode(nextCode) && nextCode !== existing.code) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РќРµР»СЊР·СЏ РјРµРЅСЏС‚СЊ code РЅР° СЃРёСЃС‚РµРјРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ.'
+        statusMessage: 'Нельзя менять code на системное значение.'
       })
     }
   }
@@ -140,7 +140,7 @@ export default eventHandler(async (event) => {
   if (!updated) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ СЂРѕР»СЊ.'
+      statusMessage: 'Не удалось обновить роль.'
     })
   }
 

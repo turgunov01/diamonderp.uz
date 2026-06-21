@@ -1,4 +1,4 @@
-﻿-- Postgres SQL: С‚Р°Р±Р»РёС†Р° РєР»РёРµРЅС‚РѕРІ РґР»СЏ HR
+﻿-- Postgres SQL: таблица клиентов для HR
 
 do $$
 begin
@@ -104,24 +104,24 @@ on conflict (id) do update
 set public = excluded.public;
 
 drop policy if exists "Allow read for authenticated users" on public.customers;
-drop policy if exists "Р Р°Р·СЂРµС€РёС‚СЊ С‡С‚РµРЅРёРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј" on public.customers;
-create policy "Р Р°Р·СЂРµС€РёС‚СЊ С‡С‚РµРЅРёРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј"
+drop policy if exists "Разрешить чтение авторизованным пользователям" on public.customers;
+create policy "Разрешить чтение авторизованным пользователям"
 on public.customers
 for select
 to authenticated
 using (true);
 
 drop policy if exists "Allow insert for authenticated users" on public.customers;
-drop policy if exists "Р Р°Р·СЂРµС€РёС‚СЊ РґРѕР±Р°РІР»РµРЅРёРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј" on public.customers;
-create policy "Р Р°Р·СЂРµС€РёС‚СЊ РґРѕР±Р°РІР»РµРЅРёРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј"
+drop policy if exists "Разрешить добавление авторизованным пользователям" on public.customers;
+create policy "Разрешить добавление авторизованным пользователям"
 on public.customers
 for insert
 to authenticated
 with check (true);
 
 drop policy if exists "Allow update for authenticated users" on public.customers;
-drop policy if exists "Р Р°Р·СЂРµС€РёС‚СЊ РѕР±РЅРѕРІР»РµРЅРёРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј" on public.customers;
-create policy "Р Р°Р·СЂРµС€РёС‚СЊ РѕР±РЅРѕРІР»РµРЅРёРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј"
+drop policy if exists "Разрешить обновление авторизованным пользователям" on public.customers;
+create policy "Разрешить обновление авторизованным пользователям"
 on public.customers
 for update
 to authenticated
@@ -129,8 +129,8 @@ using (true)
 with check (true);
 
 drop policy if exists "Allow delete for authenticated users" on public.customers;
-drop policy if exists "Р Р°Р·СЂРµС€РёС‚СЊ СѓРґР°Р»РµРЅРёРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј" on public.customers;
-create policy "Р Р°Р·СЂРµС€РёС‚СЊ СѓРґР°Р»РµРЅРёРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј"
+drop policy if exists "Разрешить удаление авторизованным пользователям" on public.customers;
+create policy "Разрешить удаление авторизованным пользователям"
 on public.customers
 for delete
 to authenticated
@@ -139,12 +139,12 @@ using (true);
 insert into public.customers
   (full_name, username, avatar, password, phone_number, passport_file, age, work_shift, object_pinned, object_positions, base_salary, position_bonus, salary_currency, status, must_change_password, activated_at)
 values
-  ('Alex Smith', 'alex.smith', 'https://i.pravatar.cc/128?u=alex.smith', 'AxS!2026', '+1-202-555-0101', 'passports/alex-smith.pdf', 29, 'day', 'РљРѕСЂРїСѓСЃ Рђ', array['Р’С‚РѕСЂРѕР№ СЌС‚Р°Р¶', 'РўСѓР°Р»РµС‚ 1', 'РўСѓР°Р»РµС‚ 2'], 1000000, 120000, 'UZS', 'active', false, now()),
-  ('Jordan Brown', 'jordan.brown', 'https://i.pravatar.cc/128?u=jordan.brown', 'JbR#2045', '+1-202-555-0102', 'passports/jordan-brown.pdf', 34, 'night', 'РЎРєР»Р°Рґ 2', array['РџРµСЂРІС‹Р№ СЌС‚Р°Р¶', 'Р—РѕРЅР° РїРѕРіСЂСѓР·РєРё', 'РЎРєР»Р°Рґ 4'], 1000000, 150000, 'UZS', 'active', false, now()),
-  ('Taylor Green', 'taylor.green', 'https://i.pravatar.cc/128?u=taylor.green', 'TgX@9831', '+1-202-555-0103', 'passports/taylor-green.pdf', 27, 'day', 'РћС„РёСЃРЅР°СЏ Р±Р°С€РЅСЏ', array['Р’С‚РѕСЂРѕР№ СЌС‚Р°Р¶', 'РўСѓР°Р»РµС‚ 3', 'РљРѕСЂРёРґРѕСЂ СЂРµСЃРµРїС€РµРЅР°'], 1000000, 90000, 'UZS', 'active', false, now()),
-  ('Morgan White', 'morgan.white', 'https://i.pravatar.cc/128?u=morgan.white', 'Mw!1190', '+1-202-555-0104', 'passports/morgan-white.pdf', 31, 'night', 'РўР¦ РЎРµРІРµСЂ', array['РџРµСЂРІС‹Р№ СЌС‚Р°Р¶', 'РўСѓР°Р»РµС‚ 1', 'РџР°СЂРєРѕРІРєР° B1'], 1000000, 110000, 'UZS', 'active', false, now()),
-  ('Casey Gray', 'casey.gray', 'https://i.pravatar.cc/128?u=casey.gray', 'Cg$5521', '+1-202-555-0105', 'passports/casey-gray.pdf', 25, 'day', 'РљР»РёРЅРёРєР° Р—Р°РїР°Рґ', array['Р’С‚РѕСЂРѕР№ СЌС‚Р°Р¶', 'РљРѕСЂРёРґРѕСЂ РѕС‚РґРµР»РµРЅРёСЏ', 'РўСѓР°Р»РµС‚ 2'], 1000000, 70000, 'UZS', 'active', false, now()),
-  ('Jamie Johnson', 'jamie.johnson', 'https://i.pravatar.cc/128?u=jamie.johnson', 'Jj%4433', '+1-202-555-0106', 'passports/jamie-johnson.pdf', 38, 'night', 'РћС‚РµР»СЊ Р’РѕСЃС‚РѕРє', array['5 СЌС‚Р°Р¶', 'РўСѓР°Р»РµС‚ 1', 'РђРІР°СЂРёР№РЅР°СЏ Р»РµСЃС‚РЅРёС†Р°'], 1000000, 130000, 'UZS', 'active', false, now()),
-  ('Riley Davis', 'riley.davis', 'https://i.pravatar.cc/128?u=riley.davis', 'Rd*7845', '+1-202-555-0107', 'passports/riley-davis.pdf', 30, 'day', 'Р—Р°РІРѕРґСЃРєР°СЏ Р»РёРЅРёСЏ 1', array['Р“Р»Р°РІРЅС‹Р№ Р·Р°Р»', 'РўСѓР°Р»РµС‚ 2', 'Р—РѕРЅР° C'], 1000000, 80000, 'UZS', 'active', false, now()),
-  ('Kelly Wilson', 'kelly.wilson', 'https://i.pravatar.cc/128?u=kelly.wilson', 'Kw&2201', '+1-202-555-0108', 'passports/kelly-wilson.pdf', 33, 'night', 'РЁРєРѕР»СЊРЅС‹Р№ Р±Р»РѕРє C', array['Р’С‚РѕСЂРѕР№ СЌС‚Р°Р¶', 'РўСѓР°Р»РµС‚ 1', 'РљСЂС‹Р»Рѕ РєР»Р°СЃСЃРѕРІ'], 1000000, 100000, 'UZS', 'active', false, now())
+  ('Alex Smith', 'alex.smith', 'https://i.pravatar.cc/128?u=alex.smith', 'AxS!2026', '+1-202-555-0101', 'passports/alex-smith.pdf', 29, 'day', 'Корпус А', array['Второй этаж', 'Туалет 1', 'Туалет 2'], 1000000, 120000, 'UZS', 'active', false, now()),
+  ('Jordan Brown', 'jordan.brown', 'https://i.pravatar.cc/128?u=jordan.brown', 'JbR#2045', '+1-202-555-0102', 'passports/jordan-brown.pdf', 34, 'night', 'Склад 2', array['Первый этаж', 'Зона погрузки', 'Склад 4'], 1000000, 150000, 'UZS', 'active', false, now()),
+  ('Taylor Green', 'taylor.green', 'https://i.pravatar.cc/128?u=taylor.green', 'TgX@9831', '+1-202-555-0103', 'passports/taylor-green.pdf', 27, 'day', 'Офисная башня', array['Второй этаж', 'Туалет 3', 'Коридор ресепшена'], 1000000, 90000, 'UZS', 'active', false, now()),
+  ('Morgan White', 'morgan.white', 'https://i.pravatar.cc/128?u=morgan.white', 'Mw!1190', '+1-202-555-0104', 'passports/morgan-white.pdf', 31, 'night', 'ТЦ Север', array['Первый этаж', 'Туалет 1', 'Парковка B1'], 1000000, 110000, 'UZS', 'active', false, now()),
+  ('Casey Gray', 'casey.gray', 'https://i.pravatar.cc/128?u=casey.gray', 'Cg$5521', '+1-202-555-0105', 'passports/casey-gray.pdf', 25, 'day', 'Клиника Запад', array['Второй этаж', 'Коридор отделения', 'Туалет 2'], 1000000, 70000, 'UZS', 'active', false, now()),
+  ('Jamie Johnson', 'jamie.johnson', 'https://i.pravatar.cc/128?u=jamie.johnson', 'Jj%4433', '+1-202-555-0106', 'passports/jamie-johnson.pdf', 38, 'night', 'Отель Восток', array['5 этаж', 'Туалет 1', 'Аварийная лестница'], 1000000, 130000, 'UZS', 'active', false, now()),
+  ('Riley Davis', 'riley.davis', 'https://i.pravatar.cc/128?u=riley.davis', 'Rd*7845', '+1-202-555-0107', 'passports/riley-davis.pdf', 30, 'day', 'Заводская линия 1', array['Главный зал', 'Туалет 2', 'Зона C'], 1000000, 80000, 'UZS', 'active', false, now()),
+  ('Kelly Wilson', 'kelly.wilson', 'https://i.pravatar.cc/128?u=kelly.wilson', 'Kw&2201', '+1-202-555-0108', 'passports/kelly-wilson.pdf', 33, 'night', 'Школьный блок C', array['Второй этаж', 'Туалет 1', 'Крыло классов'], 1000000, 100000, 'UZS', 'active', false, now())
 on conflict (username) do nothing;

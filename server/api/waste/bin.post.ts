@@ -6,15 +6,15 @@ export default eventHandler(async (event) => {
   const body = await readBody<{ category?: BinCategory, volumeM3?: number, weightKg?: number, status?: BinStatus, objectId?: number | null }>(event)
 
   const category = body.category
-  if (!category || !['РњР°РєСѓР»Р°С‚СѓСЂР°', 'РџР»Р°СЃС‚РёРє', 'РћР±С‰РµРµ'].includes(category)) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ category РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ.' })
+  if (!category || !['Макулатура', 'Пластик', 'Общее'].includes(category)) {
+    throw createError({ statusCode: 400, statusMessage: 'Поле category обязательно.' })
   }
 
   const volumeM3 = Number(body.volumeM3 ?? 0)
   const weightKg = Number(body.weightKg ?? 0)
   const status = body.status || 'available'
   if (!['available', 'loaded'].includes(status)) {
-    throw createError({ statusCode: 400, statusMessage: 'РџРѕР»Рµ status РЅРµРєРѕСЂСЂРµРєС‚РЅРѕ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Поле status некорректно.' })
   }
 
   const rows = await $fetch<WasteBinRow[]>(`${url}/rest/v1/waste_bins`, {

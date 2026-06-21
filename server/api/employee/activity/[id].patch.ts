@@ -35,7 +35,7 @@ function parseActivityId(event: H3Event) {
   if (!rawId || !Number.isInteger(activityId) || activityId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р°РєС‚РёРІРЅРѕСЃС‚Рё.'
+      statusMessage: 'Некорректный идентификатор активности.'
     })
   }
 
@@ -50,7 +50,7 @@ function parseDate(value: unknown) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»Рµ date РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РІ С„РѕСЂРјР°С‚Рµ YYYY-MM-DD.'
+      statusMessage: 'Поле date должно быть в формате YYYY-MM-DD.'
     })
   }
 
@@ -63,7 +63,7 @@ function parseMinutes(value: unknown, fieldName: string) {
   if (!Number.isInteger(amount) || amount < 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: `РџРѕР»Рµ ${fieldName} РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ С†РµР»С‹Рј С‡РёСЃР»РѕРј РЅРµ РјРµРЅСЊС€Рµ 0.`
+      statusMessage: `Поле ${fieldName} должно быть целым числом не меньше 0.`
     })
   }
 
@@ -74,7 +74,7 @@ function parseUpdateBody(body: unknown) {
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РєРѕСЂСЂРµРєС‚РЅС‹Рј JSON-РѕР±СЉРµРєС‚РѕРј.'
+      statusMessage: 'Тело запроса должно быть корректным JSON-объектом.'
     })
   }
 
@@ -89,7 +89,7 @@ function parseUpdateBody(body: unknown) {
     if (!isStatus(input.status)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'РџРѕР»Рµ status РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ on_time, late РёР»Рё absent.'
+        statusMessage: 'Поле status должно быть on_time, late или absent.'
       })
     }
 
@@ -107,7 +107,7 @@ function parseUpdateBody(body: unknown) {
   if (!Object.keys(nextBody).length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РќСѓР¶РЅРѕ РїРµСЂРµРґР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕ РїРѕР»Рµ РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ.'
+      statusMessage: 'Нужно передать хотя бы одно поле для обновления.'
     })
   }
 
@@ -157,7 +157,7 @@ function mapDbRowToRecord(row: EmployeeActivityDbRow, customer?: ActivityCustome
   return {
     id: row.id,
     employeeId: row.employee_id,
-    employeeName: customer?.username?.trim() || row.employee_name?.trim() || `РЎРѕС‚СЂСѓРґРЅРёРє #${row.employee_id ?? row.id}`,
+    employeeName: customer?.username?.trim() || row.employee_name?.trim() || `Сотрудник #${row.employee_id ?? row.id}`,
     date: row.activity_date,
     startedAt: row.started_at ?? null,
     finishedAt: row.finished_at ?? null,
@@ -190,7 +190,7 @@ export default eventHandler(async (event) => {
   if (!updatedRow) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Р—Р°РїРёСЃСЊ Р°РєС‚РёРІРЅРѕСЃС‚Рё РЅРµ РЅР°Р№РґРµРЅР°.'
+      statusMessage: 'Запись активности не найдена.'
     })
   }
 

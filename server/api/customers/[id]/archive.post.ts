@@ -6,7 +6,7 @@ function parseCustomerId(event: H3Event) {
   const rawId = getRouterParam(event, 'id')
   const id = Number(rawId)
   if (!rawId || !Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный идентификатор пользователя.' })
   }
   return id
 }
@@ -17,7 +17,7 @@ export default eventHandler(async (event) => {
   const comment = typeof body?.comment === 'string' ? body.comment.trim() : null
 
   if (!comment) {
-    throw createError({ statusCode: 400, statusMessage: 'РљРѕРјРјРµРЅС‚Р°СЂРёР№ РѕР±СЏР·Р°С‚РµР»РµРЅ РїСЂРё Р°СЂС…РёРІР°С†РёРё.' })
+    throw createError({ statusCode: 400, statusMessage: 'Комментарий обязателен при архивации.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()
@@ -40,7 +40,7 @@ export default eventHandler(async (event) => {
 
   const updated = rows[0]
   if (!updated) {
-    throw createError({ statusCode: 404, statusMessage: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ.' })
+    throw createError({ statusCode: 404, statusMessage: 'Пользователь не найден.' })
   }
 
   return mapCustomerDbRowToRecord(updated)

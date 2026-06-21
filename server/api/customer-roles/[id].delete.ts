@@ -9,7 +9,7 @@ function parseRoleId(event: H3Event) {
   if (!rawId || !Number.isInteger(roleId) || roleId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ СЂРѕР»Рё.'
+      statusMessage: 'Некорректный идентификатор роли.'
     })
   }
 
@@ -57,14 +57,14 @@ export default eventHandler(async (event) => {
   if (!role) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Р РѕР»СЊ РЅРµ РЅР°Р№РґРµРЅР°.'
+      statusMessage: 'Роль не найдена.'
     })
   }
 
   if (await roleIsUsed(role)) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Р РѕР»СЊ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ Сѓ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ. РЎРЅР°С‡Р°Р»Р° РёР·РјРµРЅРёС‚Рµ СЂРѕР»Рё Сѓ СЃРѕС‚СЂСѓРґРЅРёРєРѕРІ.'
+      statusMessage: 'Роль используется у сотрудников. Сначала измените роли у сотрудников.'
     })
   }
 

@@ -49,7 +49,7 @@ export default eventHandler(async (event) => {
   const idRaw = getRouterParam(event, 'id')
   const signedId = Number(idRaw)
   if (!idRaw || !Number.isInteger(signedId) || signedId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id РїРѕРґРїРёСЃР°РЅРЅРѕРіРѕ РґРѕРєСѓРјРµРЅС‚Р°.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id подписанного документа.' })
   }
 
   const objectId = parseObjectIdInput(getQuery(event).objectId, 'objectId query param is required.')
@@ -69,14 +69,14 @@ export default eventHandler(async (event) => {
 
   const row = rows[0]
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'РџРѕРґРїРёСЃР°РЅРЅС‹Р№ РґРѕРєСѓРјРµРЅС‚ РЅРµ РЅР°Р№РґРµРЅ.' })
+    throw createError({ statusCode: 404, statusMessage: 'Подписанный документ не найден.' })
   }
 
   const signaturePath = row.signature_path
     || inferSignaturePathFromFileUrl({ signatureBucket: documentSignatureBucket, fileUrl: row.file_url })
 
   if (!signaturePath) {
-    throw createError({ statusCode: 404, statusMessage: 'РџРѕРґРїРёСЃСЊ РґР»СЏ СЌС‚РѕРіРѕ РґРѕРєСѓРјРµРЅС‚Р° РЅРµ РЅР°Р№РґРµРЅР°.' })
+    throw createError({ statusCode: 404, statusMessage: 'Подпись для этого документа не найдена.' })
   }
 
   const signedUrlResponse = await $fetch<StorageSignedUrlResponse>(
@@ -95,7 +95,7 @@ export default eventHandler(async (event) => {
 
   const signedUrl = signedUrlResponse.signedURL || signedUrlResponse.signedUrl
   if (!signedUrl) {
-    throw createError({ statusCode: 500, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃС„РѕСЂРјРёСЂРѕРІР°С‚СЊ СЃСЃС‹Р»РєСѓ РЅР° РїРѕРґРїРёСЃСЊ.' })
+    throw createError({ statusCode: 500, statusMessage: 'Не удалось сформировать ссылку на подпись.' })
   }
 
   setHeader(event, 'Cache-Control', 'no-store')

@@ -8,7 +8,7 @@ function parseCustomerId(event: H3Event) {
   if (!rawId || !Number.isInteger(customerId) || customerId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.'
+      statusMessage: 'Некорректный идентификатор пользователя.'
     })
   }
 
@@ -45,13 +45,13 @@ export default eventHandler(async (event) => {
     if (!existing) {
       throw createError({
         statusCode: 404,
-        statusMessage: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ.'
+        statusMessage: 'Пользователь не найден.'
       })
     }
 
     throw createError({
       statusCode: 409,
-      statusMessage: 'РњРѕР¶РЅРѕ СѓРґР°Р»РёС‚СЊ РїРѕР»РЅРѕСЃС‚СЊСЋ С‚РѕР»СЊРєРѕ Р°СЂС…РёРІРёСЂРѕРІР°РЅРЅРѕРіРѕ СЃРѕС‚СЂСѓРґРЅРёРєР°.'
+      statusMessage: 'Можно удалить полностью только архивированного сотрудника.'
     })
   }
 

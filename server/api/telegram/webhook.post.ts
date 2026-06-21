@@ -37,7 +37,7 @@ type ExistingMessageRow = {
 
 export default eventHandler(async (event) => {
   if (!verifyTelegramSecret(event)) {
-    throw createError({ statusCode: 401, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ СЃРµРєСЂРµС‚ webhook.' })
+    throw createError({ statusCode: 401, statusMessage: 'Некорректный секрет webhook.' })
   }
 
   const update = await readBody<TgUpdate>(event)
@@ -156,7 +156,7 @@ export default eventHandler(async (event) => {
 
     const createdChat = inserted[0]
     if (!createdChat?.id) {
-      throw createError({ statusCode: 500, statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РёР»Рё РѕР±РЅРѕРІРёС‚СЊ С‡Р°С‚ РґР»СЏ Telegram.' })
+      throw createError({ statusCode: 500, statusMessage: 'Не удалось создать или обновить чат для Telegram.' })
     }
 
     chatId = createdChat.id

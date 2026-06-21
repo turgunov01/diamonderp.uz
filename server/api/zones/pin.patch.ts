@@ -11,7 +11,7 @@ export default eventHandler(async (event) => {
   if (!userId || !zoneName) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РџРѕР»СЏ userId Рё zoneName РѕР±СЏР·Р°С‚РµР»СЊРЅС‹.'
+      statusMessage: 'Поля userId и zoneName обязательны.'
     })
   }
 
@@ -37,7 +37,7 @@ export default eventHandler(async (event) => {
     console.error('Error pinning user to zone:', error)
     throw createError({
       statusCode: 500,
-      statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РєСЂРµРїРёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Р·Р° Р·РѕРЅРѕР№.'
+      statusMessage: 'Не удалось закрепить пользователя за зоной.'
     })
   }
 })

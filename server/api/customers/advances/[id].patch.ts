@@ -6,14 +6,14 @@ function parseAdvanceId(event: H3Event) {
   const raw = getRouterParam(event, 'id')
   const id = Number(raw)
   if (!raw || !Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ id Р°РІР°РЅСЃР°.' })
+    throw createError({ statusCode: 400, statusMessage: 'Некорректный id аванса.' })
   }
   return id
 }
 
 function parseBody(body: unknown) {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'РўРµР»Рѕ Р·Р°РїСЂРѕСЃР° РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РѕР±СЉРµРєС‚РѕРј.' })
+    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть объектом.' })
   }
 
   const input = body as Record<string, unknown>
@@ -24,7 +24,7 @@ function parseBody(body: unknown) {
 
   if (input.comment !== undefined) {
     if (input.comment !== null && typeof input.comment !== 'string') {
-      throw createError({ statusCode: 400, statusMessage: 'comment РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ СЃС‚СЂРѕРєРѕР№ РёР»Рё null.' })
+      throw createError({ statusCode: 400, statusMessage: 'comment должен быть строкой или null.' })
     }
     update.comment = input.comment as string | null
   }
@@ -32,17 +32,17 @@ function parseBody(body: unknown) {
   if (input.status !== undefined) {
     const status = String(input.status)
     if (!['issued', 'settled', 'cancelled'].includes(status)) {
-      throw createError({ statusCode: 400, statusMessage: 'status РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ issued/settled/cancelled.' })
+      throw createError({ statusCode: 400, statusMessage: 'status должен быть issued/settled/cancelled.' })
     }
     update.status = status as AdvanceStatus
   }
 
   if (!Object.keys(update).length) {
-    throw createError({ statusCode: 400, statusMessage: 'РќСѓР¶РЅРѕ РїРµСЂРµРґР°С‚СЊ С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕ РїРѕР»Рµ.' })
+    throw createError({ statusCode: 400, statusMessage: 'Нужно передать хотя бы одно поле.' })
   }
 
   if (update.status && update.status !== 'issued') {
-    update.comment = update.comment ?? 'Р—Р°РєСЂС‹С‚'
+    update.comment = update.comment ?? 'Закрыт'
   }
 
   return update
@@ -70,7 +70,7 @@ export default eventHandler(async (event) => {
 
   const updated = rows[0]
   if (!updated) {
-    throw createError({ statusCode: 404, statusMessage: 'РђРІР°РЅСЃ РЅРµ РЅР°Р№РґРµРЅ.' })
+    throw createError({ statusCode: 404, statusMessage: 'Аванс не найден.' })
   }
 
   return mapAdvanceDbRowToRecord(updated)

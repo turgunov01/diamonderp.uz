@@ -32,7 +32,7 @@ interface BulkImportPreviewResponse {
 
 type DraftCustomer = {
   id: string
-  buildingId: number
+  buildingId: number | string
   sourceRow: number
   createdAt: string
   updatedAt: string
@@ -101,7 +101,7 @@ const saving = ref(false)
 const draftsOpen = ref(false)
 const editorOpen = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
-const activeBuilding = useState<{ id: number, name: string } | null>('active-building')
+const activeBuilding = useState<{ id: number | string, name: string } | null>('active-building')
 
 type CustomerRoleItem = {
   id: number
@@ -130,13 +130,26 @@ const roleOptions = computed(() => {
 const drafts = useLocalStorage<DraftCustomer[]>(
   'customers-import-drafts',
   [],
-  { listenToStorageChanges: false }
+  { listenToStorageChanges: true }
 )
 
+function normalizeBuildingId(value: unknown) {
+  const parsed = typeof value === 'number' ? value : Number(String(value ?? '').trim())
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function getActiveBuildingId() {
+  return normalizeBuildingId(activeBuilding.value?.id)
+}
+
 const activeBuildingDrafts = computed(() => {
-  const buildingId = activeBuilding.value?.id
+  const buildingId = getActiveBuildingId()
   if (!buildingId) return []
-  return (drafts.value || []).filter(item => item.buildingId === buildingId)
+
+  return (drafts.value || [])
+    .filter(item => normalizeBuildingId(item.buildingId) === buildingId)
+    .slice()
+    .sort((a, b) => a.sourceRow - b.sourceRow || a.fullName.localeCompare(b.fullName))
 })
 
 const activeBuildingDraftCount = computed(() => activeBuildingDrafts.value.length)
@@ -277,9 +290,9 @@ function removeDraft(id: string) {
 }
 
 function clearDraftsForActiveBuilding() {
-  const buildingId = activeBuilding.value?.id
+  const buildingId = getActiveBuildingId()
   if (!buildingId) return
-  drafts.value = (drafts.value || []).filter(item => item.buildingId !== buildingId)
+  drafts.value = (drafts.value || []).filter(item => normalizeBuildingId(item.buildingId) !== buildingId)
 }
 
 function fillStateFromDraft(draft: DraftCustomer) {
@@ -355,13 +368,14 @@ async function onFileSelected(event: Event) {
   importing.value = true
 
   try {
-    if (!activeBuilding.value?.id) {
+    const buildingId = getActiveBuildingId()
+    if (!buildingId) {
       throw new Error('Выберите здание перед импортом.')
     }
 
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('buildingId', String(activeBuilding.value.id))
+    formData.append('buildingId', String(buildingId))
 
     const result = await $fetch<BulkImportPreviewResponse>('/api/customers/bulk-import-preview', {
       method: 'POST',
@@ -369,7 +383,12 @@ async function onFileSelected(event: Event) {
     })
 
     const now = new Date().toISOString()
-    const existingPhoneSet = new Set((drafts.value || []).map(item => item.phoneNumber.trim()))
+    const existingPhoneSet = new Set(
+      (drafts.value || [])
+        .filter(item => normalizeBuildingId(item.buildingId) === buildingId)
+        .map(item => item.phoneNumber.trim())
+        .filter(Boolean)
+    )
     let addedToCache = 0
     let skippedAlreadyCached = 0
 
@@ -382,7 +401,7 @@ async function onFileSelected(event: Event) {
 
       const draft: DraftCustomer = {
         id: createLocalId(),
-        buildingId: item.buildingId,
+        buildingId: normalizeBuildingId(item.buildingId) ?? buildingId,
         sourceRow: item.row,
         createdAt: now,
         updatedAt: now,
@@ -398,7 +417,6 @@ async function onFileSelected(event: Event) {
         objectPositions: []
       }
 
-      existingPhoneSet.add(phoneKey)
       upsertDraft(draft)
       addedToCache++
     }
@@ -447,6 +465,11 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
 
   try {
     const data = event.data as FormState
+    const buildingId = normalizeBuildingId(draft.buildingId)
+    if (!buildingId) {
+      throw new Error('У черновика не найдено здание. Повторите импорт для активного здания.')
+    }
+
     const fullName = data.fullName.trim()
     const username = data.username.trim()
     const phoneNumber = data.phoneNumber.trim()
@@ -473,7 +496,7 @@ async function onCreateSubmit(event?: FormSubmitEvent<Record<string, unknown>>) 
     await $fetch('/api/customers', {
       method: 'POST',
       body: {
-        buildingId: draft.buildingId,
+        buildingId,
         fullName,
         username,
         avatar: { src: `https://i.pravatar.cc/128?u=${encodeURIComponent(username)}` },

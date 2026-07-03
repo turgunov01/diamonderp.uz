@@ -327,5 +327,7 @@ export function resolveScopedObjectIds(context: MobileAccessContext, requestedOb
 }
 
 export function findAccessibleObject(context: MobileAccessContext, objectId: number) {
-  return context.objects.find(object => object.id === objectId)
+  // Object ids arrive from the data API as strings while callers pass a parsed
+  // Number, so compare them numerically to avoid a strict-equality miss (404).
+  return context.objects.find(object => Number(object.id) === Number(objectId))
 }

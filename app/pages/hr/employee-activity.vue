@@ -31,7 +31,10 @@ const editLoading = ref(false)
 const employeesLoading = ref(false)
 const editingRecord = ref<EmployeeActivityRecord | null>(null)
 const selectedRouteRecord = ref<EmployeeActivityRecord | null>(null)
-const employeeOptions = ref<EmployeeSelectItem[]>([])
+// useState (not a local ref) so the SSR-loaded options are serialized into the
+// payload and hydrate identically on the client — otherwise the empty-state
+// `<p v-if="!employeeOptions.length">` mismatches between server and client.
+const employeeOptions = useState<EmployeeSelectItem[]>('employee-activity-options', () => [])
 
 const filters = reactive({
   from: '',
@@ -60,6 +63,7 @@ function statusLabel(status: EmployeeActivityStatus) {
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('ru-RU', {
+    timeZone: 'Asia/Tashkent',
     day: '2-digit',
     month: 'short',
     year: 'numeric'
@@ -313,9 +317,14 @@ async function saveEditRecord() {
 if (import.meta.server) {
   await loadPageData()
 } else {
-  employeeActivityStore.$patch({ list: [], routePoints: [] })
-  employeeOptions.value = []
-  void loadPageData()
+  // Defer the client refresh until after hydration. Running it during setup
+  // flips the loading flags synchronously and mismatches the SSR markup
+  // (disabled refresh button / select + spinner icon).
+  onMounted(() => {
+    employeeActivityStore.$patch({ list: [], routePoints: [] })
+    employeeOptions.value = []
+    void loadPageData()
+  })
 }
 
 const totalWorkMinutes = computed(() =>

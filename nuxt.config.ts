@@ -66,5 +66,19 @@ export default defineNuxtConfig({
     }
   },
 
+  nitro: {
+    // These are shared helper modules colocated with their endpoints, not route
+    // handlers. Without this they get registered as routes and 500 (leaking a
+    // stack trace) when hit. Excluding them from scanning keeps imports working.
+    ignore: [
+      '**/api/customers/customers.ts',
+      '**/api/documents/documents.ts',
+      '**/api/warehouse/warehouse.ts',
+      '**/api/waste/waste.ts',
+      '**/api/expenses/expenses.ts',
+      '**/api/customer-roles/roles.ts'
+    ]
+  },
+
   compatibilityDate: '2024-07-11'
 })

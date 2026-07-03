@@ -1,6 +1,7 @@
 ﻿import type { H3Event } from 'h3'
 import type { AuthRole, AuthSession } from '~~/shared/types/auth'
 import { getDataApiServerConfig, getDataApiServerHeaders } from './data-api'
+import { verifyAuthToken } from './auth'
 import { randomUUID } from 'node:crypto'
 
 interface TaskObjectRow {
@@ -241,6 +242,26 @@ function parsePositiveInteger(value: unknown, field: string) {
   return parsed
 }
 
+function normalizeDatabasePositiveInteger(value: unknown, field: string) {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: `Invalid ${field} returned from database.`
+    })
+  }
+
+  return parsed
+}
+
+function normalizeOptionalDatabasePositiveInteger(value: unknown, field: string) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  return normalizeDatabasePositiveInteger(value, field)
+}
+
 function getDataApiErrorCode(error: unknown) {
   if (!error || typeof error !== 'object') {
     return undefined
@@ -442,29 +463,45 @@ function readSessionCookie(event: H3Event) {
   }
 }
 
-export function requireTaskManagerSession(event: H3Event) {
-  const session = readSessionCookie(event)
-  if (!session) {
+export function requireTaskManagerSession(event: H3Event): AuthSession {
+  // Authorization must derive from the signed token, never the unsigned
+  // `diamond-erp-session` cookie (which a client could forge to fake a role).
+  const token = getCookie(event, 'diamond-erp-token')
+  let payload
+  try {
+    payload = verifyAuthToken(token || '')
+  } catch {
     throw createError({
       statusCode: 401,
       statusMessage: 'Session is required.'
     })
   }
 
-  if (!TASK_MANAGER_ROLES.includes(session.role)) {
+  if (!TASK_MANAGER_ROLES.includes(payload.role)) {
     throw createError({
       statusCode: 403,
       statusMessage: 'Task management access denied.'
     })
   }
 
-  return session
+  // Identity (id, role) comes from the verified token; display-only fields
+  // (name, avatar) are read from the session cookie without trusting them.
+  const idFromSub = Number(payload.sub.split(':')[1])
+  const profile = readSessionCookie(event)
+
+  return {
+    id: Number.isInteger(idFromSub) && idFromSub > 0 ? idFromSub : (profile?.id ?? 0),
+    email: payload.email ?? profile?.email,
+    name: profile?.name || payload.email || 'Unknown',
+    role: payload.role,
+    avatar: profile?.avatar ?? null
+  }
 }
 
 function mapObjectRow(row: TaskObjectRow) {
   return {
-    id: row.id,
-    buildingId: row.building_id ?? null,
+    id: normalizeDatabasePositiveInteger(row.id, 'object id'),
+    buildingId: normalizeOptionalDatabasePositiveInteger(row.building_id, 'object building id'),
     name: row.name,
     description: row.description || undefined,
     address: row.address || undefined,
@@ -473,10 +510,20 @@ function mapObjectRow(row: TaskObjectRow) {
   }
 }
 
-function mapEmployeeRow(row: TaskCustomerRow): ObjectTaskEmployeeRecord {
+function mapCustomerRow(row: TaskCustomerRow): TaskCustomerRow {
   return {
-    id: row.id,
-    name: normalizeDisplayName(row) || `Employee #${row.id}`,
+    ...row,
+    id: normalizeDatabasePositiveInteger(row.id, 'customer id'),
+    building_id: normalizeOptionalDatabasePositiveInteger(row.building_id, 'customer building id')
+  }
+}
+
+function mapEmployeeRow(row: TaskCustomerRow): ObjectTaskEmployeeRecord {
+  const employeeId = normalizeDatabasePositiveInteger(row.id, 'customer id')
+
+  return {
+    id: employeeId,
+    name: normalizeDisplayName(row) || `Employee #${employeeId}`,
     username: row.username,
     phone: row.phone_number || undefined,
     workShift: row.work_shift || undefined,
@@ -484,9 +531,22 @@ function mapEmployeeRow(row: TaskCustomerRow): ObjectTaskEmployeeRecord {
   }
 }
 
+function mapTaskListRow(row: ObjectTaskListDbRow): ObjectTaskListDbRow {
+  return {
+    ...row,
+    id: normalizeDatabasePositiveInteger(row.id, 'task list id'),
+    object_id: normalizeOptionalDatabasePositiveInteger(row.object_id, 'task object id'),
+    employee_id: normalizeOptionalDatabasePositiveInteger(row.employee_id, 'task employee id'),
+    reviewer_id: normalizeOptionalDatabasePositiveInteger(row.reviewer_id, 'task reviewer id'),
+    created_by_id: normalizeOptionalDatabasePositiveInteger(row.created_by_id, 'task creator id')
+  }
+}
+
 function mapTaskItemRow(row: ObjectTaskItemDbRow): ObjectTaskItemRecord {
   const { url, taskPhotoBucket } = getDataApiServerConfig()
   const base = url.replace(/\/+$/, '')
+  const itemId = normalizeDatabasePositiveInteger(row.id, 'task item id')
+  const taskListId = normalizeDatabasePositiveInteger(row.task_list_id, 'task item task list id')
   const raw = row.proof_photo_path || null
   let paths: string[] = []
 
@@ -506,8 +566,8 @@ function mapTaskItemRow(row: ObjectTaskItemDbRow): ObjectTaskItemRecord {
   const proofPhotoUrls = paths.map(path => `${base}/storage/v1/object/public/${taskPhotoBucket}/${encodeStoragePath(path)}`)
 
   return {
-    id: row.id,
-    taskListId: row.task_list_id,
+    id: itemId,
+    taskListId,
     title: row.title,
     isDone: row.is_done === true,
     completedAt: row.completed_at || null,
@@ -600,10 +660,12 @@ async function fetchCustomers(options: FetchCustomerOptions = {}) {
     query.or = `(building_id.eq.${options.buildingId},building_id.is.null)`
   }
 
-  return await fetchRows<TaskCustomerRow>(() => $fetch<TaskCustomerRow[]>(`${url}/rest/v1/customers`, {
+  const rows = await fetchRows<TaskCustomerRow>(() => $fetch<TaskCustomerRow[]>(`${url}/rest/v1/customers`, {
     headers: getDataApiServerHeaders(serviceRoleKey),
     query
   }))
+
+  return rows.map(mapCustomerRow)
 }
 
 async function fetchTaskLists(options: FetchTaskListOptions = {}) {
@@ -653,10 +715,12 @@ async function fetchTaskLists(options: FetchTaskListOptions = {}) {
     query.review_status = `eq.${options.reviewStatus}`
   }
 
-  return await fetchRowsOrEmpty<ObjectTaskListDbRow>(() => $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
+  const rows = await fetchRowsOrEmpty<ObjectTaskListDbRow>(() => $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
     headers: getDataApiServerHeaders(serviceRoleKey),
     query
   }))
+
+  return rows.map(mapTaskListRow)
 }
 
 async function fetchTaskItems(taskListIds: number[]) {
@@ -684,8 +748,13 @@ function buildTaskRecord(
 ): ObjectTaskRecord {
   const { url, taskPhotoBucket } = getDataApiServerConfig()
   const base = url.replace(/\/+$/, '')
-  const object = typeof row.object_id === 'number' ? objectById.get(row.object_id) : undefined
-  const employee = typeof row.employee_id === 'number' ? employeeById.get(row.employee_id) : undefined
+  const taskId = normalizeDatabasePositiveInteger(row.id, 'task list id')
+  const objectId = normalizeOptionalDatabasePositiveInteger(row.object_id, 'task object id')
+  const employeeId = normalizeOptionalDatabasePositiveInteger(row.employee_id, 'task employee id')
+  const reviewerId = normalizeOptionalDatabasePositiveInteger(row.reviewer_id, 'task reviewer id')
+  const createdById = normalizeOptionalDatabasePositiveInteger(row.created_by_id, 'task creator id')
+  const object = objectId ? objectById.get(objectId) : undefined
+  const employee = employeeId ? employeeById.get(employeeId) : undefined
   const completedItems = items.filter(item => item.isDone).length
   const totalItems = items.length
   const status = deriveTaskStatus(items)
@@ -709,29 +778,29 @@ function buildTaskRecord(
   const reviewPhotoUrls = reviewPhotoPaths.map(path => `${base}/storage/v1/object/public/${taskPhotoBucket}/${encodeStoragePath(path)}`)
 
   return {
-    id: row.id,
-    objectId: row.object_id ?? null,
-    objectName: object?.name || `Object #${row.object_id ?? row.id}`,
-    employeeId: row.employee_id ?? null,
-    employeeName: typeof row.employee_id === 'number'
-      ? (normalizeDisplayName(employee) || `Employee #${row.employee_id}`)
+    id: taskId,
+    objectId,
+    objectName: object?.name || `Object #${objectId ?? taskId}`,
+    employeeId,
+    employeeName: employeeId
+      ? (normalizeDisplayName(employee) || `Employee #${employeeId}`)
       : 'Все сотрудники',
-    employeeUsername: typeof row.employee_id === 'number' ? (employee?.username || undefined) : undefined,
-    employeePhone: typeof row.employee_id === 'number' ? (employee?.phone_number || undefined) : undefined,
-    employeeStatus: typeof row.employee_id === 'number' ? (employee?.status || undefined) : undefined,
+    employeeUsername: employeeId ? (employee?.username || undefined) : undefined,
+    employeePhone: employeeId ? (employee?.phone_number || undefined) : undefined,
+    employeeStatus: employeeId ? (employee?.status || undefined) : undefined,
     title: row.title,
     note: row.note || null,
     dueDate: row.due_date || null,
     status,
     reviewStatus,
-    reviewerId: row.reviewer_id ?? null,
+    reviewerId,
     reviewRequestedAt: row.review_requested_at || null,
     reviewedAt: row.reviewed_at || null,
     reviewComment: row.review_comment || null,
     reviewPhotoUrl: reviewPhotoUrls[0] || null,
     reviewPhotoUrls,
     reviewImages: reviewPhotoUrls,
-    createdById: row.created_by_id ?? null,
+    createdById,
     createdByName: row.created_by_name || null,
     createdByRole: row.created_by_role || null,
     createdAt: row.created_at || null,
@@ -747,9 +816,10 @@ function buildItemsMap(rows: ObjectTaskItemDbRow[]) {
   const map = new Map<number, ObjectTaskItemRecord[]>()
 
   for (const row of rows) {
-    const next = map.get(row.task_list_id) || []
-    next.push(mapTaskItemRow(row))
-    map.set(row.task_list_id, next)
+    const item = mapTaskItemRow(row)
+    const next = map.get(item.taskListId) || []
+    next.push(item)
+    map.set(item.taskListId, next)
   }
 
   return map
@@ -1022,7 +1092,7 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   let createdLists: ObjectTaskListDbRow[] = []
 
   try {
-    createdLists = await $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
+    const rows = await $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {
       method: 'POST',
       headers: {
         ...headers,
@@ -1042,6 +1112,7 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
         updated_at: now
       }))
     })
+    createdLists = rows.map(mapTaskListRow)
   } catch (error: unknown) {
     if (isMissingTableError(error)) {
       throwMissingTaskTablesError()

@@ -1,5 +1,5 @@
 import pg from 'pg'
-import type { Pool as PoolType, QueryResultRow } from 'pg'
+import type { Pool as PoolType, PoolClient, QueryResultRow } from 'pg'
 
 const { Pool } = pg
 
@@ -99,6 +99,23 @@ function getPool() {
 
 export async function postgresQuery<T extends QueryResultRow = QueryResultRow>(text: string, values: unknown[] = []) {
   return await getPool().query<T>(text, values)
+}
+
+export async function withPostgresTransaction<T>(callback: (client: PoolClient) => Promise<T>) {
+  const client = await getPool().connect()
+
+  try {
+    await client.query('BEGIN')
+    const result = await callback(client)
+    await client.query('COMMIT')
+
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 export async function testPostgresConnection() {

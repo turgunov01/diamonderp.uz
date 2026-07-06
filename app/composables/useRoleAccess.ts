@@ -9,6 +9,7 @@ export function useRoleAccess() {
   const isProcurement = computed(() => role.value === 'procurement')
 
   const canManageHr = computed(() => isAdmin.value || isHr.value)
+  const canManageBuildings = computed(() => isAdmin.value)
   const canManageObjects = computed(() => isAdmin.value)
   const canManageObjectTasks = computed(() => isAdmin.value || isProcurement.value)
   const canManageExpenses = computed(() => isAdmin.value || isProcurement.value)
@@ -27,6 +28,7 @@ export function useRoleAccess() {
     isProcurement,
     canAccess: (path: string) => canAccessPath(role.value, path),
     canManageHr,
+    canManageBuildings,
     canManageObjects,
     canManageObjectTasks,
     canManageExpenses,

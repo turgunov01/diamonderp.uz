@@ -38,6 +38,12 @@ const links: SidebarLinks = [
       ]
     },
     {
+      label: 'Здания',
+      icon: 'i-lucide-building-2',
+      to: '/buildings',
+      exact: true
+    },
+    {
       label: 'Объекты',
       icon: 'i-lucide-map',
       to: '/objects',

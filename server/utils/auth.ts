@@ -95,16 +95,15 @@ export function mapCustomerToSession(row: CustomerProfileRow | CustomerLoginRow)
 
 export function normalizeCredentials(body: Partial<LoginRequestBody> | null | undefined) {
   const record = body as Record<string, unknown> | null | undefined
-  const login = typeof body?.email === 'string'
-    ? body.email.trim()
-    : typeof record?.phone === 'string'
-      ? record.phone.trim()
-      : typeof record?.login === 'string'
-        ? record.login.trim()
-        : ''
+  const login = [
+    body?.email,
+    record?.phone,
+    record?.login
+  ].find(value => typeof value === 'string' && value.trim().length > 0)
+  const normalizedLogin = typeof login === 'string' ? login.trim() : ''
   const password = typeof body?.password === 'string' ? body.password : ''
 
-  if (!login || !password) {
+  if (!normalizedLogin || !password) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Specify login and password.'
@@ -112,7 +111,7 @@ export function normalizeCredentials(body: Partial<LoginRequestBody> | null | un
   }
 
   return {
-    login,
+    login: normalizedLogin,
     password
   }
 }
@@ -235,7 +234,7 @@ export async function fetchUserByEmail(email: string) {
 
 export async function fetchCustomerByLogin(login: string) {
   const normalized = normalizePhoneOrUsername(login)
-  const digits = normalized.replace(/\D/g, '')
+  const digits = normalizePhone(login)
   const plusDigits = digits ? `+${digits}` : ''
 
   const result = await postgresQuery<CustomerLoginRow>(
@@ -245,11 +244,11 @@ export async function fetchCustomerByLogin(login: string) {
         or phone_number = $2
         or phone_number = $3
         or phone_number = $4
-        or phone_number ilike $5
-        or username = $1
-        or username = $2
+        or ($3 <> '' and regexp_replace(coalesce(phone_number, ''), '[^0-9]', '', 'g') = $3)
+        or lower(username) = lower($1)
+        or lower(username) = lower($2)
      limit 1`,
-    [normalized, login, digits, plusDigits, digits ? `%${digits}%` : '']
+    [normalized, login.trim(), digits, plusDigits]
   )
 
   return result.rows[0] || null

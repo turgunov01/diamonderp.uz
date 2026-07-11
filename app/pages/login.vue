@@ -11,14 +11,14 @@ const route = useRoute()
 const { login } = useAuth()
 
 const schema = z.object({
-  email: z.string().email('Введите корректный email.'),
+  login: z.string().trim().min(1, 'Введите email, телефон или логин.'),
   password: z.string().min(6, 'Минимум 6 символов.')
 })
 
 type LoginSchema = z.output<typeof schema>
 
 const state = reactive<LoginSchema>({
-  email: 'admin@diamond.local',
+  login: 'admin@diamond.local',
   password: 'password123'
 })
 
@@ -103,13 +103,13 @@ async function onSubmit(event: FormSubmitEvent<LoginSchema>) {
             class="space-y-5"
             @submit="onSubmit"
           >
-            <UFormField label="Email" name="email" required>
+            <UFormField label="Email, телефон или логин" name="login" required>
               <UInput
-                v-model="state.email"
-                type="email"
-                icon="i-lucide-mail"
+                v-model="state.login"
+                type="text"
+                icon="i-lucide-user"
                 autocomplete="username"
-                placeholder="admin@diamond.local"
+                placeholder="admin@diamond.local или +998901234567"
                 class="w-full"
               />
             </UFormField>

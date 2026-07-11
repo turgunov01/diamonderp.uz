@@ -1,6 +1,6 @@
 import { getRouterParams, setResponseStatus } from 'h3'
-import { requireMobileAccess, isFrontlineMobileAccess } from '../../utils/mobile-access'
-import { getEmployeeTaskById } from '../../utils/object-tasks'
+import { requireMobileAccess } from '../../utils/mobile-access'
+import { getObjectScopedTaskById } from '../../utils/object-tasks'
 import reviewTaskHandler from './tasks/[taskId]/review.post'
 
 export default defineEventHandler(async (event) => {
@@ -21,9 +21,6 @@ export default defineEventHandler(async (event) => {
 
     try {
       const access = await requireMobileAccess(event)
-      if (!isFrontlineMobileAccess(access)) {
-        throw createError({ statusCode: 403, statusMessage: 'Only employee accounts can access mobile tasks.' })
-      }
       if (!Number.isInteger(objectId) || objectId <= 0) {
         throw createError({ statusCode: 400, statusMessage: 'Invalid object id.' })
       }
@@ -34,7 +31,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 403, statusMessage: 'Object access denied.' })
       }
 
-      const task = await getEmployeeTaskById(access.customer?.id ?? 0, taskId)
+      const task = await getObjectScopedTaskById(taskId)
       if (!task || task.objectId !== objectId) {
         throw createError({ statusCode: 404, statusMessage: 'Task not found.' })
       }

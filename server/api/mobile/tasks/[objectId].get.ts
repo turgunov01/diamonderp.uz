@@ -1,5 +1,5 @@
-import { isFrontlineMobileAccess, requireMobileAccess } from '../../../utils/mobile-access'
-import { listEmployeeObjectTasksByObject, listReviewerObjectTasksByObject, parseOptionalObjectTaskReviewStatus, parseOptionalObjectTaskStatus } from '../../../utils/object-tasks'
+import { requireMobileAccess } from '../../../utils/mobile-access'
+import { listScopedObjectTasksByObject, parseOptionalObjectTaskStatus } from '../../../utils/object-tasks'
 
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
@@ -23,27 +23,8 @@ export default eventHandler(async (event) => {
 
   const query = getQuery(event)
 
-  if (access.role === 'manager' && access.customer) {
-    const reviewStatus = parseOptionalObjectTaskReviewStatus(query.reviewStatus) ?? 'pending'
-    const items = await listReviewerObjectTasksByObject(access.customer.id, objectId, reviewStatus)
-
-    return {
-      role: access.role,
-      frontend: access.frontend,
-      objectId,
-      items
-    }
-  }
-
-  if (!isFrontlineMobileAccess(access)) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Only employee accounts can access mobile tasks.'
-    })
-  }
-
   const status = parseOptionalObjectTaskStatus(query.status)
-  const items = await listEmployeeObjectTasksByObject(access.customer.id, objectId, status)
+  const items = await listScopedObjectTasksByObject(objectId, status)
 
   return {
     role: access.role,

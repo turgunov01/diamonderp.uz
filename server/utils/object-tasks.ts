@@ -2,6 +2,7 @@
 import type { AuthRole, AuthSession } from '~~/shared/types/auth'
 import { getDataApiServerConfig, getDataApiServerHeaders } from './data-api'
 import { verifyAuthToken } from './auth'
+import { isMobileEmployeeTaskRole } from './mobile-access'
 import { randomUUID } from 'node:crypto'
 
 interface TaskObjectRow {
@@ -613,7 +614,7 @@ function isAssignableEmployee(customer: TaskCustomerRow, objectName: string) {
   const role = customer.role || 'customer'
   const status = customer.status || 'active'
 
-  if (role !== 'customer' && role !== 'cleaner') {
+  if (!isMobileEmployeeTaskRole(role)) {
     return false
   }
 
@@ -1246,6 +1247,47 @@ export async function listEmployeeObjectTasksByObject(
   return sortTasks(taskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
 }
 
+export async function listScopedObjectTasks(objectIds: number[] = [], status?: ObjectTaskStatus) {
+  const normalizedObjectIds = Array.from(new Set(objectIds
+    .map(value => typeof value === 'number' ? value : Number(value))
+    .filter((value): value is number => Number.isInteger(value) && value > 0)))
+
+  if (!normalizedObjectIds.length) {
+    return []
+  }
+
+  const taskLists = await fetchTaskLists({
+    objectIds: normalizedObjectIds,
+    status
+  })
+
+  if (!taskLists.length) {
+    return []
+  }
+
+  const taskItems = await fetchTaskItems(taskLists.map(task => task.id))
+  const employeeIds = Array.from(new Set(taskLists
+    .map(task => task.employee_id)
+    .filter((value): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0)))
+
+  const [objects, customers] = await Promise.all([
+    fetchObjects({ objectIds: normalizedObjectIds }),
+    employeeIds.length ? fetchCustomers({ customerIds: employeeIds }) : Promise.resolve([])
+  ])
+
+  const objectById = new Map(objects.map(object => [object.id, object]))
+  const customerById = new Map(customers.map(customer => [customer.id, customer]))
+  const itemsByTaskId = buildItemsMap(taskItems)
+
+  return sortTasks(taskLists.map(row => buildTaskRecord(row, itemsByTaskId.get(row.id) || [], objectById, customerById)))
+}
+
+export async function listScopedObjectTasksByObject(objectId: number, status?: ObjectTaskStatus) {
+  const normalizedObjectId = parsePositiveInteger(objectId, 'objectId')
+
+  return await listScopedObjectTasks([normalizedObjectId], status)
+}
+
 export async function listReviewerObjectTasks(
   reviewerId: number,
   objectIds: number[],
@@ -1656,6 +1698,34 @@ export async function getEmployeeTaskById(employeeId: number, taskId: number) {
       statusMessage: 'Task access denied.'
     })
   }
+
+  const objectById = new Map(objects.map(object => [object.id, object]))
+  const customerById = new Map(customers.map(customer => [customer.id, customer]))
+  const items = taskItems.map(mapTaskItemRow)
+
+  return buildTaskRecord(taskList, items, objectById, customerById)
+}
+
+export async function getObjectScopedTaskById(taskId: number) {
+  const normalizedTaskId = parsePositiveInteger(taskId, 'taskId')
+
+  const taskList = await fetchTaskListById(normalizedTaskId)
+  if (!taskList) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Task not found.'
+    })
+  }
+
+  const [taskItems, objects, customers] = await Promise.all([
+    fetchTaskItems([normalizedTaskId]),
+    typeof taskList.object_id === 'number' && taskList.object_id > 0
+      ? fetchObjects({ objectIds: [taskList.object_id] })
+      : Promise.resolve([]),
+    typeof taskList.employee_id === 'number' && taskList.employee_id > 0
+      ? fetchCustomers({ customerIds: [taskList.employee_id] })
+      : Promise.resolve([])
+  ])
 
   const objectById = new Map(objects.map(object => [object.id, object]))
   const customerById = new Map(customers.map(customer => [customer.id, customer]))

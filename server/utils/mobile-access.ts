@@ -60,9 +60,14 @@ export interface MobileAccessContext {
 }
 
 function mapObjectRow(row: ObjectRow): MobileObjectRecord {
+  const objectId = Number(row.id)
+  const buildingId = row.building_id === null || row.building_id === undefined
+    ? null
+    : Number(row.building_id)
+
   return {
-    id: row.id,
-    buildingId: row.building_id ?? null,
+    id: Number.isInteger(objectId) && objectId > 0 ? objectId : row.id,
+    buildingId: Number.isInteger(buildingId) && buildingId > 0 ? buildingId : null,
     name: row.name,
     description: row.description || undefined,
     address: row.address || undefined,
@@ -120,6 +125,22 @@ export function isFrontlineMobileAccess(
   context: MobileAccessContext
 ): context is MobileAccessContext & { customer: CustomerProfileRow } {
   return Boolean(context.customer) && isFrontlineMobileRole(context.role)
+}
+
+const NON_EMPLOYEE_TASK_ROLES = new Set(['admin', 'hr', 'procurement', 'manager'])
+
+export function isMobileEmployeeTaskRole(role: unknown) {
+  const normalizedRole = typeof role === 'string' && role.trim()
+    ? role.trim().toLowerCase()
+    : 'customer'
+
+  return !NON_EMPLOYEE_TASK_ROLES.has(normalizedRole)
+}
+
+export function isMobileEmployeeTaskAccess(
+  context: MobileAccessContext
+): context is MobileAccessContext & { customer: CustomerProfileRow } {
+  return Boolean(context.customer) && isMobileEmployeeTaskRole(context.role)
 }
 
 function readBearerToken(event: H3Event) {

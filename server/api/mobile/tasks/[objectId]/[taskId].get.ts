@@ -1,5 +1,5 @@
-import { isFrontlineMobileAccess, requireMobileAccess } from '../../../../utils/mobile-access'
-import { getEmployeeTaskById, getReviewerTaskById } from '../../../../utils/object-tasks'
+import { requireMobileAccess } from '../../../../utils/mobile-access'
+import { getObjectScopedTaskById } from '../../../../utils/object-tasks'
 
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
@@ -30,31 +30,7 @@ export default eventHandler(async (event) => {
     })
   }
 
-  if (access.role === 'manager' && access.customer) {
-    const task = await getReviewerTaskById(access.customer.id, taskId)
-
-    if (task.objectId !== objectId) {
-      throw createError({
-        statusCode: 404,
-        statusMessage: 'Task not found.'
-      })
-    }
-
-    return {
-      role: access.role,
-      frontend: access.frontend,
-      task
-    }
-  }
-
-  if (!isFrontlineMobileAccess(access)) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Only employee accounts can access mobile tasks.'
-    })
-  }
-
-  const task = await getEmployeeTaskById(access.customer.id, taskId)
+  const task = await getObjectScopedTaskById(taskId)
 
   if (task.objectId !== objectId) {
     throw createError({

@@ -1,5 +1,5 @@
 import { setResponseStatus } from 'h3'
-import { isFrontlineMobileAccess, requireMobileAccess } from '../../../../../utils/mobile-access'
+import { requireMobileAccess } from '../../../../../utils/mobile-access'
 
 // This endpoint exists only to prevent the SPA fallback when someone calls
 // /api/mobile/tasks/:objectId/items/:itemId without specifying taskId.
@@ -10,14 +10,6 @@ export default eventHandler(async (event) => {
   setHeader(event, 'Content-Type', 'application/json; charset=utf-8')
 
   const access = await requireMobileAccess(event)
-
-  if (!isFrontlineMobileAccess(access)) {
-    setResponseStatus(event, 403, 'Only employee accounts can access mobile tasks.')
-    return {
-      error: 'forbidden',
-      message: 'Only employee accounts can access mobile tasks.'
-    }
-  }
 
   const rawObjectId = getRouterParam(event, 'objectId')
   const objectId = Number(rawObjectId)

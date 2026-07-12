@@ -46,6 +46,9 @@ const toast = useToast()
 const { canManageWarehouse } = useRoleAccess()
 const createModalOpen = ref(false)
 const creating = ref(false)
+const deleteModalOpen = ref(false)
+const deletingItemId = ref<number | null>(null)
+const warehouseItemToDelete = ref<WarehouseItem | null>(null)
 
 const form = reactive<CreateWarehouseItemState>({
   name: '',
@@ -72,6 +75,9 @@ const { data, error, refresh, status, pending } = await useAutoRefreshFetch<Ware
       }
     }
   }),
+  query: {
+    activeOnly: true
+  },
   immediate: true
 })
 
@@ -181,6 +187,43 @@ async function createWarehouseItem() {
     creating.value = false
   }
 }
+
+function confirmDeleteWarehouseItem(item: WarehouseItem) {
+  if (!canManageWarehouse.value) {
+    toast.add({
+      title: 'Удаление позиций доступно только администратору',
+      color: 'warning'
+    })
+    return
+  }
+
+  warehouseItemToDelete.value = item
+  deleteModalOpen.value = true
+}
+
+async function deleteWarehouseItem() {
+  if (!canManageWarehouse.value || !warehouseItemToDelete.value || deletingItemId.value !== null) {
+    return
+  }
+
+  deletingItemId.value = warehouseItemToDelete.value.id
+
+  try {
+    await $fetch(`/api/warehouse/${warehouseItemToDelete.value.id}`, { method: 'DELETE' })
+    toast.add({ title: 'Позиция удалена', color: 'success' })
+    deleteModalOpen.value = false
+    warehouseItemToDelete.value = null
+    await refresh()
+  } catch (err: unknown) {
+    toast.add({
+      title: 'Не удалось удалить позицию',
+      description: getErrorMessage(err) || 'Попробуйте позже.',
+      color: 'error'
+    })
+  } finally {
+    deletingItemId.value = null
+  }
+}
 </script>
 
 <template>
@@ -274,7 +317,21 @@ async function createWarehouseItem() {
                 <p class="font-semibold text-highlighted truncate">{{ item.name }}</p>
                 <p class="text-sm text-muted truncate">{{ item.manufacturer }}</p>
               </div>
-              <UBadge :label="unitLabels[item.calculationType]" color="primary" variant="subtle" />
+              <div class="flex shrink-0 items-center gap-2">
+                <UBadge :label="unitLabels[item.calculationType]" color="primary" variant="subtle" />
+                <UButton
+                  v-if="canManageWarehouse"
+                  icon="i-lucide-trash"
+                  color="error"
+                  variant="ghost"
+                  size="xs"
+                  square
+                  aria-label="Удалить позицию"
+                  :loading="deletingItemId === item.id"
+                  :disabled="deletingItemId !== null && deletingItemId !== item.id"
+                  @click="confirmDeleteWarehouseItem(item)"
+                />
+              </div>
             </div>
 
             <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -355,6 +412,38 @@ async function createWarehouseItem() {
                 icon="i-lucide-check"
                 :loading="creating"
                 @click="createWarehouseItem"
+              />
+            </div>
+          </div>
+        </template>
+      </UModal>
+
+      <UModal
+        v-if="canManageWarehouse"
+        v-model:open="deleteModalOpen"
+        title="Удалить позицию склада?"
+        description="Позиция исчезнет из склада и больше не будет доступна при создании закупок."
+      >
+        <template #body>
+          <div class="space-y-3">
+            <p class="text-sm text-muted">
+              Вы уверены, что хотите удалить позицию
+              <strong>{{ warehouseItemToDelete?.name || '' }}</strong>?
+            </p>
+            <div class="flex items-center justify-end gap-2">
+              <UButton
+                label="Отмена"
+                color="neutral"
+                variant="subtle"
+                :disabled="deletingItemId !== null"
+                @click="deleteModalOpen = false"
+              />
+              <UButton
+                label="Удалить"
+                color="error"
+                icon="i-lucide-trash"
+                :loading="deletingItemId !== null"
+                @click="deleteWarehouseItem"
               />
             </div>
           </div>

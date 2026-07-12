@@ -1,4 +1,4 @@
-﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
+import { postgresQuery } from '../../utils/postgres'
 import {
   isWarehouseCalculationType,
   mapWarehouseItemDbRowToRecord,
@@ -37,26 +37,23 @@ function parseCreateBody(body: unknown): CreateWarehouseItemBody {
 
 export default eventHandler(async (event) => {
   const payload = parseCreateBody(await readBody(event))
-  const { url, serviceRoleKey } = getDataApiServerConfig()
+  const result = await postgresQuery<WarehouseItemDbRow>(
+    `insert into public.warehouse_items (name, manufacturer, calculation_type, unit_price, is_active)
+     values ($1, $2, $3, $4, true)
+     on conflict (lower(name), lower(manufacturer), calculation_type)
+     do update
+     set name = excluded.name,
+         manufacturer = excluded.manufacturer,
+         unit_price = excluded.unit_price,
+         is_active = true
+     where warehouse_items.is_active = false
+     returning id, name, manufacturer, calculation_type, unit_price, is_active, created_at, updated_at`,
+    [payload.name, payload.manufacturer, payload.calculationType, payload.unitPrice]
+  )
 
-  const rows = await $fetch<WarehouseItemDbRow[]>(`${url}/rest/v1/warehouse_items`, {
-    method: 'POST',
-    headers: {
-      ...getDataApiServerHeaders(serviceRoleKey),
-      Prefer: 'return=representation'
-    },
-    body: {
-      name: payload.name,
-      manufacturer: payload.manufacturer,
-      calculation_type: payload.calculationType,
-      unit_price: payload.unitPrice,
-      is_active: true
-    }
-  })
-
-  const created = rows[0]
+  const created = result.rows[0]
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Postgres не вернул созданную позицию.' })
+    throw createError({ statusCode: 409, statusMessage: 'Такая активная позиция уже существует.' })
   }
 
   setResponseStatus(event, 201)

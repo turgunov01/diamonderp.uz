@@ -1,14 +1,14 @@
 export type WarehouseCalculationType = 'kg' | 'liter' | 'piece'
 
 export interface WarehouseItemDbRow {
-  id: number
+  id: number | string
   name: string
   manufacturer: string
   calculation_type: WarehouseCalculationType
-  unit_price: number
+  unit_price: number | string
   is_active: boolean
-  created_at: string
-  updated_at: string
+  created_at: string | Date
+  updated_at: string | Date
 }
 
 export interface WarehouseItemRecord {
@@ -24,14 +24,14 @@ export interface WarehouseItemRecord {
 
 export function mapWarehouseItemDbRowToRecord(row: WarehouseItemDbRow): WarehouseItemRecord {
   return {
-    id: row.id,
+    id: Number(row.id),
     name: row.name,
     manufacturer: row.manufacturer,
     calculationType: row.calculation_type,
     unitPrice: Number(row.unit_price) || 0,
     isActive: row.is_active,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString()
   }
 }
 

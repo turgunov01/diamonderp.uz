@@ -1,25 +1,83 @@
 <script setup lang="ts">
 import * as z from 'zod'
-import type { FormError } from '@nuxt/ui'
+import type { FormError, FormSubmitEvent } from '@nuxt/ui'
 
 const passwordSchema = z.object({
-  current: z.string().min(8, 'Минимум 8 символов'),
-  new: z.string().min(8, 'Минимум 8 символов')
+  currentPassword: z.string().min(1, 'Введите текущий пароль'),
+  newPassword: z.string().min(8, 'Минимум 8 символов'),
+  confirmPassword: z.string().min(8, 'Минимум 8 символов')
 })
 
 type PasswordSchema = z.output<typeof passwordSchema>
 
-const password = reactive<Partial<PasswordSchema>>({
-  current: '',
-  new: ''
+const toast = useToast()
+const changingPassword = ref(false)
+
+const password = reactive<PasswordSchema>({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: ''
 })
 
 const validate = (state: Partial<PasswordSchema>): FormError[] => {
   const errors: FormError[] = []
-  if (state.current && state.new && state.current === state.new) {
-    errors.push({ name: 'new', message: 'Пароли должны отличаться' })
+  if (state.currentPassword && state.newPassword && state.currentPassword === state.newPassword) {
+    errors.push({ name: 'newPassword', message: 'Пароли должны отличаться' })
+  }
+  if (state.newPassword && state.confirmPassword && state.newPassword !== state.confirmPassword) {
+    errors.push({ name: 'confirmPassword', message: 'Пароли не совпадают' })
   }
   return errors
+}
+
+function resetPasswordForm() {
+  password.currentPassword = ''
+  password.newPassword = ''
+  password.confirmPassword = ''
+}
+
+function getErrorMessage(error: unknown) {
+  if (error && typeof error === 'object') {
+    const err = error as { data?: { statusMessage?: string }, message?: string }
+    return err.data?.statusMessage || err.message
+  }
+
+  return undefined
+}
+
+async function onPasswordSubmit(event: FormSubmitEvent<PasswordSchema>) {
+  if (changingPassword.value) {
+    return
+  }
+
+  changingPassword.value = true
+
+  try {
+    await $fetch('/api/auth/change-password', {
+      method: 'POST',
+      body: {
+        currentPassword: event.data.currentPassword,
+        newPassword: event.data.newPassword
+      }
+    })
+
+    resetPasswordForm()
+    toast.add({
+      title: 'Пароль обновлен',
+      description: 'Теперь используйте новый пароль при следующем входе.',
+      icon: 'i-lucide-check',
+      color: 'success'
+    })
+  } catch (error: unknown) {
+    toast.add({
+      title: 'Не удалось обновить пароль',
+      description: getErrorMessage(error) || 'Проверьте текущий пароль и повторите попытку.',
+      icon: 'i-lucide-circle-alert',
+      color: 'error'
+    })
+  } finally {
+    changingPassword.value = false
+  }
 }
 </script>
 
@@ -34,26 +92,45 @@ const validate = (state: Partial<PasswordSchema>): FormError[] => {
       :state="password"
       :validate="validate"
       class="flex flex-col gap-4 max-w-xs"
+      @submit="onPasswordSubmit"
     >
-      <UFormField name="current">
+      <UFormField label="Текущий пароль" name="currentPassword">
         <UInput
-          v-model="password.current"
+          v-model="password.currentPassword"
           type="password"
-          placeholder="Текущий пароль"
+          autocomplete="current-password"
+          icon="i-lucide-lock-keyhole"
           class="w-full"
         />
       </UFormField>
 
-      <UFormField name="new">
+      <UFormField label="Новый пароль" name="newPassword">
         <UInput
-          v-model="password.new"
+          v-model="password.newPassword"
           type="password"
-          placeholder="Новый пароль"
+          autocomplete="new-password"
+          icon="i-lucide-key-round"
           class="w-full"
         />
       </UFormField>
 
-      <UButton label="Обновить" class="w-fit" type="submit" />
+      <UFormField label="Повторите новый пароль" name="confirmPassword">
+        <UInput
+          v-model="password.confirmPassword"
+          type="password"
+          autocomplete="new-password"
+          icon="i-lucide-key-round"
+          class="w-full"
+        />
+      </UFormField>
+
+      <UButton
+        label="Обновить пароль"
+        icon="i-lucide-save"
+        class="w-fit"
+        type="submit"
+        :loading="changingPassword"
+      />
     </UForm>
   </UPageCard>
 

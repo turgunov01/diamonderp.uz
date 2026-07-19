@@ -40,7 +40,7 @@ watch(
     toast.add({
       title: "Не удалось загрузить зоны",
       description:
-        newError.statusMessage || "Проверьте API и переменные окружения Postgres.",
+        newError.data?.message || newError.statusMessage || "Проверьте API и переменные окружения Postgres.",
       color: "error",
     });
   },

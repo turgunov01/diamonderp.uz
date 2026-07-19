@@ -19,7 +19,7 @@ interface ObjectIdRow {
 export function parseBuildingId(idRaw: string | number | undefined | null) {
   const id = Number(idRaw)
   if (idRaw === undefined || idRaw === null || !Number.isSafeInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id здания.' })
+    throw createError({ statusCode: 400, message: 'Некорректный id здания.' })
   }
 
   return id
@@ -27,17 +27,17 @@ export function parseBuildingId(idRaw: string | number | undefined | null) {
 
 export function parseBuildingIds(idsRaw: unknown) {
   if (!Array.isArray(idsRaw)) {
-    throw createError({ statusCode: 400, statusMessage: 'ids должен быть массивом.' })
+    throw createError({ statusCode: 400, message: 'ids должен быть массивом.' })
   }
 
   if (!idsRaw.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Выберите хотя бы одно здание.' })
+    throw createError({ statusCode: 400, message: 'Выберите хотя бы одно здание.' })
   }
 
   const ids = idsRaw.map((idRaw) => {
     const id = Number(idRaw)
     if (!Number.isSafeInteger(id) || id <= 0) {
-      throw createError({ statusCode: 400, statusMessage: 'ids содержит некорректный id здания.' })
+      throw createError({ statusCode: 400, message: 'ids содержит некорректный id здания.' })
     }
 
     return id

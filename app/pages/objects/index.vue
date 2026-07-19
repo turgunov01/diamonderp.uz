@@ -96,11 +96,11 @@ watch(error, (value) => {
     return
   }
 
-  const fetchError = value as { data?: { statusMessage?: string }, message?: string }
+  const fetchError = value as { data?: { message?: string, statusMessage?: string }, message?: string }
 
   toast.add({
     title: 'Не удалось загрузить объекты',
-    description: fetchError.data?.statusMessage || fetchError.message,
+    description: fetchError.data?.message || fetchError.message,
     color: 'error'
   })
 }, { immediate: true })
@@ -225,8 +225,8 @@ function closeBulkDeleteModal() {
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error && typeof error === 'object') {
-    const payload = error as { data?: { statusMessage?: string }, message?: string }
-    return payload.data?.statusMessage || payload.message || fallback
+    const payload = error as { data?: { message?: string, statusMessage?: string }, message?: string }
+    return payload.data?.message || payload.message || fallback
   }
 
   return fallback

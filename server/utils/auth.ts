@@ -106,7 +106,7 @@ export function normalizeCredentials(body: Partial<LoginRequestBody> | null | un
   if (!normalizedLogin || !password) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Specify login and password.'
+      message: 'Specify login and password.'
     })
   }
 
@@ -155,7 +155,7 @@ export function verifyAuthToken(token: string): VerifiedAuthTokenPayload {
   if (typeof token !== 'string' || !token.trim()) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Missing auth token.'
+      message: 'Missing auth token.'
     })
   }
 
@@ -163,7 +163,7 @@ export function verifyAuthToken(token: string): VerifiedAuthTokenPayload {
   if (parts.length !== 3) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Invalid auth token.'
+      message: 'Invalid auth token.'
     })
   }
 
@@ -179,7 +179,7 @@ export function verifyAuthToken(token: string): VerifiedAuthTokenPayload {
   ) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Invalid auth token signature.'
+      message: 'Invalid auth token signature.'
     })
   }
 
@@ -190,14 +190,14 @@ export function verifyAuthToken(token: string): VerifiedAuthTokenPayload {
   } catch {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Invalid auth token payload.'
+      message: 'Invalid auth token payload.'
     })
   }
 
   if (!payload?.sub || !isAuthRole(payload.role)) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Invalid auth token claims.'
+      message: 'Invalid auth token claims.'
     })
   }
 
@@ -205,7 +205,7 @@ export function verifyAuthToken(token: string): VerifiedAuthTokenPayload {
   if (typeof payload.exp === 'number' && payload.exp <= now) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Auth token expired.'
+      message: 'Auth token expired.'
     })
   }
 
@@ -226,7 +226,7 @@ export async function fetchUserByEmail(email: string) {
   } catch (error) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to fetch erp user.',
+      message: 'Failed to fetch erp user.',
       data: error
     })
   }
@@ -328,6 +328,6 @@ export async function authenticateLogin(body: Partial<LoginRequestBody> | null |
 
   throw createError({
     statusCode: 401,
-    statusMessage: 'Invalid login or password.'
+    message: 'Invalid login or password.'
   })
 }

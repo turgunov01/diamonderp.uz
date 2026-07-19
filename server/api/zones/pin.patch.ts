@@ -11,7 +11,7 @@ export default eventHandler(async (event) => {
   if (!userId || !zoneName) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поля userId и zoneName обязательны.'
+      message: 'Поля userId и zoneName обязательны.'
     })
   }
 
@@ -37,7 +37,7 @@ export default eventHandler(async (event) => {
     console.error('Error pinning user to zone:', error)
     throw createError({
       statusCode: 500,
-      statusMessage: 'Не удалось закрепить пользователя за зоной.'
+      message: 'Не удалось закрепить пользователя за зоной.'
     })
   }
 })

@@ -8,7 +8,7 @@ function parseCustomerId(event: H3Event) {
   if (!rawId || !Number.isInteger(customerId) || customerId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Некорректный идентификатор пользователя.'
+      message: 'Некорректный идентификатор пользователя.'
     })
   }
 
@@ -45,13 +45,13 @@ export default eventHandler(async (event) => {
     if (!existing) {
       throw createError({
         statusCode: 404,
-        statusMessage: 'Пользователь не найден.'
+        message: 'Пользователь не найден.'
       })
     }
 
     throw createError({
       statusCode: 409,
-      statusMessage: 'Можно удалить полностью только архивированного сотрудника.'
+      message: 'Можно удалить полностью только архивированного сотрудника.'
     })
   }
 

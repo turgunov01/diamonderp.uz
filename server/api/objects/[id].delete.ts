@@ -5,7 +5,7 @@ export default eventHandler(async (event) => {
   const [deleted] = await deleteObjectsByIds([id])
 
   if (!deleted) {
-    throw createError({ statusCode: 404, statusMessage: 'Объект не найден.' })
+    throw createError({ statusCode: 404, message: 'Объект не найден.' })
   }
 
   return deleted

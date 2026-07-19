@@ -29,7 +29,7 @@ const DELETE_REFERENCE_TABLES = new Set([
 export function parseObjectId(idRaw: string | number | undefined | null) {
   const id = Number(idRaw)
   if (idRaw === undefined || idRaw === null || !Number.isSafeInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id объекта.' })
+    throw createError({ statusCode: 400, message: 'Некорректный id объекта.' })
   }
 
   return id
@@ -37,17 +37,17 @@ export function parseObjectId(idRaw: string | number | undefined | null) {
 
 export function parseObjectIds(idsRaw: unknown) {
   if (!Array.isArray(idsRaw)) {
-    throw createError({ statusCode: 400, statusMessage: 'ids должен быть массивом.' })
+    throw createError({ statusCode: 400, message: 'ids должен быть массивом.' })
   }
 
   if (!idsRaw.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Выберите хотя бы один объект.' })
+    throw createError({ statusCode: 400, message: 'Выберите хотя бы один объект.' })
   }
 
   const ids = idsRaw.map((idRaw) => {
     const id = Number(idRaw)
     if (!Number.isSafeInteger(id) || id <= 0) {
-      throw createError({ statusCode: 400, statusMessage: 'ids содержит некорректный id объекта.' })
+      throw createError({ statusCode: 400, message: 'ids содержит некорректный id объекта.' })
     }
 
     return id
@@ -65,7 +65,7 @@ function normalizeObjectRows(rows: ObjectDeleteRow[]): DeletedObjectRow[] {
 
 function quoteIdentifier(value: string) {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
-    throw createError({ statusCode: 500, statusMessage: `Некорректное имя в схеме базы: ${value}.` })
+    throw createError({ statusCode: 500, message: `Некорректное имя в схеме базы: ${value}.` })
   }
 
   return `"${value.replace(/"/g, '""')}"`
@@ -171,7 +171,7 @@ function mapObjectDeletionError(error: unknown): never {
   if (pgError?.code === '23503') {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Нельзя удалить объект: в базе остались связанные записи. Проверьте ограничения внешних ключей для objects.',
+      message: 'Нельзя удалить объект: в базе остались связанные записи. Проверьте ограничения внешних ключей для objects.',
       data: {
         code: pgError.code,
         constraint: pgError.constraint,
@@ -183,7 +183,7 @@ function mapObjectDeletionError(error: unknown): never {
   if (pgError?.code === '42P01' || pgError?.code === '42703') {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Схема базы данных не совпадает с кодом удаления объектов.',
+      message: 'Схема базы данных не совпадает с кодом удаления объектов.',
       data: {
         code: pgError.code,
         detail: pgError.message

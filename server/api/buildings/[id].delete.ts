@@ -6,7 +6,7 @@ export default eventHandler(async (event) => {
   const [deleted] = await deleteBuildingsByIds([id], { deleteCustomers: !keepEmployees })
 
   if (!deleted) {
-    throw createError({ statusCode: 404, statusMessage: 'Здание не найдено.' })
+    throw createError({ statusCode: 404, message: 'Здание не найдено.' })
   }
 
   return deleted

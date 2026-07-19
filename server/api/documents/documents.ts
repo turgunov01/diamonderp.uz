@@ -159,7 +159,7 @@ export function parseObjectIdInput(value: unknown, message = 'objectId is requir
   if (!Number.isInteger(objectId) || objectId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: message
+      message: message
     })
   }
 
@@ -220,7 +220,7 @@ export async function ensureStorageBucket(options: {
 
     throw createError({
       statusCode: 500,
-      statusMessage: options.missingErrorMessage
+      message: options.missingErrorMessage
     })
   }
 }
@@ -248,7 +248,7 @@ export async function uploadStorageObject(options: {
   } catch {
     throw createError({
       statusCode: 400,
-      statusMessage: options.uploadErrorMessage
+      message: options.uploadErrorMessage
     })
   }
 }
@@ -277,7 +277,7 @@ export async function downloadStorageObject(options: {
   } catch {
     throw createError({
       statusCode: 404,
-      statusMessage: options.downloadErrorMessage
+      message: options.downloadErrorMessage
     })
   }
 }

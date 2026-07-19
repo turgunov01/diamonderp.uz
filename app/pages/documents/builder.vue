@@ -142,7 +142,7 @@ async function loadTemplate(id: number) {
   } catch (err) {
     toast.add({
       title: 'Не удалось загрузить шаблон',
-      description: (err as any)?.data?.statusMessage || (err as Error)?.message,
+      description: (err as any)?.data?.message || (err as Error)?.message,
       color: 'error'
     })
   } finally {
@@ -185,7 +185,7 @@ async function saveTemplate() {
   } catch (err) {
     toast.add({
       title: 'Не удалось сохранить шаблон',
-      description: (err as any)?.data?.statusMessage || (err as Error)?.message,
+      description: (err as any)?.data?.message || (err as Error)?.message,
       color: 'error'
     })
   } finally {

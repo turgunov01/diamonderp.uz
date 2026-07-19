@@ -40,10 +40,10 @@ function isMissingScheduleTypeColumn(error: unknown) {
 export default eventHandler(async (event) => {
   const body = await readBody<Body>(event)
   if (!body?.name?.trim()) {
-    throw createError({ statusCode: 400, statusMessage: 'Название обязательно.' })
+    throw createError({ statusCode: 400, message: 'Название обязательно.' })
   }
   if (!body?.buildingId || body.buildingId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'buildingId обязателен.' })
+    throw createError({ statusCode: 400, message: 'buildingId обязателен.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()
@@ -89,7 +89,7 @@ export default eventHandler(async (event) => {
   const [created] = rows
 
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Не удалось создать объект.' })
+    throw createError({ statusCode: 500, message: 'Не удалось создать объект.' })
   }
 
   setResponseStatus(event, 201)

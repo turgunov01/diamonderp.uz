@@ -149,7 +149,7 @@ watch(error, (value) => {
 
   toast.add({
     title: 'Не удалось загрузить закупки',
-    description: value.statusMessage || 'Проверьте API закупок.',
+    description: value.data?.message || value.statusMessage || 'Проверьте API закупок.',
     color: 'error'
   })
 }, { immediate: true })
@@ -161,7 +161,7 @@ watch(warehouseError, (value) => {
 
   toast.add({
     title: 'Не удалось загрузить склад',
-    description: value.statusMessage || 'Проверьте API склада.',
+    description: value.data?.message || value.statusMessage || 'Проверьте API склада.',
     color: 'error'
   })
 }, { immediate: true })
@@ -210,8 +210,8 @@ function statusLabel(status: ExpenseStatus) {
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === 'object') {
-    const err = error as { data?: { statusMessage?: string }, message?: string }
-    return err.data?.statusMessage || err.message
+    const err = error as { data?: { message?: string, statusMessage?: string }, message?: string }
+    return err.data?.message || err.message
   }
 
   return undefined

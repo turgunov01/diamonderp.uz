@@ -62,7 +62,7 @@ function getTashkentDateParts(date: Date) {
   if ([year, month, day, hour, minute, second].some(value => Number.isNaN(value))) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to resolve Asia/Tashkent shift date parts.'
+      message: 'Failed to resolve Asia/Tashkent shift date parts.'
     })
   }
 

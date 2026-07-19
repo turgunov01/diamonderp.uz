@@ -127,7 +127,7 @@ watch(chatListError, (value) => {
 
   toast.add({
     title: 'Не удалось загрузить чаты',
-    description: value.statusMessage || 'Проверьте интеграцию Telegram и API чатов.',
+    description: (value.data as { message?: string })?.message || value.statusMessage || 'Проверьте интеграцию Telegram и API чатов.',
     color: 'error'
   })
 }, { immediate: true })
@@ -485,8 +485,8 @@ function isVideoMedia(message: ChatMessage) {
 
 function getErrorMessage(fetchError: unknown) {
   if (fetchError && typeof fetchError === 'object') {
-    const err = fetchError as { data?: { statusMessage?: string }, message?: string }
-    return err.data?.statusMessage || err.message
+    const err = fetchError as { data?: { message?: string, statusMessage?: string }, message?: string }
+    return err.data?.message || err.message
   }
 
   return undefined

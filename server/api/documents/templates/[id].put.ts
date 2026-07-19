@@ -22,7 +22,7 @@ function parseTemplateId(event: H3Event) {
   const rawId = getRouterParam(event, 'id')
   const templateId = Number(rawId)
   if (!rawId || !Number.isInteger(templateId) || templateId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id шаблона.' })
+    throw createError({ statusCode: 400, message: 'Некорректный id шаблона.' })
   }
 
   return templateId
@@ -30,7 +30,7 @@ function parseTemplateId(event: H3Event) {
 
 function parseUpdateBody(body: unknown): UpdateTemplateBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
+    throw createError({ statusCode: 400, message: 'Тело запроса должно быть корректным объектом.' })
   }
 
   const input = body as UpdateTemplateBody
@@ -64,7 +64,7 @@ export default eventHandler(async (event) => {
 
   const existing = rows[0]
   if (!existing) {
-    throw createError({ statusCode: 404, statusMessage: 'Шаблон не найден.' })
+    throw createError({ statusCode: 404, message: 'Шаблон не найден.' })
   }
 
   const nextName = payload.name || existing.name
@@ -117,7 +117,7 @@ export default eventHandler(async (event) => {
 
     const updated = updatedRows[0]
     if (!updated) {
-      throw createError({ statusCode: 500, statusMessage: 'Postgres не вернул обновленный шаблон.' })
+      throw createError({ statusCode: 500, message: 'Postgres не вернул обновленный шаблон.' })
     }
 
     return {
@@ -130,14 +130,14 @@ export default eventHandler(async (event) => {
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/postgres/documents.sql.'
+        message: 'Таблица "document_templates" отсутствует. Сначала выполните db/postgres/documents.sql.'
       })
     }
 
     if (data?.message) {
       throw createError({
         statusCode: 400,
-        statusMessage: data.message
+        message: data.message
       })
     }
 

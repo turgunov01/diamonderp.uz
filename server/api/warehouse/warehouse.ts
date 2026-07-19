@@ -43,7 +43,7 @@ export function requiredTrimmedString(value: unknown, fieldName: string) {
   if (typeof value !== 'string' || !value.trim().length) {
     throw createError({
       statusCode: 400,
-      statusMessage: `${fieldName} is required.`
+      message: `${fieldName} is required.`
     })
   }
 
@@ -55,7 +55,7 @@ export function parsePositiveInt(value: unknown, fieldName: string) {
   if (!Number.isInteger(amount) || amount <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: `${fieldName} must be an integer > 0.`
+      message: `${fieldName} must be an integer > 0.`
     })
   }
 
@@ -67,7 +67,7 @@ export function parsePositiveNumber(value: unknown, fieldName: string) {
   if (!Number.isFinite(amount) || amount <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: `${fieldName} must be a number > 0.`
+      message: `${fieldName} must be a number > 0.`
     })
   }
 

@@ -38,7 +38,7 @@ function isNonEmptyString(value: unknown): value is string {
 
 function getRequiredString(value: unknown, fieldName: string) {
   if (!isNonEmptyString(value)) {
-    throw createError({ statusCode: 400, statusMessage: `Поле ${fieldName} обязательно.` })
+    throw createError({ statusCode: 400, message: `Поле ${fieldName} обязательно.` })
   }
 
   return value.trim()
@@ -63,7 +63,7 @@ function getDataApiErrorData(error: unknown): DataApiErrorData | undefined {
 function parseAge(value: unknown) {
   const age = typeof value === 'number' ? value : Number(value)
   if (!Number.isInteger(age) || age < 18) {
-    throw createError({ statusCode: 400, statusMessage: 'Возраст должен быть целым числом не меньше 18.' })
+    throw createError({ statusCode: 400, message: 'Возраст должен быть целым числом не меньше 18.' })
   }
 
   return age
@@ -79,7 +79,7 @@ function parseOptionalBuildingId(value: unknown) {
   if (!Number.isInteger(buildingId) || buildingId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле buildingId должно быть положительным целым числом.'
+      message: 'Поле buildingId должно быть положительным целым числом.'
     })
   }
 
@@ -95,7 +95,7 @@ function parseOptionalMoney(value: unknown, fieldName: string) {
   if (!Number.isInteger(amount) || amount < 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: `Поле ${fieldName} должно быть целым числом не меньше 0.`
+      message: `Поле ${fieldName} должно быть целым числом не меньше 0.`
     })
   }
 
@@ -106,7 +106,7 @@ function parseObjectPositions(value: unknown) {
   if (!isNonEmptyString(value)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле objectPositions обязательно.'
+      message: 'Поле objectPositions обязательно.'
     })
   }
 
@@ -131,7 +131,7 @@ function parseObjectPositions(value: unknown) {
   if (!objectPositions.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле objectPositions должно быть непустым массивом строк.'
+      message: 'Поле objectPositions должно быть непустым массивом строк.'
     })
   }
 
@@ -142,7 +142,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Тело запроса должно быть корректным JSON-объектом.'
+      message: 'Тело запроса должно быть корректным JSON-объектом.'
     })
   }
 
@@ -151,7 +151,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   const username = getOptionalString(input.username) || generateUsername(fullName)
 
   if (!input.avatar || typeof input.avatar !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Поле avatar.src обязательно.' })
+    throw createError({ statusCode: 400, message: 'Поле avatar.src обязательно.' })
   }
 
   const avatarSrc = getRequiredString(input.avatar.src, 'avatar.src')
@@ -161,7 +161,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   const age = parseAge(input.age)
 
   if (!isWorkShift(input.workShift)) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле workShift должно быть \'day\' или \'night\'.' })
+    throw createError({ statusCode: 400, message: 'Поле workShift должно быть \'day\' или \'night\'.' })
   }
 
   const objectPinned = getOptionalString(input.objectPinned)
@@ -172,7 +172,7 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   let salaryType: SalaryType | undefined
   if (salaryTypeValue !== undefined) {
     if (!isSalaryType(salaryTypeValue)) {
-      throw createError({ statusCode: 400, statusMessage: 'Поле salaryType должно быть fixed или hourly.' })
+      throw createError({ statusCode: 400, message: 'Поле salaryType должно быть fixed или hourly.' })
     }
     salaryType = salaryTypeValue
   }
@@ -184,11 +184,11 @@ function parseJsonBody(body: unknown): CreateCustomerBody {
   const role = (getOptionalString((input as any).role) || 'customer').toLowerCase()
 
   if (!isAuthRole(role) || role.length > 64) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле role содержит недопустимую роль.' })
+    throw createError({ statusCode: 400, message: 'Поле role содержит недопустимую роль.' })
   }
 
   if (!Array.isArray(input.objectPositions) || !input.objectPositions.length || input.objectPositions.some(position => !isNonEmptyString(position))) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле objectPositions должно быть непустым массивом строк.' })
+    throw createError({ statusCode: 400, message: 'Поле objectPositions должно быть непустым массивом строк.' })
   }
 
   return {
@@ -280,7 +280,7 @@ async function ensureStorageBucket(options: {
 
     throw createError({
       statusCode: 500,
-      statusMessage: `Не удалось подготовить бакет хранилища "${options.bucket}".`
+      message: `Не удалось подготовить бакет хранилища "${options.bucket}".`
     })
   }
 }
@@ -306,7 +306,7 @@ async function uploadStorageObject(options: {
   } catch {
     throw createError({
       statusCode: 400,
-      statusMessage: `Не удалось загрузить файл в бакет "${options.bucket}".`
+      message: `Не удалось загрузить файл в бакет "${options.bucket}".`
     })
   }
 }
@@ -335,7 +335,7 @@ function generateUsername(fullName: string) {
     .toLowerCase()
 
   if (!normalized) {
-    throw createError({ statusCode: 400, statusMessage: 'Не удалось сгенерировать никнейм из ФИО.' })
+    throw createError({ statusCode: 400, message: 'Не удалось сгенерировать никнейм из ФИО.' })
   }
 
   const parts = normalized.split(' ')
@@ -354,7 +354,7 @@ function ensurePasswordSafe(password: string, fullName: string, username: string
   if (normalizedPassword === normalizedName || normalizedPassword === normalizedUsername) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Пароль не может совпадать с ФИО или никнеймом.'
+      message: 'Пароль не может совпадать с ФИО или никнеймом.'
     })
   }
 }
@@ -364,7 +364,7 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
   if (!form || !form.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Данные multipart/form-data пусты.'
+      message: 'Данные multipart/form-data пусты.'
     })
   }
 
@@ -416,7 +416,7 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
   let salaryType: SalaryType | undefined
   if (salaryTypeRaw) {
     if (!isSalaryType(salaryTypeRaw)) {
-      throw createError({ statusCode: 400, statusMessage: 'Поле salaryType должно быть fixed или hourly.' })
+      throw createError({ statusCode: 400, message: 'Поле salaryType должно быть fixed или hourly.' })
     }
     salaryType = salaryTypeRaw
   }
@@ -425,30 +425,30 @@ async function parseMultipartBody(event: H3Event): Promise<CreateCustomerBody> {
   ensurePasswordSafe(password, fullName, username)
 
   if (!isAuthRole(role) || role.length > 64) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле role должно быть непустой строкой.' })
+    throw createError({ statusCode: 400, message: 'Поле role должно быть непустой строкой.' })
   }
 
   if (!isWorkShift(workShiftRaw)) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле workShift должно быть \'day\' или \'night\'.' })
+    throw createError({ statusCode: 400, message: 'Поле workShift должно быть \'day\' или \'night\'.' })
   }
 
   if (!avatarFile) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле avatarFile обязательно.' })
+    throw createError({ statusCode: 400, message: 'Поле avatarFile обязательно.' })
   }
   if (!avatarFile.type?.startsWith('image/')) {
-    throw createError({ statusCode: 400, statusMessage: 'Файл avatarFile должен быть изображением.' })
+    throw createError({ statusCode: 400, message: 'Файл avatarFile должен быть изображением.' })
   }
 
   if (passportFrontFile && !passportBackFile) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле passportBackFile обязательно.' })
+    throw createError({ statusCode: 400, message: 'Поле passportBackFile обязательно.' })
   }
   if (passportBackFile && !passportFrontFile) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле passportFrontFile обязательно.' })
+    throw createError({ statusCode: 400, message: 'Поле passportFrontFile обязательно.' })
   }
   if (!legacyPassportFile && !(passportFrontFile && passportBackFile)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле passportFile или оба passportFrontFile/passportBackFile обязательны.'
+      message: 'Поле passportFile или оба passportFrontFile/passportBackFile обязательны.'
     })
   }
 
@@ -582,7 +582,7 @@ export default eventHandler(async (event) => {
     if (!createdRow) {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Postgres не вернул созданного клиента.'
+        message: 'Postgres не вернул созданного клиента.'
       })
     }
 
@@ -594,14 +594,14 @@ export default eventHandler(async (event) => {
     if (data?.code === '23505') {
       throw createError({
         statusCode: 409,
-        statusMessage: 'Клиент с таким именем пользователя уже существует.'
+        message: 'Клиент с таким именем пользователя уже существует.'
       })
     }
 
     if (data?.message) {
       throw createError({
         statusCode: 400,
-        statusMessage: data.message
+        message: data.message
       })
     }
 

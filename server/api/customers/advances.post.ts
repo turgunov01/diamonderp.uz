@@ -13,18 +13,18 @@ interface CreateAdvanceBody {
 
 function parseBody(body: unknown): CreateAdvanceBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть объектом.' })
+    throw createError({ statusCode: 400, message: 'Тело запроса должно быть объектом.' })
   }
 
   const input = body as Record<string, unknown>
   const customerId = Number(input.customerId)
   if (!Number.isInteger(customerId) || customerId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'customerId обязателен.' })
+    throw createError({ statusCode: 400, message: 'customerId обязателен.' })
   }
 
   const amount = Number(input.amount)
   if (!Number.isInteger(amount) || amount <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'amount должен быть положительным целым числом.' })
+    throw createError({ statusCode: 400, message: 'amount должен быть положительным целым числом.' })
   }
 
   const currency = typeof input.currency === 'string' && input.currency.trim().length
@@ -66,7 +66,7 @@ export default eventHandler(async (event) => {
 
   const created = rows[0]
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Не удалось создать аванс.' })
+    throw createError({ statusCode: 500, message: 'Не удалось создать аванс.' })
   }
 
   setResponseStatus(event, 201)

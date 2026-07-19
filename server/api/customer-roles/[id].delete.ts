@@ -9,7 +9,7 @@ function parseRoleId(event: H3Event) {
   if (!rawId || !Number.isInteger(roleId) || roleId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Некорректный идентификатор роли.'
+      message: 'Некорректный идентификатор роли.'
     })
   }
 
@@ -57,14 +57,14 @@ export default eventHandler(async (event) => {
   if (!role) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Роль не найдена.'
+      message: 'Роль не найдена.'
     })
   }
 
   if (await roleIsUsed(role)) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Роль используется у сотрудников. Сначала измените роли у сотрудников.'
+      message: 'Роль используется у сотрудников. Сначала измените роли у сотрудников.'
     })
   }
 

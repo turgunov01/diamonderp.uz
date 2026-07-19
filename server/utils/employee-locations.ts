@@ -63,7 +63,7 @@ function assertEmployeeId(employeeId: number) {
   if (!Number.isInteger(employeeId) || employeeId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'employeeId must be a positive integer.'
+      message: 'employeeId must be a positive integer.'
     })
   }
 }
@@ -81,7 +81,7 @@ export function parseLocationRecordedAt(value?: string | Date | null) {
     if (Number.isNaN(value.getTime())) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'recordedAt contains an invalid date.'
+        message: 'recordedAt contains an invalid date.'
       })
     }
 
@@ -91,7 +91,7 @@ export function parseLocationRecordedAt(value?: string | Date | null) {
   if (typeof value !== 'string') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'recordedAt must be an ISO date string.'
+      message: 'recordedAt must be an ISO date string.'
     })
   }
 
@@ -99,7 +99,7 @@ export function parseLocationRecordedAt(value?: string | Date | null) {
   if (Number.isNaN(date.getTime())) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'recordedAt contains an invalid date.'
+      message: 'recordedAt contains an invalid date.'
     })
   }
 
@@ -179,7 +179,7 @@ function isMissingEmployeeLocationPointsTable(error: unknown) {
 function createMissingEmployeeLocationPointsTableError() {
   return createError({
     statusCode: 409,
-    statusMessage: 'Таблица employee_location_points отсутствует. Сначала выполните db/postgres/employee_location_points.sql.'
+    message: 'Таблица employee_location_points отсутствует. Сначала выполните db/postgres/employee_location_points.sql.'
   })
 }
 
@@ -219,7 +219,7 @@ export async function recordEmployeeLocationPoints(input: { points: EmployeeLoca
     if (!location) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'location must contain valid latitude and longitude.'
+        message: 'location must contain valid latitude and longitude.'
       })
     }
 

@@ -41,10 +41,10 @@ watch(error, (value) => {
     return
   }
 
-  const fetchError = value as { data?: { statusMessage?: string }, message?: string }
+  const fetchError = value as { data?: { message?: string, statusMessage?: string }, message?: string }
   toast.add({
     title: 'Не удалось загрузить задачи по объектам',
-    description: fetchError.data?.statusMessage || fetchError.message,
+    description: fetchError.data?.message || fetchError.message,
     color: 'error'
   })
 }, { immediate: true })
@@ -205,10 +205,10 @@ async function submitTaskList() {
     createModalOpen.value = false
     await refresh()
   } catch (err: unknown) {
-    const fetchError = err as { data?: { statusMessage?: string }, message?: string }
+    const fetchError = err as { data?: { message?: string, statusMessage?: string }, message?: string }
     toast.add({
       title: 'Не удалось создать список задач',
-      description: fetchError.data?.statusMessage || fetchError.message,
+      description: fetchError.data?.message || fetchError.message,
       color: 'error'
     })
   } finally {

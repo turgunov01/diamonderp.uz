@@ -126,7 +126,7 @@ async function submitEvent() {
   } catch (err: unknown) {
     toast.add({
       title: 'Не удалось сохранить',
-      description: (err as any)?.data?.statusMessage || (err as Error)?.message,
+      description: (err as any)?.data?.message || (err as Error)?.message,
       color: 'error'
     })
   } finally {
@@ -152,7 +152,7 @@ async function uploadPhotos(event: Event) {
   } catch (err: unknown) {
     toast.add({
       title: 'Не удалось загрузить фото',
-      description: (err as any)?.data?.statusMessage || (err as Error)?.message,
+      description: (err as any)?.data?.message || (err as Error)?.message,
       color: 'error'
     })
   } finally {

@@ -11,7 +11,7 @@ export default eventHandler(async (event) => {
   if (!name || !name.trim()) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Название зоны обязательно.'
+      message: 'Название зоны обязательно.'
     })
   }
 
@@ -38,7 +38,7 @@ export default eventHandler(async (event) => {
     console.error('Error creating zone:', error)
     throw createError({
       statusCode: 500,
-      statusMessage: 'Не удалось создать зону.'
+      message: 'Не удалось создать зону.'
     })
   }
 })

@@ -9,14 +9,14 @@ export default eventHandler(async (event) => {
   if (!access.customer) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'No customer found for this access.'
+      message: 'No customer found for this access.'
     })
   }
 
   if (!access.user?.id) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'No user ID found.'
+      message: 'No user ID found.'
     })
   }
 

@@ -11,7 +11,7 @@ export default eventHandler(async (event) => {
   const objectId = parseObjectIdInput(getQuery(event).objectId, 'objectId query param is required.')
 
   if (!rawId || !Number.isInteger(templateId) || templateId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id шаблона.' })
+    throw createError({ statusCode: 400, message: 'Некорректный id шаблона.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()
@@ -32,7 +32,7 @@ export default eventHandler(async (event) => {
 
     const deleted = rows?.[0]
     if (!deleted) {
-      throw createError({ statusCode: 404, statusMessage: 'Шаблон не найден.' })
+      throw createError({ statusCode: 404, message: 'Шаблон не найден.' })
     }
 
     return { success: true, id: templateId }
@@ -41,7 +41,7 @@ export default eventHandler(async (event) => {
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/postgres/documents.sql.'
+        message: 'Таблица "document_templates" отсутствует. Сначала выполните db/postgres/documents.sql.'
       })
     }
     throw error

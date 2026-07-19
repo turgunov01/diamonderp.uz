@@ -10,14 +10,14 @@ export default eventHandler(async (event) => {
   if (!rawObjectId || !Number.isInteger(objectId) || objectId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Invalid object id.'
+      message: 'Invalid object id.'
     })
   }
 
   if (!access.objectIds.includes(objectId)) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Object access denied.'
+      message: 'Object access denied.'
     })
   }
 

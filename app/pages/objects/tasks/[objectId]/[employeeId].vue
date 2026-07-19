@@ -49,10 +49,10 @@ watch(error, (value) => {
     return
   }
 
-  const fetchError = value as { data?: { statusMessage?: string }, message?: string }
+  const fetchError = value as { data?: { message?: string, statusMessage?: string }, message?: string }
   toast.add({
     title: 'Не удалось загрузить задачи сотрудника',
-    description: fetchError.data?.statusMessage || fetchError.message,
+    description: fetchError.data?.message || fetchError.message,
     color: 'error'
   })
 }, { immediate: true })

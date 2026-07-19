@@ -42,7 +42,7 @@ function ensurePasswordSafe(password: string, fullName: string, username: string
   if (normalizedPassword === normalizedName || normalizedPassword === normalizedUsername) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Пароль не может совпадать с ФИО или никнеймом.'
+      message: 'Пароль не может совпадать с ФИО или никнеймом.'
     })
   }
 }
@@ -53,7 +53,7 @@ export default eventHandler(async (event) => {
   if (!access.customer) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Only customer accounts can change password.'
+      message: 'Only customer accounts can change password.'
     })
   }
 
@@ -64,21 +64,21 @@ export default eventHandler(async (event) => {
   if (!currentPassword) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'currentPassword is required.'
+      message: 'currentPassword is required.'
     })
   }
 
   if (newPassword.trim().length < 6) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'newPassword must be at least 6 chars.'
+      message: 'newPassword must be at least 6 chars.'
     })
   }
 
   if (newPassword === currentPassword) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'New password must be different from the current password.'
+      message: 'New password must be different from the current password.'
     })
   }
 
@@ -98,7 +98,7 @@ export default eventHandler(async (event) => {
   if (!customer) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Customer not found.'
+      message: 'Customer not found.'
     })
   }
 
@@ -108,7 +108,7 @@ export default eventHandler(async (event) => {
   if (!bcryptOk && !plainOk) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Invalid current password.'
+      message: 'Invalid current password.'
     })
   }
 
@@ -131,7 +131,7 @@ export default eventHandler(async (event) => {
   if (!updatedRows[0]) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to update password.'
+      message: 'Failed to update password.'
     })
   }
 

@@ -26,7 +26,7 @@ const FILTER_OPERATORS = ['ilike', 'gte', 'lte', 'neq', 'eq', 'gt', 'lt', 'is', 
 
 function assertIdentifier(value: string, label: string) {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
-    throw createError({ statusCode: 400, statusMessage: `Invalid ${label}.` })
+    throw createError({ statusCode: 400, message: `Invalid ${label}.` })
   }
 }
 
@@ -122,7 +122,7 @@ function parseScalar(raw: string) {
 function parseFilterExpression(expression: string) {
   const operator = FILTER_OPERATORS.find(candidate => expression.startsWith(`${candidate}.`))
   if (!operator) {
-    throw createError({ statusCode: 400, statusMessage: `Unsupported filter expression "${expression}".` })
+    throw createError({ statusCode: 400, message: `Unsupported filter expression "${expression}".` })
   }
 
   return {
@@ -134,7 +134,7 @@ function parseFilterExpression(expression: string) {
 function parseConditionToken(token: string) {
   const firstDot = token.indexOf('.')
   if (firstDot === -1) {
-    throw createError({ statusCode: 400, statusMessage: `Invalid filter "${token}".` })
+    throw createError({ statusCode: 400, message: `Invalid filter "${token}".` })
   }
 
   const column = token.slice(0, firstDot)
@@ -191,7 +191,7 @@ function buildCondition(column: string, expression: string, baseIndex: number): 
   if (operator === 'lte') return { sql: `${columnRef} <= ${placeholder}`, values: [value] }
   if (operator === 'ilike') return { sql: `${columnRef} ILIKE ${placeholder}`, values: [value] }
 
-  throw createError({ statusCode: 400, statusMessage: `Unsupported filter operator "${operator}".` })
+  throw createError({ statusCode: 400, message: `Unsupported filter operator "${operator}".` })
 }
 
 function queryValues(value: QueryValue): string[] {
@@ -270,7 +270,7 @@ function buildOrder(orderRaw?: QueryValue) {
   const items = splitTopLevel(order).map((item) => {
     const [column, directionRaw, nullsRaw] = item.split('.')
     if (!column) {
-      throw createError({ statusCode: 400, statusMessage: 'Invalid order column.' })
+      throw createError({ statusCode: 400, message: 'Invalid order column.' })
     }
     assertIdentifier(column, 'order column')
 
@@ -332,7 +332,7 @@ function buildSelectList(table: string, select: SelectSpec) {
 
     throw createError({
       statusCode: 400,
-      statusMessage: `Unsupported embedded relation "${relation.alias}:${relation.table}".`
+      message: `Unsupported embedded relation "${relation.alias}:${relation.table}".`
     })
   }
 
@@ -372,13 +372,13 @@ function normalizeRowsBody(body: unknown) {
     return [body as Record<string, unknown>]
   }
 
-  throw createError({ statusCode: 400, statusMessage: 'Request body must be an object or an array.' })
+  throw createError({ statusCode: 400, message: 'Request body must be an object or an array.' })
 }
 
 function buildInsert(table: string, rows: Array<Record<string, unknown>>, query: Record<string, QueryValue>, event: H3Event) {
   const columns = Array.from(new Set(rows.flatMap(row => Object.keys(row))))
   if (!columns.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Request body must contain at least one column.' })
+    throw createError({ statusCode: 400, message: 'Request body must contain at least one column.' })
   }
 
   for (const column of columns) {
@@ -451,7 +451,7 @@ async function handlePost(event: H3Event, table: string, query: Record<string, Q
 async function handlePatch(event: H3Event, table: string, query: Record<string, QueryValue>) {
   const body = await readBody<Record<string, unknown>>(event)
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    throw createError({ statusCode: 400, statusMessage: 'PATCH body must be an object.' })
+    throw createError({ statusCode: 400, message: 'PATCH body must be an object.' })
   }
 
   const columns = Object.keys(body)
@@ -506,7 +506,7 @@ function mapDatabaseError(error: unknown): never {
 
   throw createError({
     statusCode,
-    statusMessage: message,
+    message: message,
     data: {
       code,
       message,
@@ -533,5 +533,5 @@ export default eventHandler(async (event) => {
     mapDatabaseError(error)
   }
 
-  throw createError({ statusCode: 405, statusMessage: `Method ${method} is not supported.` })
+  throw createError({ statusCode: 405, message: `Method ${method} is not supported.` })
 })

@@ -35,7 +35,7 @@ function parseActivityId(event: H3Event) {
   if (!rawId || !Number.isInteger(activityId) || activityId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Некорректный идентификатор активности.'
+      message: 'Некорректный идентификатор активности.'
     })
   }
 
@@ -50,7 +50,7 @@ function parseDate(value: unknown) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле date должно быть в формате YYYY-MM-DD.'
+      message: 'Поле date должно быть в формате YYYY-MM-DD.'
     })
   }
 
@@ -63,7 +63,7 @@ function parseMinutes(value: unknown, fieldName: string) {
   if (!Number.isInteger(amount) || amount < 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: `Поле ${fieldName} должно быть целым числом не меньше 0.`
+      message: `Поле ${fieldName} должно быть целым числом не меньше 0.`
     })
   }
 
@@ -74,7 +74,7 @@ function parseUpdateBody(body: unknown) {
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Тело запроса должно быть корректным JSON-объектом.'
+      message: 'Тело запроса должно быть корректным JSON-объектом.'
     })
   }
 
@@ -89,7 +89,7 @@ function parseUpdateBody(body: unknown) {
     if (!isStatus(input.status)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле status должно быть on_time, late или absent.'
+        message: 'Поле status должно быть on_time, late или absent.'
       })
     }
 
@@ -107,7 +107,7 @@ function parseUpdateBody(body: unknown) {
   if (!Object.keys(nextBody).length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Нужно передать хотя бы одно поле для обновления.'
+      message: 'Нужно передать хотя бы одно поле для обновления.'
     })
   }
 
@@ -190,7 +190,7 @@ export default eventHandler(async (event) => {
   if (!updatedRow) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Запись активности не найдена.'
+      message: 'Запись активности не найдена.'
     })
   }
 

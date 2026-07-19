@@ -316,7 +316,7 @@ async function parseSpreadsheet(bytes: Uint8Array, fileName: string) {
   if (extension !== 'csv' && extension !== 'xlsx') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поддерживаются только файлы .xlsx или .csv.'
+      message: 'Поддерживаются только файлы .xlsx или .csv.'
     })
   }
 
@@ -334,7 +334,7 @@ async function parseSpreadsheet(bytes: Uint8Array, fileName: string) {
   } catch {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Не удалось прочитать файл. Убедитесь, что это валидный .xlsx или .csv.'
+      message: 'Не удалось прочитать файл. Убедитесь, что это валидный .xlsx или .csv.'
     })
   }
 
@@ -348,13 +348,13 @@ async function parseSpreadsheet(bytes: Uint8Array, fileName: string) {
 export default eventHandler(async (event) => {
   const form = await readMultipartFormData(event)
   if (!form?.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Данные multipart/form-data пусты.' })
+    throw createError({ statusCode: 400, message: 'Данные multipart/form-data пусты.' })
   }
 
   const filePart = form.find(part => part.name === 'file' && part.filename) as MultipartPart | undefined
   const buildingField = form.find(part => part.name === 'buildingId' && !part.filename)
   if (!filePart || !filePart.filename) {
-    throw createError({ statusCode: 400, statusMessage: 'Файл обязателен в поле "file".' })
+    throw createError({ statusCode: 400, message: 'Файл обязателен в поле "file".' })
   }
 
   const selectedBuildingId = buildingField
@@ -364,7 +364,7 @@ export default eventHandler(async (event) => {
   const rawRows = await parseSpreadsheet(filePart.data, filePart.filename)
 
   if (!rawRows.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Таблица пуста.' })
+    throw createError({ statusCode: 400, message: 'Таблица пуста.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()
@@ -535,7 +535,7 @@ export default eventHandler(async (event) => {
 
     throw createError({
       statusCode: 400,
-      statusMessage: message
+      message: message
     })
   }
 

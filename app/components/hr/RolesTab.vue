@@ -41,8 +41,8 @@ const filteredRoles = computed(() => {
 
 function getErrorMessage(err: unknown) {
   if (err && typeof err === 'object') {
-    const anyErr = err as { data?: { statusMessage?: string }, message?: string }
-    return anyErr.data?.statusMessage || anyErr.message
+    const anyErr = err as { data?: { message?: string, statusMessage?: string }, message?: string }
+    return anyErr.data?.message || anyErr.message
   }
   return undefined
 }

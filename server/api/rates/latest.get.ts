@@ -15,7 +15,7 @@ export default cachedEventHandler(async () => {
   if (!res?.rates) {
     throw createError({
       statusCode: 502,
-      statusMessage: 'Не удалось получить курсы валют.'
+      message: 'Не удалось получить курсы валют.'
     })
   }
 

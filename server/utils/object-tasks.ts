@@ -224,7 +224,7 @@ function parseDueDate(value?: string | null) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'dueDate must use YYYY-MM-DD format.'
+      message: 'dueDate must use YYYY-MM-DD format.'
     })
   }
 
@@ -236,7 +236,7 @@ function parsePositiveInteger(value: unknown, field: string) {
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: `${field} must be a positive integer.`
+      message: `${field} must be a positive integer.`
     })
   }
 
@@ -248,7 +248,7 @@ function normalizeDatabasePositiveInteger(value: unknown, field: string) {
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw createError({
       statusCode: 500,
-      statusMessage: `Invalid ${field} returned from database.`
+      message: `Invalid ${field} returned from database.`
     })
   }
 
@@ -343,7 +343,7 @@ function throwDataApiRequestError(error: unknown): never {
   if (isDataApiConnectionError(error)) {
     throw createError({
       statusCode: 503,
-      statusMessage: 'База данных недоступна: не удалось выполнить сетевой запрос. Проверьте интернет/DNS и POSTGRES_HOST.'
+      message: 'База данных недоступна: не удалось выполнить сетевой запрос. Проверьте интернет/DNS и POSTGRES_HOST.'
     })
   }
 
@@ -353,7 +353,7 @@ function throwDataApiRequestError(error: unknown): never {
 function throwMissingTaskTablesError() {
   throw createError({
     statusCode: 500,
-    statusMessage: 'Таблицы object_task_lists/object_task_items не найдены. Примените миграцию db/postgres/object_tasks.sql в базе данных.'
+    message: 'Таблицы object_task_lists/object_task_items не найдены. Примените миграцию db/postgres/object_tasks.sql в базе данных.'
   })
 }
 
@@ -400,7 +400,7 @@ async function ensureStorageBucket(options: {
 
     throw createError({
       statusCode: 500,
-      statusMessage: `Не удалось подготовить бакет "${options.bucket}".`
+      message: `Не удалось подготовить бакет "${options.bucket}".`
     })
   }
 }
@@ -426,7 +426,7 @@ async function uploadStorageObject(options: {
   } catch {
     throw createError({
       statusCode: 400,
-      statusMessage: `Не удалось загрузить файл в бакет "${options.bucket}".`
+      message: `Не удалось загрузить файл в бакет "${options.bucket}".`
     })
   }
 }
@@ -474,14 +474,14 @@ export function requireTaskManagerSession(event: H3Event): AuthSession {
   } catch {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Session is required.'
+      message: 'Session is required.'
     })
   }
 
   if (!TASK_MANAGER_ROLES.includes(payload.role)) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Task management access denied.'
+      message: 'Task management access denied.'
     })
   }
 
@@ -845,7 +845,7 @@ export function parseOptionalObjectTaskStatus(value: unknown) {
 
   throw createError({
     statusCode: 400,
-    statusMessage: 'Invalid task status.'
+    message: 'Invalid task status.'
   })
 }
 
@@ -860,7 +860,7 @@ export function parseOptionalObjectTaskReviewStatus(value: unknown) {
 
   throw createError({
     statusCode: 400,
-    statusMessage: 'Invalid task review status.'
+    message: 'Invalid task review status.'
   })
 }
 
@@ -1033,14 +1033,14 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   if (!title) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'title is required.'
+      message: 'title is required.'
     })
   }
 
   if (!itemTitles.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'At least one todo item is required.'
+      message: 'At least one todo item is required.'
     })
   }
 
@@ -1050,7 +1050,7 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   if (!object) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Object not found.'
+      message: 'Object not found.'
     })
   }
 
@@ -1061,14 +1061,14 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
       if (!employee) {
         throw createError({
           statusCode: 404,
-          statusMessage: 'Employee not found.'
+          message: 'Employee not found.'
         })
       }
 
       if (!isAssignableEmployee(employee, object.name)) {
         throw createError({
           statusCode: 400,
-          statusMessage: 'Employee is not assigned to the selected object.'
+          message: 'Employee is not assigned to the selected object.'
         })
       }
 
@@ -1081,7 +1081,7 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   if (!targetEmployees.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'No employees found for the selected object.'
+      message: 'No employees found for the selected object.'
     })
   }
 
@@ -1124,7 +1124,7 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   if (!createdLists.length) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to create task list.'
+      message: 'Failed to create task list.'
     })
   }
 
@@ -1162,7 +1162,7 @@ export async function createObjectTaskList(input: CreateObjectTaskListInput) {
   if (!representative) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to create task list.'
+      message: 'Failed to create task list.'
     })
   }
   const representativeItems = itemsByTaskId.get(representative.id) || []
@@ -1231,7 +1231,7 @@ export async function listEmployeeObjectTasksByObject(
   if (!objects.length) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Object not found.'
+      message: 'Object not found.'
     })
   }
 
@@ -1414,7 +1414,7 @@ export async function listReviewerObjectTasksByObject(
   if (!objects.length) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Object not found.'
+      message: 'Object not found.'
     })
   }
 
@@ -1448,7 +1448,7 @@ export async function getReviewerTaskById(reviewerId: number, taskId: number) {
   if (!taskList) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Task not found.'
+      message: 'Task not found.'
     })
   }
 
@@ -1460,7 +1460,7 @@ export async function getReviewerTaskById(reviewerId: number, taskId: number) {
   ) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Task review access denied.'
+      message: 'Task review access denied.'
     })
   }
 
@@ -1484,7 +1484,7 @@ export async function getReviewerTaskById(reviewerId: number, taskId: number) {
     if (task.status !== 'completed') {
       throw createError({
         statusCode: 404,
-        statusMessage: 'Task not found.'
+        message: 'Task not found.'
       })
     }
 
@@ -1527,14 +1527,14 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   if (!taskList) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Task list not found.'
+      message: 'Task list not found.'
     })
   }
 
   if (taskList.employee_id !== employeeId) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Task item access denied.'
+      message: 'Task item access denied.'
     })
   }
 
@@ -1542,7 +1542,7 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   if (reviewStatus === 'pending' || reviewStatus === 'approved') {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Task is locked for review.'
+      message: 'Task is locked for review.'
     })
   }
 
@@ -1550,7 +1550,7 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   if (!existingItem) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Task item not found.'
+      message: 'Task item not found.'
     })
   }
 
@@ -1573,7 +1573,7 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   if (isCompleting && (!input.photoFiles || !input.photoFiles.length) && !existingPaths.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Photo is required to complete this item.'
+      message: 'Photo is required to complete this item.'
     })
   }
 
@@ -1627,7 +1627,7 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   if (!updatedItem) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to update task item.'
+      message: 'Failed to update task item.'
     })
   }
 
@@ -1680,7 +1680,7 @@ export async function getEmployeeTaskById(employeeId: number, taskId: number) {
   if (!taskList) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Task not found.'
+      message: 'Task not found.'
     })
   }
 
@@ -1695,7 +1695,7 @@ export async function getEmployeeTaskById(employeeId: number, taskId: number) {
   if (taskList.employee_id !== normalizedEmployeeId) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Task access denied.'
+      message: 'Task access denied.'
     })
   }
 
@@ -1713,7 +1713,7 @@ export async function getObjectScopedTaskById(taskId: number) {
   if (!taskList) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Task not found.'
+      message: 'Task not found.'
     })
   }
 
@@ -1757,7 +1757,7 @@ export async function reviewObjectTaskList(input: {
   if (!isReviewDecision(input.decision)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Invalid review decision.'
+      message: 'Invalid review decision.'
     })
   }
 
@@ -1765,7 +1765,7 @@ export async function reviewObjectTaskList(input: {
   if (input.decision === 'rejected' && !comment) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'comment is required to reject a task.'
+      message: 'comment is required to reject a task.'
     })
   }
 
@@ -1773,7 +1773,7 @@ export async function reviewObjectTaskList(input: {
   if (!taskList) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Task not found.'
+      message: 'Task not found.'
     })
   }
 
@@ -1781,7 +1781,7 @@ export async function reviewObjectTaskList(input: {
   if (reviewStatus !== 'pending' && reviewStatus !== 'none') {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Task is not pending review.'
+      message: 'Task is not pending review.'
     })
   }
 
@@ -1801,7 +1801,7 @@ export async function reviewObjectTaskList(input: {
   if (input.decision === 'approved' && (!input.photoFiles || !input.photoFiles.length) && !existingReviewPhotoPaths.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Photo is required to approve a task.'
+      message: 'Photo is required to approve a task.'
     })
   }
 
@@ -1813,7 +1813,7 @@ export async function reviewObjectTaskList(input: {
   ) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Task review access denied.'
+      message: 'Task review access denied.'
     })
   }
 
@@ -1824,7 +1824,7 @@ export async function reviewObjectTaskList(input: {
   if (derivedStatus !== 'completed') {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Task is not completed yet.'
+      message: 'Task is not completed yet.'
     })
   }
 

@@ -36,14 +36,14 @@ function getErpUserId(event: H3Event) {
   try {
     payload = verifyAuthToken(readAuthToken(event))
   } catch {
-    throw createError({ statusCode: 401, statusMessage: 'Требуется авторизация.' })
+    throw createError({ statusCode: 401, message: 'Требуется авторизация.' })
   }
 
   const [source, rawUserId] = payload.sub.split(':')
   const userId = Number(rawUserId)
 
   if (source !== 'erp' || !Number.isInteger(userId) || userId <= 0 || !isErpAuthRole(payload.role)) {
-    throw createError({ statusCode: 403, statusMessage: 'Смена пароля доступна только аккаунтам админки.' })
+    throw createError({ statusCode: 403, message: 'Смена пароля доступна только аккаунтам админки.' })
   }
 
   return userId
@@ -62,7 +62,7 @@ function ensurePasswordSafe(password: string, user: ErpPasswordRow) {
   ) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Пароль не может совпадать с именем или email.'
+      message: 'Пароль не может совпадать с именем или email.'
     })
   }
 }
@@ -74,15 +74,15 @@ export default eventHandler(async (event) => {
   const newPassword = isNonEmptyString(body?.newPassword) ? body.newPassword : ''
 
   if (!currentPassword) {
-    throw createError({ statusCode: 400, statusMessage: 'Введите текущий пароль.' })
+    throw createError({ statusCode: 400, message: 'Введите текущий пароль.' })
   }
 
   if (newPassword.trim().length < 8) {
-    throw createError({ statusCode: 400, statusMessage: 'Новый пароль должен содержать минимум 8 символов.' })
+    throw createError({ statusCode: 400, message: 'Новый пароль должен содержать минимум 8 символов.' })
   }
 
   if (newPassword === currentPassword) {
-    throw createError({ statusCode: 400, statusMessage: 'Новый пароль должен отличаться от текущего.' })
+    throw createError({ statusCode: 400, message: 'Новый пароль должен отличаться от текущего.' })
   }
 
   const userResult = await postgresQuery<ErpPasswordRow>(
@@ -95,12 +95,12 @@ export default eventHandler(async (event) => {
 
   const user = userResult.rows[0]
   if (!user || user.is_active === false || !isErpAuthRole(user.role)) {
-    throw createError({ statusCode: 404, statusMessage: 'Пользователь админки не найден.' })
+    throw createError({ statusCode: 404, message: 'Пользователь админки не найден.' })
   }
 
   const passwordMatches = await compare(currentPassword, user.password_hash).catch(() => false)
   if (!passwordMatches) {
-    throw createError({ statusCode: 401, statusMessage: 'Текущий пароль указан неверно.' })
+    throw createError({ statusCode: 401, message: 'Текущий пароль указан неверно.' })
   }
 
   ensurePasswordSafe(newPassword, user)
@@ -115,7 +115,7 @@ export default eventHandler(async (event) => {
   )
 
   if (!updated.rows[0]) {
-    throw createError({ statusCode: 500, statusMessage: 'Не удалось обновить пароль.' })
+    throw createError({ statusCode: 500, message: 'Не удалось обновить пароль.' })
   }
 
   return { ok: true }

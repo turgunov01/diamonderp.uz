@@ -17,14 +17,14 @@ interface CreateWarehouseItemBody {
 
 function parseCreateBody(body: unknown): CreateWarehouseItemBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
+    throw createError({ statusCode: 400, message: 'Тело запроса должно быть корректным объектом.' })
   }
 
   const input = body as Partial<CreateWarehouseItemBody>
   const calculationType = input.calculationType
 
   if (!isWarehouseCalculationType(calculationType)) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный тип расчета.' })
+    throw createError({ statusCode: 400, message: 'Некорректный тип расчета.' })
   }
 
   return {
@@ -53,7 +53,7 @@ export default eventHandler(async (event) => {
 
   const created = result.rows[0]
   if (!created) {
-    throw createError({ statusCode: 409, statusMessage: 'Такая активная позиция уже существует.' })
+    throw createError({ statusCode: 409, message: 'Такая активная позиция уже существует.' })
   }
 
   setResponseStatus(event, 201)

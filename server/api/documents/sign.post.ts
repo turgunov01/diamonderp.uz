@@ -24,14 +24,14 @@ interface SignBody {
 function parseNumberField(value: unknown, field: string) {
   const num = Number(value)
   if (!Number.isInteger(num) || num <= 0) {
-    throw createError({ statusCode: 400, statusMessage: `${field} обязателен.` })
+    throw createError({ statusCode: 400, message: `${field} обязателен.` })
   }
   return num
 }
 
 function parseBody(body: unknown): SignBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть объектом.' })
+    throw createError({ statusCode: 400, message: 'Тело запроса должно быть объектом.' })
   }
 
   const input = body as Record<string, unknown>
@@ -40,13 +40,13 @@ function parseBody(body: unknown): SignBody {
   const signatureImage = typeof input.signatureImage === 'string' ? input.signatureImage.trim() : ''
 
   if (!employeeName) {
-    throw createError({ statusCode: 400, statusMessage: 'employeeName обязателен.' })
+    throw createError({ statusCode: 400, message: 'employeeName обязателен.' })
   }
   if (!phoneNumber) {
-    throw createError({ statusCode: 400, statusMessage: 'phoneNumber обязателен.' })
+    throw createError({ statusCode: 400, message: 'phoneNumber обязателен.' })
   }
   if (!signatureImage) {
-    throw createError({ statusCode: 400, statusMessage: 'signatureImage обязателен.' })
+    throw createError({ statusCode: 400, message: 'signatureImage обязателен.' })
   }
 
   return {
@@ -101,7 +101,7 @@ export default eventHandler(async (event) => {
 
   const dispatch = dispatchRows[0]
   if (!dispatch) {
-    throw createError({ statusCode: 404, statusMessage: 'Отправка договора не найдена.' })
+    throw createError({ statusCode: 404, message: 'Отправка договора не найдена.' })
   }
 
   const { buffer, contentType } = toBuffer(payload.signatureImage)
@@ -144,7 +144,7 @@ export default eventHandler(async (event) => {
 
   const signed = inserted[0]
   if (!signed) {
-    throw createError({ statusCode: 500, statusMessage: 'Не удалось сохранить подпись.' })
+    throw createError({ statusCode: 500, message: 'Не удалось сохранить подпись.' })
   }
 
   const newSignedCount = (dispatch.signed_count || 0) + 1

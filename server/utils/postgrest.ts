@@ -6,7 +6,7 @@ export function buildEqOrInFilter(values: number[]) {
   if (!values.length) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'At least one value is required.'
+      message: 'At least one value is required.'
     })
   }
 

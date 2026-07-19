@@ -90,7 +90,7 @@ export function parseNonNegativeInt(value: unknown, fieldName: string) {
   if (!Number.isInteger(amount) || amount < 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: `${fieldName} must be an integer >= 0.`
+      message: `${fieldName} must be an integer >= 0.`
     })
   }
 

@@ -18,7 +18,7 @@ function parseExpenseId(event: H3Event) {
   const expenseId = Number(rawId)
 
   if (!rawId || !Number.isInteger(expenseId) || expenseId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id расхода.' })
+    throw createError({ statusCode: 400, message: 'Некорректный id расхода.' })
   }
 
   return expenseId
@@ -26,7 +26,7 @@ function parseExpenseId(event: H3Event) {
 
 function parseUpdateBody(body: unknown) {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
+    throw createError({ statusCode: 400, message: 'Тело запроса должно быть корректным объектом.' })
   }
 
   const input = body as UpdateExpenseBody
@@ -36,7 +36,7 @@ function parseUpdateBody(body: unknown) {
 
   if (input.status !== undefined) {
     if (!isExpenseStatus(input.status)) {
-      throw createError({ statusCode: 400, statusMessage: 'Некорректный статус.' })
+      throw createError({ statusCode: 400, message: 'Некорректный статус.' })
     }
     patch.status = input.status
   }
@@ -52,7 +52,7 @@ function parseUpdateBody(body: unknown) {
   }
 
   if (Object.keys(patch).length === 1) {
-    throw createError({ statusCode: 400, statusMessage: 'Нет данных для обновления.' })
+    throw createError({ statusCode: 400, message: 'Нет данных для обновления.' })
   }
 
   return patch
@@ -77,7 +77,7 @@ export default eventHandler(async (event) => {
 
   const updated = rows[0]
   if (!updated) {
-    throw createError({ statusCode: 404, statusMessage: 'Расход не найден.' })
+    throw createError({ statusCode: 404, message: 'Расход не найден.' })
   }
 
   return mapExpenseDbRowToRecord(updated)

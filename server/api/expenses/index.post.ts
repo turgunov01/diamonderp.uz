@@ -36,7 +36,7 @@ function requiredTrimmedString(value: unknown, fieldName: string) {
   if (typeof value !== 'string' || !value.trim().length) {
     throw createError({
       statusCode: 400,
-      statusMessage: `${fieldName} is required.`
+      message: `${fieldName} is required.`
     })
   }
 
@@ -45,7 +45,7 @@ function requiredTrimmedString(value: unknown, fieldName: string) {
 
 function parseCreateBody(body: unknown): ParsedCreateExpenseBody {
   if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, statusMessage: 'Тело запроса должно быть корректным объектом.' })
+    throw createError({ statusCode: 400, message: 'Тело запроса должно быть корректным объектом.' })
   }
 
   const input = body as Partial<CreateExpenseBody>
@@ -64,7 +64,7 @@ function parseCreateBody(body: unknown): ParsedCreateExpenseBody {
 
   if (warehouseItemId) {
     if (quantity === undefined) {
-      throw createError({ statusCode: 400, statusMessage: 'quantity is required.' })
+      throw createError({ statusCode: 400, message: 'quantity is required.' })
     }
   } else {
     title = requiredTrimmedString(input.title, 'title')
@@ -76,7 +76,7 @@ function parseCreateBody(body: unknown): ParsedCreateExpenseBody {
   let status: ExpenseStatus = 'draft'
   if (input.status !== undefined) {
     if (!isExpenseStatus(input.status)) {
-      throw createError({ statusCode: 400, statusMessage: 'Некорректный статус.' })
+      throw createError({ statusCode: 400, message: 'Некорректный статус.' })
     }
     status = input.status
   }
@@ -113,7 +113,7 @@ async function fetchWarehouseItem(url: string, serviceRoleKey: string, id: numbe
 
   const row = rows[0]
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'Позиция склада не найдена.' })
+    throw createError({ statusCode: 404, message: 'Позиция склада не найдена.' })
   }
 
   return mapWarehouseItemDbRowToRecord(row)
@@ -153,7 +153,7 @@ export default eventHandler(async (event) => {
 
   const created = rows[0]
   if (!created) {
-    throw createError({ statusCode: 500, statusMessage: 'Postgres не вернул созданный расход.' })
+    throw createError({ statusCode: 500, message: 'Postgres не вернул созданный расход.' })
   }
 
   setResponseStatus(event, 201)

@@ -530,7 +530,7 @@ watch(error, (newError) => {
 
   toast.add({
     title: 'Не удалось загрузить клиентов',
-    description: newError.statusMessage || 'Проверьте API и переменные окружения Postgres.',
+    description: newError.data?.message || newError.statusMessage || 'Проверьте API и переменные окружения Postgres.',
     color: 'error'
   })
 }, { immediate: true })
@@ -542,7 +542,7 @@ watch(monthlyActivityError, (newError) => {
 
   toast.add({
     title: 'Не удалось загрузить активность сотрудников для расчета зарплаты',
-    description: newError.statusMessage || 'Проверьте API активности сотрудников.',
+    description: newError.data?.message || newError.statusMessage || 'Проверьте API активности сотрудников.',
     color: 'error'
   })
 }, { immediate: true })
@@ -1291,8 +1291,8 @@ function parseNonNegativeInteger(value: unknown, fieldName: string) {
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === 'object') {
-    const err = error as { data?: { statusMessage?: string }, message?: string }
-    return err.data?.statusMessage || err.message
+    const err = error as { data?: { message?: string, statusMessage?: string }, message?: string }
+    return err.data?.message || err.message
   }
 
   return undefined

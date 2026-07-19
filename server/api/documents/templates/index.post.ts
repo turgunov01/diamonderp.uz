@@ -29,7 +29,7 @@ function parseJsonCreateTemplateBody(body: unknown): Required<Pick<CreateTemplat
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Тело запроса должно быть корректным объектом.'
+      message: 'Тело запроса должно быть корректным объектом.'
     })
   }
 
@@ -39,7 +39,7 @@ function parseJsonCreateTemplateBody(body: unknown): Required<Pick<CreateTemplat
   if (!name) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Название шаблона обязательно.'
+      message: 'Название шаблона обязательно.'
     })
   }
 
@@ -59,7 +59,7 @@ function parseJsonCreateTemplateBody(body: unknown): Required<Pick<CreateTemplat
 async function parseMultipartCreateTemplateBody(event: H3Event): Promise<CreateTemplateBody> {
   const form = await readMultipartFormData(event)
   if (!form?.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Пустая форма.' })
+    throw createError({ statusCode: 400, message: 'Пустая форма.' })
   }
 
   const fields = new Map<string, string>()
@@ -183,7 +183,7 @@ export default eventHandler(async (event) => {
     if (!createdRow) {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Postgres не вернул созданную запись шаблона.'
+        message: 'Postgres не вернул созданную запись шаблона.'
       })
     }
 
@@ -198,14 +198,14 @@ export default eventHandler(async (event) => {
     if (data?.code === '42P01') {
       throw createError({
         statusCode: 500,
-        statusMessage: 'Таблица "document_templates" отсутствует. Сначала выполните db/postgres/documents.sql.'
+        message: 'Таблица "document_templates" отсутствует. Сначала выполните db/postgres/documents.sql.'
       })
     }
 
     if (data?.message) {
       throw createError({
         statusCode: 400,
-        statusMessage: data.message
+        message: data.message
       })
     }
 

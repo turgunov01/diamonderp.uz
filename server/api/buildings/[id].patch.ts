@@ -17,7 +17,7 @@ export default eventHandler(async (event) => {
   const idRaw = getRouterParam(event, 'id')
   const id = Number(idRaw)
   if (!idRaw || !Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id здания.' })
+    throw createError({ statusCode: 400, message: 'Некорректный id здания.' })
   }
 
   const body = await readBody<UpdateBuildingBody>(event)
@@ -25,7 +25,7 @@ export default eventHandler(async (event) => {
 
   if (body.name !== undefined) {
     if (typeof body.name !== 'string' || !body.name.trim()) {
-      throw createError({ statusCode: 400, statusMessage: 'Название обязательно.' })
+      throw createError({ statusCode: 400, message: 'Название обязательно.' })
     }
     patchBody.name = body.name.trim()
   }
@@ -41,7 +41,7 @@ export default eventHandler(async (event) => {
   }
 
   if (!Object.keys(patchBody).length) {
-    throw createError({ statusCode: 400, statusMessage: 'Нужно передать хотя бы одно поле для обновления.' })
+    throw createError({ statusCode: 400, message: 'Нужно передать хотя бы одно поле для обновления.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()
@@ -58,7 +58,7 @@ export default eventHandler(async (event) => {
 
   const [row] = rows
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'Здание не найдено.' })
+    throw createError({ statusCode: 404, message: 'Здание не найдено.' })
   }
 
   return row

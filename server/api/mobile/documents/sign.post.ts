@@ -30,7 +30,7 @@ function parseNumberField(value: unknown, fieldName: string) {
   if (!Number.isInteger(num) || num <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: `${fieldName} is required.`
+      message: `${fieldName} is required.`
     })
   }
 
@@ -41,7 +41,7 @@ function parseJsonBody(body: unknown): MobileSignBody {
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Request body must be an object.'
+      message: 'Request body must be an object.'
     })
   }
 
@@ -55,7 +55,7 @@ function parseJsonBody(body: unknown): MobileSignBody {
   if (!signatureImage) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'signatureImage (or signature/photo/image) is required.'
+      message: 'signatureImage (or signature/photo/image) is required.'
     })
   }
 
@@ -76,7 +76,7 @@ function parseJsonBody(body: unknown): MobileSignBody {
 async function parseMultipartBody(event: H3Event): Promise<MobileSignBody> {
   const parts = await readMultipartFormData(event)
   if (!parts) {
-    throw createError({ statusCode: 400, statusMessage: 'Malformed multipart data.' })
+    throw createError({ statusCode: 400, message: 'Malformed multipart data.' })
   }
 
   const fields: Record<string, string> = {}
@@ -109,7 +109,7 @@ async function parseMultipartBody(event: H3Event): Promise<MobileSignBody> {
   if (!fileBuffer && !signatureImage) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'signatureImage (file or base64) is required.'
+      message: 'signatureImage (file or base64) is required.'
     })
   }
 
@@ -179,7 +179,7 @@ export default eventHandler(async (event) => {
   if (!isFrontlineMobileAccess(access) || !access.user.phone) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Only employee accounts can sign mobile documents.'
+      message: 'Only employee accounts can sign mobile documents.'
     })
   }
 
@@ -209,7 +209,7 @@ export default eventHandler(async (event) => {
   if (!dispatch) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Document dispatch not found.'
+      message: 'Document dispatch not found.'
     })
   }
 
@@ -217,7 +217,7 @@ export default eventHandler(async (event) => {
   if (!Number.isInteger(resolvedTemplateId) || (resolvedTemplateId ?? 0) <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'templateId is missing for this dispatch.'
+      message: 'templateId is missing for this dispatch.'
     })
   }
 
@@ -228,14 +228,14 @@ export default eventHandler(async (event) => {
   if (!dispatch.object_id) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Dispatch object is missing.'
+      message: 'Dispatch object is missing.'
     })
   }
 
   if (!assignedToCurrentUser) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Dispatch is not assigned to the current user.'
+      message: 'Dispatch is not assigned to the current user.'
     })
   }
 
@@ -257,14 +257,14 @@ export default eventHandler(async (event) => {
   if (existingSignedRows[0]) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'This document is already signed by the current user.'
+      message: 'This document is already signed by the current user.'
     })
   }
 
   if (!payload.signatureFileBuffer && !payload.signatureImage) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Signature payload is missing.'
+      message: 'Signature payload is missing.'
     })
   }
 
@@ -313,7 +313,7 @@ export default eventHandler(async (event) => {
   if (!signed) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to persist signed document.'
+      message: 'Failed to persist signed document.'
     })
   }
 

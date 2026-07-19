@@ -22,18 +22,18 @@ export default defineEventHandler(async (event) => {
     try {
       const access = await requireMobileAccess(event)
       if (!Number.isInteger(objectId) || objectId <= 0) {
-        throw createError({ statusCode: 400, statusMessage: 'Invalid object id.' })
+        throw createError({ statusCode: 400, message: 'Invalid object id.' })
       }
       if (!Number.isInteger(taskId) || taskId <= 0) {
-        throw createError({ statusCode: 400, statusMessage: 'Invalid task id.' })
+        throw createError({ statusCode: 400, message: 'Invalid task id.' })
       }
       if (!access.objectIds.includes(objectId)) {
-        throw createError({ statusCode: 403, statusMessage: 'Object access denied.' })
+        throw createError({ statusCode: 403, message: 'Object access denied.' })
       }
 
       const task = await getObjectScopedTaskById(taskId)
       if (!task || task.objectId !== objectId) {
-        throw createError({ statusCode: 404, statusMessage: 'Task not found.' })
+        throw createError({ statusCode: 404, message: 'Task not found.' })
       }
 
       return {
@@ -49,6 +49,6 @@ export default defineEventHandler(async (event) => {
   setResponseStatus(event, 404)
   return {
     statusCode: 404,
-    statusMessage: 'Mobile API route not found.'
+    message: 'Mobile API route not found.'
   }
 })

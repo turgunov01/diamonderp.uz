@@ -29,7 +29,7 @@ function parseCustomerId(event: H3Event) {
   if (!rawId || !Number.isInteger(customerId) || customerId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Некорректный идентификатор пользователя.'
+      message: 'Некорректный идентификатор пользователя.'
     })
   }
 
@@ -44,7 +44,7 @@ function parseMoney(value: unknown, fieldName: string, allowNegative = false) {
   if (!isValid) {
     throw createError({
       statusCode: 400,
-      statusMessage: allowNegative
+      message: allowNegative
         ? `Поле ${fieldName} должно быть целым числом.`
         : `Поле ${fieldName} должно быть целым числом не меньше 0.`
     })
@@ -58,7 +58,7 @@ function parseAge(value: unknown) {
   if (!Number.isInteger(age) || age < 18) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле age должно быть целым числом не меньше 18.'
+      message: 'Поле age должно быть целым числом не меньше 18.'
     })
   }
 
@@ -75,7 +75,7 @@ function parseOptionalBuildingId(value: unknown) {
   if (!Number.isInteger(buildingId) || buildingId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле buildingId должно быть положительным целым числом.'
+      message: 'Поле buildingId должно быть положительным целым числом.'
     })
   }
 
@@ -86,7 +86,7 @@ function parseObjectPositions(value: unknown) {
   if (!Array.isArray(value)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле objectPositions должно быть массивом строк.'
+      message: 'Поле objectPositions должно быть массивом строк.'
     })
   }
 
@@ -101,7 +101,7 @@ function normalizePhone(value: unknown) {
   if (typeof value !== 'string' && typeof value !== 'number') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле phoneNumber обязательно.'
+      message: 'Поле phoneNumber обязательно.'
     })
   }
 
@@ -109,7 +109,7 @@ function normalizePhone(value: unknown) {
   if (digits.length < 9) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле phoneNumber должно быть валидным номером.'
+      message: 'Поле phoneNumber должно быть валидным номером.'
     })
   }
 
@@ -120,7 +120,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Тело запроса должно быть корректным JSON-объектом.'
+      message: 'Тело запроса должно быть корректным JSON-объектом.'
     })
   }
 
@@ -131,7 +131,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isNonEmptyString(input.fullName)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле fullName обязательно.'
+        message: 'Поле fullName обязательно.'
       })
     }
     update.fullName = input.fullName.trim()
@@ -141,7 +141,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isNonEmptyString(input.username) || input.username.trim().length < 3) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле username должно содержать минимум 3 символа.'
+        message: 'Поле username должно содержать минимум 3 символа.'
       })
     }
     update.username = input.username.trim()
@@ -151,7 +151,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isNonEmptyString(input.password) || input.password.trim().length < 6) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле password должно содержать минимум 6 символов.'
+        message: 'Поле password должно содержать минимум 6 символов.'
       })
     }
     update.password = input.password
@@ -173,7 +173,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isWorkShift(input.workShift)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле workShift должно быть \'day\' или \'night\'.'
+        message: 'Поле workShift должно быть \'day\' или \'night\'.'
       })
     }
     update.workShift = input.workShift
@@ -191,7 +191,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isNonEmptyString(input.role) || !isAuthRole(input.role.trim()) || input.role.trim().length > 64) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле role содержит недопустимую роль.'
+        message: 'Поле role содержит недопустимую роль.'
       })
     }
     update.role = input.role.trim().toLowerCase()
@@ -210,7 +210,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (!isSalaryType(salaryTypeValue)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле salaryType должно быть fixed или hourly.'
+        message: 'Поле salaryType должно быть fixed или hourly.'
       })
     }
     update.salaryType = salaryTypeValue
@@ -228,7 +228,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (typeof input.status !== 'string' || !allowed.includes(input.status)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле status должно быть pending, active, inactive или archived.'
+        message: 'Поле status должно быть pending, active, inactive или archived.'
       })
     }
     requestedStatus = input.status as UpdateCustomerBody['status']
@@ -239,7 +239,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (typeof input.mustChangePassword !== 'boolean') {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле mustChangePassword должно быть true/false.'
+        message: 'Поле mustChangePassword должно быть true/false.'
       })
     }
     update.mustChangePassword = input.mustChangePassword
@@ -249,7 +249,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (input.deactivationComment !== null && typeof input.deactivationComment !== 'string') {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле deactivationComment должно быть строкой.'
+        message: 'Поле deactivationComment должно быть строкой.'
       })
     }
     update.deactivationComment = input.deactivationComment as string | undefined
@@ -259,7 +259,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (input.archivedAt !== null && typeof input.archivedAt !== 'string') {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле archivedAt должно быть ISO-датой или null.'
+        message: 'Поле archivedAt должно быть ISO-датой или null.'
       })
     }
     update.archivedAt = input.archivedAt as string | null
@@ -270,7 +270,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
     if (typeof comment !== 'string' || !comment.trim()) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Для архивации обязательно заполните комментарий deactivationComment.'
+        message: 'Для архивации обязательно заполните комментарий deactivationComment.'
       })
     }
     update.deactivationComment = comment.trim()
@@ -282,7 +282,7 @@ function parseUpdateBody(body: unknown): UpdateCustomerBody {
   if (Object.keys(update).length === 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Нужно передать хотя бы одно поле для обновления.'
+      message: 'Нужно передать хотя бы одно поле для обновления.'
     })
   }
 
@@ -315,7 +315,7 @@ export default eventHandler(async (event) => {
     if (!updatedRow) {
       throw createError({
         statusCode: 404,
-        statusMessage: 'Пользователь не найден.'
+        message: 'Пользователь не найден.'
       })
     }
 
@@ -336,14 +336,14 @@ export default eventHandler(async (event) => {
     if (data?.code === '23505') {
       throw createError({
         statusCode: 409,
-        statusMessage: 'Пользователь с таким username или phoneNumber уже существует.'
+        message: 'Пользователь с таким username или phoneNumber уже существует.'
       })
     }
 
     if (data?.message) {
       throw createError({
         statusCode: 400,
-        statusMessage: data.message
+        message: data.message
       })
     }
 

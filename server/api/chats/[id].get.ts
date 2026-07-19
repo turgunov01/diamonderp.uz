@@ -23,7 +23,7 @@ type MessageRow = {
 export default eventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id чата.' })
+    throw createError({ statusCode: 400, message: 'Некорректный id чата.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()
@@ -35,7 +35,7 @@ export default eventHandler(async (event) => {
   })
 
   if (!chat) {
-    throw createError({ statusCode: 404, statusMessage: 'Чат не найден.' })
+    throw createError({ statusCode: 404, message: 'Чат не найден.' })
   }
 
   const messages = await $fetch<MessageRow[]>(`${url}/rest/v1/chat_messages`, {

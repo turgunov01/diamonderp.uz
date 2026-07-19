@@ -6,7 +6,7 @@ export default eventHandler(async (event) => {
   const idRaw = getRouterParam(event, 'id')
   const id = Number(idRaw)
   if (!idRaw || !Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id' })
+    throw createError({ statusCode: 400, message: 'Некорректный id' })
   }
 
   const body = await readBody<Partial<WasteBinRow>>(event)
@@ -29,7 +29,7 @@ export default eventHandler(async (event) => {
 
   const row = rows[0]
   if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'Бак не найден' })
+    throw createError({ statusCode: 404, message: 'Бак не найден' })
   }
 
   return row

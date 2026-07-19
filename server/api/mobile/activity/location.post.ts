@@ -50,7 +50,7 @@ function normalizeLocationBody(body: unknown) {
   if (!body || typeof body !== 'object') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Request body must be a valid JSON object.'
+      message: 'Request body must be a valid JSON object.'
     })
   }
 
@@ -63,14 +63,14 @@ function normalizeLocationBody(body: unknown) {
   if (!items.length || items.some(item => item.location === undefined || item.location === null)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'location or locations must be provided.'
+      message: 'location or locations must be provided.'
     })
   }
 
   if (items.length > MAX_LOCATION_POINTS_PER_REQUEST) {
     throw createError({
       statusCode: 413,
-      statusMessage: `At most ${MAX_LOCATION_POINTS_PER_REQUEST} location points are allowed per request.`
+      message: `At most ${MAX_LOCATION_POINTS_PER_REQUEST} location points are allowed per request.`
     })
   }
 
@@ -83,7 +83,7 @@ export default eventHandler(async (event) => {
   if (!isFrontlineMobileAccess(access)) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Only employee accounts can record location points.'
+      message: 'Only employee accounts can record location points.'
     })
   }
 

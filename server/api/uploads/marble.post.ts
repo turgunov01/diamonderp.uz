@@ -9,7 +9,7 @@ function safeFilename(name?: string) {
 
 export default eventHandler(async (event) => {
   if (!event.node.req.headers['content-type']?.toLowerCase().includes('multipart/form-data')) {
-    throw createError({ statusCode: 400, statusMessage: 'Content-Type должен быть multipart/form-data.' })
+    throw createError({ statusCode: 400, message: 'Content-Type должен быть multipart/form-data.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()
@@ -28,18 +28,18 @@ export default eventHandler(async (event) => {
   } catch (error: any) {
     const status = error?.status
     if (status !== 400 && status !== 409) {
-      throw createError({ statusCode: 500, statusMessage: 'Не удалось подготовить bucket marble-photos.' })
+      throw createError({ statusCode: 500, message: 'Не удалось подготовить bucket marble-photos.' })
     }
   }
 
   const form = await readMultipartFormData(event)
   if (!form || !form.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Файлы не переданы.' })
+    throw createError({ statusCode: 400, message: 'Файлы не переданы.' })
   }
 
   const files = form.filter(f => f.type === 'file' && f.filename && f.data)
   if (!files.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Файлы не переданы.' })
+    throw createError({ statusCode: 400, message: 'Файлы не переданы.' })
   }
 
   const urls: string[] = []

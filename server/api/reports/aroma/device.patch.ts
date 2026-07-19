@@ -18,7 +18,7 @@ export default eventHandler(async (event) => {
 
   const id = Number(body.id)
   if (!Number.isInteger(id) || id <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'id обязателен' })
+    throw createError({ statusCode: 400, message: 'id обязателен' })
   }
 
   const patch: Record<string, unknown> = {}
@@ -32,7 +32,7 @@ export default eventHandler(async (event) => {
   if (body.object_id !== undefined) patch.object_id = body.object_id ?? null
 
   if (!Object.keys(patch).length) {
-    throw createError({ statusCode: 400, statusMessage: 'Нет данных для обновления' })
+    throw createError({ statusCode: 400, message: 'Нет данных для обновления' })
   }
 
   const rows = await $fetch<any[]>(`${url}/rest/v1/aroma_devices`, {
@@ -46,7 +46,7 @@ export default eventHandler(async (event) => {
   })
 
   if (!rows.length) {
-    throw createError({ statusCode: 404, statusMessage: 'Устройство не найдено' })
+    throw createError({ statusCode: 404, message: 'Устройство не найдено' })
   }
 
   return rows[0]

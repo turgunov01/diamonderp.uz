@@ -15,7 +15,7 @@ export default eventHandler(async (event) => {
   if (!isFrontlineMobileAccess(access)) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Only employee accounts can record work completion.'
+      message: 'Only employee accounts can record work completion.'
     })
   }
 

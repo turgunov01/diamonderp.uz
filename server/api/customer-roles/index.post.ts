@@ -16,7 +16,7 @@ function parseBuildingId(value: unknown) {
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле buildingId должно быть положительным целым числом или null.'
+      message: 'Поле buildingId должно быть положительным целым числом или null.'
     })
   }
 
@@ -32,14 +32,14 @@ export default eventHandler(async (event) => {
   if (!code) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле code обязательно (латиница/цифры/._-).'
+      message: 'Поле code обязательно (латиница/цифры/._-).'
     })
   }
 
   if (!label) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле label обязательно.'
+      message: 'Поле label обязательно.'
     })
   }
 
@@ -61,7 +61,7 @@ export default eventHandler(async (event) => {
   if (!created) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Не удалось создать роль.'
+      message: 'Не удалось создать роль.'
     })
   }
 

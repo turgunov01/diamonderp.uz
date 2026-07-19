@@ -12,21 +12,21 @@ export default eventHandler(async (event) => {
   if (!rawObjectId || !Number.isInteger(objectId) || objectId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Invalid object id.'
+      message: 'Invalid object id.'
     })
   }
 
   if (!rawTaskId || !Number.isInteger(taskId) || taskId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Invalid task id.'
+      message: 'Invalid task id.'
     })
   }
 
   if (!access.objectIds.includes(objectId)) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Object access denied.'
+      message: 'Object access denied.'
     })
   }
 
@@ -35,7 +35,7 @@ export default eventHandler(async (event) => {
   if (task.objectId !== objectId) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Task not found.'
+      message: 'Task not found.'
     })
   }
 

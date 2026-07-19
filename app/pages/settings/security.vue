@@ -38,8 +38,8 @@ function resetPasswordForm() {
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === 'object') {
-    const err = error as { data?: { statusMessage?: string }, message?: string }
-    return err.data?.statusMessage || err.message
+    const err = error as { data?: { message?: string, statusMessage?: string }, message?: string }
+    return err.data?.message || err.message
   }
 
   return undefined

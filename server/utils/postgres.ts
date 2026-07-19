@@ -53,14 +53,14 @@ function readDatabaseConfig() {
   if (missing.length) {
     throw createError({
       statusCode: 500,
-      statusMessage: `${missing.map(([name]) => name).join(', ')} must be configured.`
+      message: `${missing.map(([name]) => name).join(', ')} must be configured.`
     })
   }
 
   if (!Number.isInteger(port) || port <= 0) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'POSTGRES_PORT must be a positive integer.'
+      message: 'POSTGRES_PORT must be a positive integer.'
     })
   }
 

@@ -8,7 +8,7 @@ const DEFAULT_OBJECT_ID = Number(process.env.TELEGRAM_DEFAULT_OBJECT_ID || NaN)
 
 function assertBotToken() {
   if (!BOT_TOKEN) {
-    throw createError({ statusCode: 500, statusMessage: 'Missing TELEGRAM_BOT_TOKEN env' })
+    throw createError({ statusCode: 500, message: 'Missing TELEGRAM_BOT_TOKEN env' })
   }
 }
 
@@ -41,7 +41,7 @@ export async function getTelegramFileUrl(fileId: string) {
 
   const path = fileResp?.result?.file_path
   if (!fileResp?.ok || !path) {
-    throw createError({ statusCode: 502, statusMessage: 'Failed to resolve Telegram file' })
+    throw createError({ statusCode: 502, message: 'Failed to resolve Telegram file' })
   }
 
   // Publicly accessible file URL
@@ -50,7 +50,7 @@ export async function getTelegramFileUrl(fileId: string) {
 
 export function getDefaultObjectId(): number {
   if (!Number.isInteger(DEFAULT_OBJECT_ID) || DEFAULT_OBJECT_ID <= 0) {
-    throw createError({ statusCode: 500, statusMessage: 'Set TELEGRAM_DEFAULT_OBJECT_ID env to valid object id' })
+    throw createError({ statusCode: 500, message: 'Set TELEGRAM_DEFAULT_OBJECT_ID env to valid object id' })
   }
   return DEFAULT_OBJECT_ID
 }

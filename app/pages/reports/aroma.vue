@@ -227,7 +227,7 @@ async function generateReport() {
   } catch (err: unknown) {
     toast.add({
       title: 'Не удалось сформировать отчёт',
-      description: (err as any)?.data?.statusMessage || (err as Error)?.message,
+      description: (err as any)?.data?.message || (err as Error)?.message,
       color: 'error'
     })
   } finally {

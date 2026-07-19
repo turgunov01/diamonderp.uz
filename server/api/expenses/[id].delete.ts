@@ -8,7 +8,7 @@ function parseExpenseId(event: H3Event) {
   if (!rawId || !Number.isInteger(expenseId) || expenseId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Некорректный идентификатор расхода.'
+      message: 'Некорректный идентификатор расхода.'
     })
   }
 
@@ -34,7 +34,7 @@ export default eventHandler(async (event) => {
   if (!deletedRow) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Расход не найден.'
+      message: 'Расход не найден.'
     })
   }
 

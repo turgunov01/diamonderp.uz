@@ -18,7 +18,7 @@ export default eventHandler(async (event) => {
 
   const binId = Number(body.binId)
   if (!Number.isInteger(binId) || binId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле binId обязательно.' })
+    throw createError({ statusCode: 400, message: 'Поле binId обязательно.' })
   }
 
   const amountM3 = Number(body.amountM3 ?? 0)
@@ -37,7 +37,7 @@ export default eventHandler(async (event) => {
 
   const bin = binRows[0]
   if (!bin) {
-    throw createError({ statusCode: 404, statusMessage: 'Бак не найден' })
+    throw createError({ statusCode: 404, message: 'Бак не найден' })
   }
 
   const fromObjectId = body.fromObjectId ?? bin.object_id ?? null

@@ -20,7 +20,7 @@ function parseRoleId(event: H3Event) {
   if (!rawId || !Number.isInteger(roleId) || roleId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Некорректный идентификатор роли.'
+      message: 'Некорректный идентификатор роли.'
     })
   }
 
@@ -49,7 +49,7 @@ export default eventHandler(async (event) => {
   if (!existing) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Роль не найдена.'
+      message: 'Роль не найдена.'
     })
   }
 
@@ -60,7 +60,7 @@ export default eventHandler(async (event) => {
   if (label !== undefined && !label) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Поле label не может быть пустым.'
+      message: 'Поле label не может быть пустым.'
     })
   }
 
@@ -68,28 +68,28 @@ export default eventHandler(async (event) => {
     if (!nextCode) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Поле code не может быть пустым.'
+        message: 'Поле code не может быть пустым.'
       })
     }
 
     if (!existing.building_id) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Нельзя менять code у глобальной роли. Создайте новую роль с нужным кодом.'
+        message: 'Нельзя менять code у глобальной роли. Создайте новую роль с нужным кодом.'
       })
     }
 
     if (isReservedCustomerRoleCode(existing.code)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Нельзя менять code у системной роли.'
+        message: 'Нельзя менять code у системной роли.'
       })
     }
 
     if (isReservedCustomerRoleCode(nextCode) && nextCode !== existing.code) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Нельзя менять code на системное значение.'
+        message: 'Нельзя менять code на системное значение.'
       })
     }
   }
@@ -140,7 +140,7 @@ export default eventHandler(async (event) => {
   if (!updated) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Не удалось обновить роль.'
+      message: 'Не удалось обновить роль.'
     })
   }
 

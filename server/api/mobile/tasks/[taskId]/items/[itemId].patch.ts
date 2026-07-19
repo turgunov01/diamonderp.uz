@@ -7,7 +7,7 @@ export default eventHandler(async (event) => {
   if (!isMobileEmployeeTaskAccess(access)) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Only employee accounts can update mobile tasks.'
+      message: 'Only employee accounts can update mobile tasks.'
     })
   }
 
@@ -20,7 +20,7 @@ export default eventHandler(async (event) => {
   if (contentType.includes('multipart/form-data')) {
     const form = await readMultipartFormData(event)
     if (!form?.length) {
-      throw createError({ statusCode: 400, statusMessage: 'Empty form data.' })
+      throw createError({ statusCode: 400, message: 'Empty form data.' })
     }
 
     for (const raw of form) {
@@ -67,7 +67,7 @@ export default eventHandler(async (event) => {
   }
 
   if (typeof done !== 'boolean') {
-    throw createError({ statusCode: 400, statusMessage: 'done must be a boolean.' })
+    throw createError({ statusCode: 400, message: 'done must be a boolean.' })
   }
 
   const task = await updateObjectTaskItemCompletion({

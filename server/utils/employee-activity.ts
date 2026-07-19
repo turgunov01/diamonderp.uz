@@ -184,7 +184,7 @@ function assertEmployeeId(employeeId: number) {
   if (!Number.isInteger(employeeId) || employeeId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'employeeId must be a positive integer.'
+      message: 'employeeId must be a positive integer.'
     })
   }
 }
@@ -198,7 +198,7 @@ function parseRecordedAt(value?: string | Date | null) {
     if (Number.isNaN(value.getTime())) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'recordedAt contains an invalid date.'
+        message: 'recordedAt contains an invalid date.'
       })
     }
 
@@ -208,7 +208,7 @@ function parseRecordedAt(value?: string | Date | null) {
   if (typeof value !== 'string') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'recordedAt must be an ISO date string.'
+      message: 'recordedAt must be an ISO date string.'
     })
   }
 
@@ -216,7 +216,7 @@ function parseRecordedAt(value?: string | Date | null) {
   if (Number.isNaN(date.getTime())) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'recordedAt contains an invalid date.'
+      message: 'recordedAt contains an invalid date.'
     })
   }
 
@@ -247,7 +247,7 @@ function getTashkentParts(value: Date) {
   if (!year || !month || !day || !hour || !minute) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to resolve Asia/Tashkent date parts.'
+      message: 'Failed to resolve Asia/Tashkent date parts.'
     })
   }
 
@@ -301,7 +301,7 @@ function parseActivityDate(value: string) {
   if (!match) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Invalid employee activity date format.'
+      message: 'Invalid employee activity date format.'
     })
   }
 
@@ -356,7 +356,7 @@ function buildInitialActivityStatus(
   if ([year, month, day].some(value => Number.isNaN(value))) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to resolve Asia/Tashkent shift date parts.'
+      message: 'Failed to resolve Asia/Tashkent shift date parts.'
     })
   }
 
@@ -409,14 +409,14 @@ async function fetchActivityCustomer(employeeId: number) {
   if (!customer) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Employee not found.'
+      message: 'Employee not found.'
     })
   }
 
   if (!customer.object_pinned?.trim()) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Employee is disabled and cannot record activity.'
+      message: 'Employee is disabled and cannot record activity.'
     })
   }
 
@@ -550,7 +550,7 @@ async function createActivity(
   if (!createdActivity) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to create employee activity.'
+      message: 'Failed to create employee activity.'
     })
   }
 
@@ -575,7 +575,7 @@ async function updateActivity(activityId: number, body: Record<string, unknown>)
   if (!updatedActivity) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Employee activity record not found.'
+      message: 'Employee activity record not found.'
     })
   }
 
@@ -751,7 +751,7 @@ export async function finishEmployeeWork(input: {
   if (objectPinned !== undefined && !objectPinned?.trim()) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Employee is disabled and cannot record activity.'
+      message: 'Employee is disabled and cannot record activity.'
     })
   }
 
@@ -794,7 +794,7 @@ export async function finishEmployeeWork(input: {
   if (!activity) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Employee activity record not found for the current shift.'
+      message: 'Employee activity record not found for the current shift.'
     })
   }
 

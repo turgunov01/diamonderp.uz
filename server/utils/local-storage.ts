@@ -19,7 +19,7 @@ function getStorageRoot() {
 
 function assertSafeSegment(value: string, label: string) {
   if (!value || value === '.' || value === '..' || value.includes('\\') || value.includes('/')) {
-    throw createError({ statusCode: 400, statusMessage: `Invalid ${label}.` })
+    throw createError({ statusCode: 400, message: `Invalid ${label}.` })
   }
 }
 
@@ -39,7 +39,7 @@ export function resolveStorageObjectPath(bucket: string, objectPath: string) {
   const filePath = resolve(bucketRoot, ...parts)
 
   if (filePath !== bucketRoot && !filePath.startsWith(`${bucketRoot}\\`) && !filePath.startsWith(`${bucketRoot}/`)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid object path.' })
+    throw createError({ statusCode: 400, message: 'Invalid object path.' })
   }
 
   return {

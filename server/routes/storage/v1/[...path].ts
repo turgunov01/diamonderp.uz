@@ -25,7 +25,7 @@ async function handleBucketPost(event: H3Event) {
   const bucket = body?.id || body?.name
 
   if (!bucket) {
-    throw createError({ statusCode: 400, statusMessage: 'Bucket id is required.' })
+    throw createError({ statusCode: 400, message: 'Bucket id is required.' })
   }
 
   await ensureLocalBucket(bucket, body.public === true)
@@ -57,7 +57,7 @@ async function handleObjectDownload(event: H3Event, bucket: string, objectPath: 
   if (isPublic) {
     const metadata = await getLocalBucketMetadata(bucket)
     if (!metadata.public) {
-      throw createError({ statusCode: 403, statusMessage: 'Bucket is not public.' })
+      throw createError({ statusCode: 403, message: 'Bucket is not public.' })
     }
   } else {
     const token = getQuery(event).token
@@ -96,7 +96,7 @@ export default eventHandler(async (event) => {
   }
 
   if (segments[0] !== 'object') {
-    throw createError({ statusCode: 404, statusMessage: 'Storage route not found.' })
+    throw createError({ statusCode: 404, message: 'Storage route not found.' })
   }
 
   const isPublic = segments[1] === 'public'
@@ -106,7 +106,7 @@ export default eventHandler(async (event) => {
   const objectPath = segments.slice(bucketIndex + 1).join('/')
 
   if (!bucket || !objectPath) {
-    throw createError({ statusCode: 400, statusMessage: 'Bucket and object path are required.' })
+    throw createError({ statusCode: 400, message: 'Bucket and object path are required.' })
   }
 
   if (method === 'POST' && isSign) {
@@ -121,5 +121,5 @@ export default eventHandler(async (event) => {
     return await handleObjectDownload(event, bucket, objectPath, isPublic)
   }
 
-  throw createError({ statusCode: 405, statusMessage: `Method ${method} is not supported.` })
+  throw createError({ statusCode: 405, message: `Method ${method} is not supported.` })
 })

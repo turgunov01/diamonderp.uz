@@ -23,11 +23,11 @@ export default eventHandler(async (event) => {
   const objectId = Number(body?.objectId)
 
   if (!Number.isInteger(tgChatId) || tgChatId === 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле tgChatId обязательно.' })
+    throw createError({ statusCode: 400, message: 'Поле tgChatId обязательно.' })
   }
 
   if (!Number.isInteger(objectId) || objectId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле objectId обязательно.' })
+    throw createError({ statusCode: 400, message: 'Поле objectId обязательно.' })
   }
 
   const { url, serviceRoleKey } = getDataApiServerConfig()
@@ -52,7 +52,7 @@ export default eventHandler(async (event) => {
   })
 
   if (!saved?.id) {
-    throw createError({ statusCode: 500, statusMessage: 'Не удалось сохранить привязку Telegram.' })
+    throw createError({ statusCode: 500, message: 'Не удалось сохранить привязку Telegram.' })
   }
 
   return {

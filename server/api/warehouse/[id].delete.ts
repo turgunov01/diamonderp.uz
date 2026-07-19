@@ -10,7 +10,7 @@ function parseWarehouseItemId(event: H3Event) {
   const warehouseItemId = Number(rawId)
 
   if (!rawId || !Number.isInteger(warehouseItemId) || warehouseItemId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный идентификатор позиции склада.' })
+    throw createError({ statusCode: 400, message: 'Некорректный идентификатор позиции склада.' })
   }
 
   return warehouseItemId
@@ -29,11 +29,11 @@ function requireAdminSession(event: H3Event) {
   try {
     payload = verifyAuthToken(readAuthToken(event))
   } catch {
-    throw createError({ statusCode: 401, statusMessage: 'Требуется авторизация.' })
+    throw createError({ statusCode: 401, message: 'Требуется авторизация.' })
   }
 
   if (payload.role !== 'admin') {
-    throw createError({ statusCode: 403, statusMessage: 'Удаление позиций склада доступно только администратору.' })
+    throw createError({ statusCode: 403, message: 'Удаление позиций склада доступно только администратору.' })
   }
 }
 
@@ -64,7 +64,7 @@ export default eventHandler(async (event) => {
 
   const existingItem = existing.rows[0]
   if (!existingItem) {
-    throw createError({ statusCode: 404, statusMessage: 'Позиция склада не найдена.' })
+    throw createError({ statusCode: 404, message: 'Позиция склада не найдена.' })
   }
 
   return mapWarehouseItemDbRowToRecord(existingItem)

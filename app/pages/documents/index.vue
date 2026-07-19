@@ -227,7 +227,7 @@ watch(error, (value) => {
 
   toast.add({
     title: 'Не удалось загрузить документы',
-    description: value.statusMessage || 'Проверьте API документов и подключение к Postgres.',
+    description: (value.data as { message?: string })?.message || value.statusMessage || 'Проверьте API документов и подключение к Postgres.',
     color: 'error'
   })
 }, { immediate: true })
@@ -345,8 +345,8 @@ function openDispatchDetails(id: number) {
 
 function getErrorMessage(fetchError: unknown) {
   if (fetchError && typeof fetchError === 'object') {
-    const err = fetchError as { data?: { statusMessage?: string }, message?: string }
-    return err.data?.statusMessage || err.message
+    const err = fetchError as { data?: { message?: string, statusMessage?: string }, message?: string }
+    return err.data?.message || err.message
   }
 
   return undefined

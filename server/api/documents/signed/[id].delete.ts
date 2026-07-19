@@ -8,7 +8,7 @@ export default eventHandler(async (event) => {
   const idRaw = getRouterParam(event, 'id')
   const signedId = Number(idRaw)
   if (!idRaw || !Number.isInteger(signedId) || signedId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Некорректный id подписанного документа.' })
+    throw createError({ statusCode: 400, message: 'Некорректный id подписанного документа.' })
   }
 
   const objectId = parseObjectIdInput(getQuery(event).objectId, 'objectId query param is required.')
@@ -27,7 +27,7 @@ export default eventHandler(async (event) => {
 
   const count = Number(res.headers.get('content-range')?.split('/')?.[1] ?? '0')
   if (!count) {
-    throw createError({ statusCode: 404, statusMessage: 'Подписанный документ не найден.' })
+    throw createError({ statusCode: 404, message: 'Подписанный документ не найден.' })
   }
 
   return { deleted: true }

@@ -19,13 +19,13 @@ interface ForeignKeyReferenceRow extends QueryResultRow {
 
 export function parseCustomerIds(idsRaw: unknown) {
   if (!Array.isArray(idsRaw)) {
-    throw createError({ statusCode: 400, statusMessage: 'ids должен быть массивом.' })
+    throw createError({ statusCode: 400, message: 'ids должен быть массивом.' })
   }
 
   const ids = idsRaw.map((idRaw) => {
     const id = Number(idRaw)
     if (!Number.isSafeInteger(id) || id <= 0) {
-      throw createError({ statusCode: 400, statusMessage: 'ids содержит некорректный id сотрудника.' })
+      throw createError({ statusCode: 400, message: 'ids содержит некорректный id сотрудника.' })
     }
 
     return id
@@ -36,7 +36,7 @@ export function parseCustomerIds(idsRaw: unknown) {
 
 function quoteIdentifier(value: string) {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
-    throw createError({ statusCode: 500, statusMessage: `Некорректное имя в схеме базы: ${value}.` })
+    throw createError({ statusCode: 500, message: `Некорректное имя в схеме базы: ${value}.` })
   }
 
   return `"${value.replace(/"/g, '""')}"`
@@ -104,7 +104,7 @@ function mapCustomerDeletionError(error: unknown): never {
   if (pgError?.code === '23503') {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Нельзя удалить сотрудников: в базе остались связанные записи. Проверьте ограничения внешних ключей для customers.',
+      message: 'Нельзя удалить сотрудников: в базе остались связанные записи. Проверьте ограничения внешних ключей для customers.',
       data: {
         code: pgError.code,
         constraint: pgError.constraint,
@@ -116,7 +116,7 @@ function mapCustomerDeletionError(error: unknown): never {
   if (pgError?.code === '42P01' || pgError?.code === '42703') {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Схема базы данных не совпадает с кодом удаления сотрудников.',
+      message: 'Схема базы данных не совпадает с кодом удаления сотрудников.',
       data: {
         code: pgError.code,
         detail: pgError.message

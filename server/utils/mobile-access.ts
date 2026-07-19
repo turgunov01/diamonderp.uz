@@ -156,7 +156,7 @@ function readBearerToken(event: H3Event) {
 
   throw createError({
     statusCode: 401,
-    statusMessage: 'Missing bearer token.'
+    message: 'Missing bearer token.'
   })
 }
 
@@ -245,7 +245,7 @@ async function buildErpAccess(userRow: ErpUserAuthRow, payload: VerifiedAuthToke
   if (userRow.is_active === false || !isErpAuthRole(userRow.role)) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'User is inactive.'
+      message: 'User is inactive.'
     })
   }
 
@@ -274,7 +274,7 @@ export async function resolveMobileAccessFromPayload(payload: VerifiedAuthTokenP
   if (!Number.isInteger(entityId) || entityId <= 0) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Invalid auth token subject.'
+      message: 'Invalid auth token subject.'
     })
   }
 
@@ -283,7 +283,7 @@ export async function resolveMobileAccessFromPayload(payload: VerifiedAuthTokenP
     if (!customer) {
       throw createError({
         statusCode: 401,
-        statusMessage: 'Customer not found.'
+        message: 'Customer not found.'
       })
     }
 
@@ -295,7 +295,7 @@ export async function resolveMobileAccessFromPayload(payload: VerifiedAuthTokenP
     if (!userRow) {
       throw createError({
         statusCode: 401,
-        statusMessage: 'ERP user not found.'
+        message: 'ERP user not found.'
       })
     }
 
@@ -304,7 +304,7 @@ export async function resolveMobileAccessFromPayload(payload: VerifiedAuthTokenP
 
   throw createError({
     statusCode: 401,
-    statusMessage: 'Unsupported auth token subject.'
+    message: 'Unsupported auth token subject.'
   })
 }
 
@@ -325,7 +325,7 @@ export function parseRequestedObjectId(value: unknown) {
   if (!Number.isInteger(objectId) || objectId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Invalid objectId.'
+      message: 'Invalid objectId.'
     })
   }
 
@@ -340,7 +340,7 @@ export function resolveScopedObjectIds(context: MobileAccessContext, requestedOb
   if (!context.objectIds.includes(requestedObjectId)) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Object access denied.'
+      message: 'Object access denied.'
     })
   }
 

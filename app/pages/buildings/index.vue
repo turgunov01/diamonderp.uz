@@ -76,10 +76,10 @@ watch(error, (value) => {
     return
   }
 
-  const fetchError = value as { data?: { statusMessage?: string }, message?: string }
+  const fetchError = value as { data?: { message?: string, statusMessage?: string }, message?: string }
   toast.add({
     title: 'Не удалось загрузить здания',
-    description: fetchError.data?.statusMessage || fetchError.message,
+    description: fetchError.data?.message || fetchError.message,
     color: 'error'
   })
 }, { immediate: true })
@@ -97,8 +97,8 @@ watch(deleteModalOpen, (open) => {
 
 function getErrorMessage(err: unknown, fallback: string) {
   if (err && typeof err === 'object') {
-    const payload = err as { data?: { statusMessage?: string }, message?: string }
-    return payload.data?.statusMessage || payload.message || fallback
+    const payload = err as { data?: { message?: string, statusMessage?: string }, message?: string }
+    return payload.data?.message || payload.message || fallback
   }
 
   return fallback

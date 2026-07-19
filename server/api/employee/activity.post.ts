@@ -14,7 +14,7 @@ function parseEmployeeId(body: CreateEmployeeActivityBody) {
   if (!Number.isInteger(employeeId) || employeeId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'employeeId must be a positive integer.'
+      message: 'employeeId must be a positive integer.'
     })
   }
 

@@ -31,6 +31,6 @@ export function assertInternalApiRequest(event: H3Event) {
 
   throw createError({
     statusCode: 401,
-    statusMessage: 'Internal API credentials are required.'
+    message: 'Internal API credentials are required.'
   })
 }

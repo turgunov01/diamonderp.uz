@@ -29,22 +29,22 @@ export default eventHandler(async (event) => {
 
   const type = body.type
   if (!type || !['crystallization', 'polishing'].includes(type)) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле type обязательно (crystallization|polishing).' })
+    throw createError({ statusCode: 400, message: 'Поле type обязательно (crystallization|polishing).' })
   }
 
   const team = (body.team || '').trim()
   if (!team.length) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле team обязательно.' })
+    throw createError({ statusCode: 400, message: 'Поле team обязательно.' })
   }
 
   const areaM2 = Number(body.areaM2 ?? 0)
   if (!Number.isFinite(areaM2) || areaM2 <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'areaM2 должен быть > 0' })
+    throw createError({ statusCode: 400, message: 'areaM2 должен быть > 0' })
   }
 
   const performedAt = body.performedAt ? new Date(body.performedAt) : new Date()
   if (Number.isNaN(performedAt.getTime())) {
-    throw createError({ statusCode: 400, statusMessage: 'Поле performedAt некорректно.' })
+    throw createError({ statusCode: 400, message: 'Поле performedAt некорректно.' })
   }
 
   const executors = normalizeList(body.executors)

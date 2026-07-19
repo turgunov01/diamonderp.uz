@@ -14,7 +14,7 @@ export default eventHandler(async (event) => {
   if (access.role !== 'manager' || !access.customer) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Only manager accounts can review tasks.'
+      message: 'Only manager accounts can review tasks.'
     })
   }
 
@@ -22,7 +22,7 @@ export default eventHandler(async (event) => {
   if (!Number.isInteger(taskId) || taskId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Invalid task id.'
+      message: 'Invalid task id.'
     })
   }
 
@@ -31,7 +31,7 @@ export default eventHandler(async (event) => {
   if (typeof task.objectId === 'number' && task.objectId > 0 && !access.objectIds.includes(task.objectId)) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Object access denied.'
+      message: 'Object access denied.'
     })
   }
 
@@ -43,7 +43,7 @@ export default eventHandler(async (event) => {
   if (contentType.includes('multipart/form-data')) {
     const form = await readMultipartFormData(event)
     if (!form?.length) {
-      throw createError({ statusCode: 400, statusMessage: 'Empty form data.' })
+      throw createError({ statusCode: 400, message: 'Empty form data.' })
     }
 
     const allowedFileFields = new Set([

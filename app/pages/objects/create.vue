@@ -28,8 +28,8 @@ const scheduleOptions = getWorkScheduleOptions()
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === 'object') {
-    const fetchError = error as { data?: { statusMessage?: string }, message?: string }
-    return fetchError.data?.statusMessage || fetchError.message
+    const fetchError = error as { data?: { message?: string, statusMessage?: string }, message?: string }
+    return fetchError.data?.message || fetchError.message
   }
 
   return undefined

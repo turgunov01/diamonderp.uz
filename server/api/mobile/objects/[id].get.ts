@@ -8,7 +8,7 @@ export default eventHandler(async (event) => {
   if (!rawId || !Number.isInteger(objectId) || objectId <= 0) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Invalid object id.'
+      message: 'Invalid object id.'
     })
   }
 
@@ -16,7 +16,7 @@ export default eventHandler(async (event) => {
   if (!objectRecord) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Object not found.'
+      message: 'Object not found.'
     })
   }
 

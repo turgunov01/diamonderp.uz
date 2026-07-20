@@ -195,12 +195,14 @@ export default eventHandler(async (event) => {
     missingErrorMessage: `Failed to prepare bucket ${documentSignatureBucket}.`
   })
 
+  // Look the dispatch up by id only. Filtering by template_id here caused false
+  // 404s, because the client-provided templateId may differ from (or the row's
+  // own template_id may be null for) legacy dispatches.
   const dispatchRows = await $fetch<DocumentDispatchDbRow[]>(`${url}/rest/v1/document_dispatches`, {
     headers,
     query: {
       select: 'id,object_id,template_id,title,recipient_ids,recipient_phones,recipient_count,signed_count,status,sent_at',
       id: `eq.${payload.dispatchId}`,
-      ...(payload.templateId ? { template_id: `eq.${payload.templateId}` } : {}),
       limit: '1'
     }
   })
@@ -213,7 +215,13 @@ export default eventHandler(async (event) => {
     })
   }
 
-  const resolvedTemplateId = payload.templateId ?? dispatch.template_id
+  // `template_id` is a bigint column, which node-postgres returns as a string,
+  // so `Number.isInteger(dispatch.template_id)` was always false and the sign
+  // failed with "templateId is missing". Coerce it, and prefer the
+  // client-provided templateId when present.
+  const dispatchTemplateId = Number(dispatch.template_id)
+  const resolvedTemplateId = payload.templateId
+    ?? (Number.isInteger(dispatchTemplateId) && dispatchTemplateId > 0 ? dispatchTemplateId : undefined)
   if (!Number.isInteger(resolvedTemplateId) || (resolvedTemplateId ?? 0) <= 0) {
     throw createError({
       statusCode: 400,

@@ -132,7 +132,7 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Получатели для этого объекта не найдены.' })
   }
 
-  const foundIds = new Set(selectedCustomers.map(customer => customer.id))
+  const foundIds = new Set(selectedCustomers.map(customer => Number(customer.id)))
   const missingIds = payload.recipientIds.filter(id => !foundIds.has(id))
   if (missingIds.length) {
     throw createError({
@@ -141,7 +141,7 @@ export default eventHandler(async (event) => {
     })
   }
 
-  const recipientIds = selectedCustomers.map(customer => customer.id)
+  const recipientIds = selectedCustomers.map(customer => Number(customer.id))
   const recipientPhones = selectedCustomers.map(customer => customer.phone_number)
   const dispatchTitle = payload.title || `${template.name} - ${new Date().toLocaleDateString('ru-RU')}`
 

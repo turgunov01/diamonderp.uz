@@ -12,7 +12,15 @@ export default eventHandler(async (event) => {
   const body = await readBody<Partial<LoginRequestBody>>(event)
   const result = await authenticateLogin(body)
   const access = await resolveMobileAccessFromPayload(result.payload)
-  const mustChangePassword = Boolean(access.customer ? (access.customer.must_change_password ?? true) : false)
+  // Every account (customer or ERP) must change its default password on first
+  // login before it can use the app, regardless of role.
+  const mustChangePassword = Boolean(
+    access.customer
+      ? (access.customer.must_change_password ?? true)
+      : access.erpUser
+        ? (access.erpUser.must_change_password ?? true)
+        : false
+  )
   let activity = null
   let shiftStarted = false
 

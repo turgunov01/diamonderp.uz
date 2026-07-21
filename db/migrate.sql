@@ -1830,6 +1830,7 @@ alter table public.erp_users
   add column if not exists role text not null default 'admin',
   add column if not exists avatar text,
   add column if not exists is_active boolean not null default true,
+  add column if not exists must_change_password boolean not null default true,
   add column if not exists last_login_at timestamptz,
   add column if not exists last_logout_at timestamptz,
   add column if not exists last_login_location jsonb,

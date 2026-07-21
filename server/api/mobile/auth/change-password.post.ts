@@ -15,6 +15,14 @@ interface CustomerPasswordRow {
   must_change_password?: boolean | null
 }
 
+interface ErpPasswordRow {
+  id: number
+  name: string
+  email: string
+  password_hash: string
+  must_change_password?: boolean | null
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
 }
@@ -50,10 +58,13 @@ function ensurePasswordSafe(password: string, fullName: string, username: string
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
 
-  if (!access.customer) {
+  // Any authenticated account (customer or ERP admin/hr/procurement) may change
+  // its own password — everyone is forced to replace the default one on first
+  // login, regardless of role.
+  if (!access.customer && !access.erpUser) {
     throw createError({
       statusCode: 403,
-      message: 'Only customer accounts can change password.'
+      message: 'This account cannot change its password here.'
     })
   }
 
@@ -85,25 +96,83 @@ export default eventHandler(async (event) => {
   const { url, serviceRoleKey } = getDataApiServerConfig()
   const headers = getDataApiServerHeaders(serviceRoleKey)
 
-  const rows = await $fetch<CustomerPasswordRow[]>(`${url}/rest/v1/customers`, {
+  if (access.customer) {
+    const rows = await $fetch<CustomerPasswordRow[]>(`${url}/rest/v1/customers`, {
+      headers,
+      query: {
+        select: 'id,full_name,username,password,must_change_password',
+        id: `eq.${access.user.id}`,
+        limit: '1'
+      }
+    })
+
+    const customer = rows[0]
+    if (!customer) {
+      throw createError({
+        statusCode: 404,
+        message: 'Customer not found.'
+      })
+    }
+
+    const bcryptOk = await compare(currentPassword, customer.password).catch(() => false)
+    const plainOk = currentPassword === customer.password
+
+    if (!bcryptOk && !plainOk) {
+      throw createError({
+        statusCode: 401,
+        message: 'Invalid current password.'
+      })
+    }
+
+    ensurePasswordSafe(newPassword, customer.full_name, customer.username)
+
+    const hashedPassword = await hash(newPassword, 10)
+
+    const updatedRows = await $fetch<CustomerPasswordRow[]>(`${url}/rest/v1/customers?id=eq.${customer.id}`, {
+      method: 'PATCH',
+      headers: {
+        ...headers,
+        Prefer: 'return=representation'
+      },
+      body: {
+        password: hashedPassword,
+        must_change_password: false
+      }
+    })
+
+    if (!updatedRows[0]) {
+      throw createError({
+        statusCode: 500,
+        message: 'Failed to update password.'
+      })
+    }
+
+    return {
+      ok: true,
+      mustChangePassword: false
+    }
+  }
+
+  // ERP account (admin / hr / procurement).
+  const rows = await $fetch<ErpPasswordRow[]>(`${url}/rest/v1/erp_users`, {
     headers,
     query: {
-      select: 'id,full_name,username,password,must_change_password',
+      select: 'id,name,email,password_hash,must_change_password',
       id: `eq.${access.user.id}`,
       limit: '1'
     }
   })
 
-  const customer = rows[0]
-  if (!customer) {
+  const erpUser = rows[0]
+  if (!erpUser) {
     throw createError({
       statusCode: 404,
-      message: 'Customer not found.'
+      message: 'User not found.'
     })
   }
 
-  const bcryptOk = await compare(currentPassword, customer.password).catch(() => false)
-  const plainOk = currentPassword === customer.password
+  const bcryptOk = await compare(currentPassword, erpUser.password_hash).catch(() => false)
+  const plainOk = currentPassword === erpUser.password_hash
 
   if (!bcryptOk && !plainOk) {
     throw createError({
@@ -112,18 +181,18 @@ export default eventHandler(async (event) => {
     })
   }
 
-  ensurePasswordSafe(newPassword, customer.full_name, customer.username)
+  ensurePasswordSafe(newPassword, erpUser.name, erpUser.email)
 
   const hashedPassword = await hash(newPassword, 10)
 
-  const updatedRows = await $fetch<CustomerPasswordRow[]>(`${url}/rest/v1/customers?id=eq.${customer.id}`, {
+  const updatedRows = await $fetch<ErpPasswordRow[]>(`${url}/rest/v1/erp_users?id=eq.${erpUser.id}`, {
     method: 'PATCH',
     headers: {
       ...headers,
       Prefer: 'return=representation'
     },
     body: {
-      password: hashedPassword,
+      password_hash: hashedPassword,
       must_change_password: false
     }
   })

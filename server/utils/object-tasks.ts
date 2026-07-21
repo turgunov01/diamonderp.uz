@@ -1466,11 +1466,11 @@ export async function getReviewerTaskById(reviewerId: number, taskId: number) {
 
   const [taskItems, objects, customers] = await Promise.all([
     fetchTaskItems([normalizedTaskId]),
-    typeof taskList.object_id === 'number' && taskList.object_id > 0
-      ? fetchObjects({ objectIds: [taskList.object_id] })
+    Number(taskList.object_id) > 0
+      ? fetchObjects({ objectIds: [Number(taskList.object_id)] })
       : Promise.resolve([]),
-    typeof taskList.employee_id === 'number' && taskList.employee_id > 0
-      ? fetchCustomers({ customerIds: [taskList.employee_id] })
+    Number(taskList.employee_id) > 0
+      ? fetchCustomers({ customerIds: [Number(taskList.employee_id)] })
       : Promise.resolve([])
   ])
 
@@ -1531,7 +1531,9 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     })
   }
 
-  if (taskList.employee_id !== employeeId) {
+  // employee_id is a bigint → arrives as a string from node-postgres, so
+  // compare numerically (otherwise "40" !== 40 always denied access).
+  if (Number(taskList.employee_id) !== employeeId) {
     throw createError({
       statusCode: 403,
       message: 'Task item access denied.'
@@ -1662,7 +1664,7 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
   })
 
   const [objects, customers] = await Promise.all([
-    typeof taskList.object_id === 'number' ? fetchObjects({ objectIds: [taskList.object_id] }) : Promise.resolve([]),
+    Number(taskList.object_id) > 0 ? fetchObjects({ objectIds: [Number(taskList.object_id)] }) : Promise.resolve([]),
     fetchCustomers({ customerIds: [employeeId] })
   ])
 
@@ -1686,13 +1688,13 @@ export async function getEmployeeTaskById(employeeId: number, taskId: number) {
 
   const [taskItems, objects, customers] = await Promise.all([
     fetchTaskItems([normalizedTaskId]),
-    typeof taskList.object_id === 'number' && taskList.object_id > 0
-      ? fetchObjects({ objectIds: [taskList.object_id] })
+    Number(taskList.object_id) > 0
+      ? fetchObjects({ objectIds: [Number(taskList.object_id)] })
       : Promise.resolve([]),
     fetchCustomers({ customerIds: [normalizedEmployeeId] })
   ])
 
-  if (taskList.employee_id !== normalizedEmployeeId) {
+  if (Number(taskList.employee_id) !== normalizedEmployeeId) {
     throw createError({
       statusCode: 403,
       message: 'Task access denied.'
@@ -1719,11 +1721,11 @@ export async function getObjectScopedTaskById(taskId: number) {
 
   const [taskItems, objects, customers] = await Promise.all([
     fetchTaskItems([normalizedTaskId]),
-    typeof taskList.object_id === 'number' && taskList.object_id > 0
-      ? fetchObjects({ objectIds: [taskList.object_id] })
+    Number(taskList.object_id) > 0
+      ? fetchObjects({ objectIds: [Number(taskList.object_id)] })
       : Promise.resolve([]),
-    typeof taskList.employee_id === 'number' && taskList.employee_id > 0
-      ? fetchCustomers({ customerIds: [taskList.employee_id] })
+    Number(taskList.employee_id) > 0
+      ? fetchCustomers({ customerIds: [Number(taskList.employee_id)] })
       : Promise.resolve([])
   ])
 
@@ -1912,11 +1914,11 @@ export async function reviewObjectTaskList(input: {
     : mappedItems
 
   const [objects, customers] = await Promise.all([
-    typeof taskList.object_id === 'number' && taskList.object_id > 0
-      ? fetchObjects({ objectIds: [taskList.object_id] })
+    Number(taskList.object_id) > 0
+      ? fetchObjects({ objectIds: [Number(taskList.object_id)] })
       : Promise.resolve([]),
-    typeof taskList.employee_id === 'number' && taskList.employee_id > 0
-      ? fetchCustomers({ customerIds: [taskList.employee_id] })
+    Number(taskList.employee_id) > 0
+      ? fetchCustomers({ customerIds: [Number(taskList.employee_id)] })
       : Promise.resolve([])
   ])
 

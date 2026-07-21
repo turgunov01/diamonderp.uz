@@ -11,6 +11,7 @@ export interface ErpUserAuthRow {
   role: AuthRole
   avatar: string | null
   is_active: boolean | null
+  must_change_password?: boolean | null
 }
 interface CustomerLoginRow {
   id: number
@@ -256,7 +257,7 @@ export async function fetchCustomerByLogin(login: string) {
 
 export async function fetchErpUserById(id: number) {
   const result = await postgresQuery<ErpUserAuthRow>(
-    `select id, name, email, password_hash, role, avatar, is_active
+    `select id, name, email, password_hash, role, avatar, is_active, must_change_password
      from public.erp_users
      where id = $1
      limit 1`,

@@ -3,7 +3,13 @@ import { resolveMobileShiftInfo } from '../../../utils/mobile-shift'
 
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
-  const mustChangePassword = Boolean(access.customer ? (access.customer.must_change_password ?? true) : false)
+  const mustChangePassword = Boolean(
+    access.customer
+      ? (access.customer.must_change_password ?? true)
+      : access.erpUser
+        ? (access.erpUser.must_change_password ?? true)
+        : false
+  )
   const shift = access.customer
     ? resolveMobileShiftInfo(access.scheduleType ?? access.customer?.work_shift)
     : null

@@ -81,7 +81,9 @@ export default eventHandler(async (event) => {
   const objectIdsForFilter = requestedObjectId ? [requestedObjectId] : objectIds
   const objectFilter = objectIdsForFilter.length ? buildEqOrInFilter(objectIdsForFilter) : undefined
 
-  const customerId = access.customer?.id
+  // `access.customer.id` is a bigint → arrives as a string; coerce so the
+  // `typeof === 'number'` / `.includes()` recipient checks below actually work.
+  const customerId = Number(access.customer?.id)
   const rawPhone = (access.user.phone || '').trim()
   const currentPhone = normalizePhone(access.user.phone)
   const objectFilterForOr = objectIdsForFilter.length === 1
@@ -100,7 +102,7 @@ export default eventHandler(async (event) => {
     if (objectFilterForOr) {
       orFilters.push(objectFilterForOr)
     }
-    if (typeof customerId === 'number') {
+    if (Number.isInteger(customerId)) {
       orFilters.push(`recipient_ids.cs.{${customerId}}`)
     }
     if (currentPhone) {
@@ -154,17 +156,19 @@ export default eventHandler(async (event) => {
     }))
   ])
 
+  // `template_id`/`dispatch_id`/`object_id` are bigint columns, which
+  // node-postgres returns as strings. Coerce before doing any numeric/Set
+  // comparison, otherwise `Number.isInteger('5')` is false and ids silently
+  // drop out (documents never show as signed, templates go missing, etc.).
   const templateIdsFromRows = new Set<number>()
-  dispatchRows.forEach((row) => {
-    if (Number.isInteger(row.template_id) && (row.template_id ?? 0) > 0) {
-      templateIdsFromRows.add(row.template_id as number)
+  const collectTemplateId = (value: unknown, target: Set<number>) => {
+    const id = Number(value)
+    if (Number.isInteger(id) && id > 0) {
+      target.add(id)
     }
-  })
-  signedRows.forEach((row) => {
-    if (Number.isInteger(row.template_id) && (row.template_id ?? 0) > 0) {
-      templateIdsFromRows.add(row.template_id as number)
-    }
-  })
+  }
+  dispatchRows.forEach(row => collectTemplateId(row.template_id, templateIdsFromRows))
+  signedRows.forEach(row => collectTemplateId(row.template_id, templateIdsFromRows))
 
   const templateQuery: Record<string, string> = {
     select: 'id,object_id,name,description,contract_type,html,css,storage_path,created_at,updated_at',
@@ -200,9 +204,9 @@ export default eventHandler(async (event) => {
 
   const visibleDispatchRows = frontlineAccess
     ? dispatchRows.filter((row) => {
-        const recipientIds = Array.isArray(row.recipient_ids) ? row.recipient_ids : []
+        const recipientIds = (Array.isArray(row.recipient_ids) ? row.recipient_ids : []).map(Number)
         const recipientPhones = Array.isArray(row.recipient_phones) ? row.recipient_phones : []
-        return (typeof customerId === 'number' && recipientIds.includes(customerId))
+        return (Number.isInteger(customerId) && recipientIds.includes(customerId))
           || recipientPhones.some(phone => normalizePhone(phone) === currentPhone)
       })
     : dispatchRows
@@ -213,18 +217,14 @@ export default eventHandler(async (event) => {
 
   const templateIds = new Set<number>()
   for (const row of visibleDispatchRows) {
-    if (Number.isInteger(row.template_id) && (row.template_id ?? 0) > 0) {
-      templateIds.add(row.template_id as number)
-    }
+    collectTemplateId(row.template_id, templateIds)
   }
   for (const row of visibleSignedRows) {
-    if (Number.isInteger(row.template_id) && (row.template_id ?? 0) > 0) {
-      templateIds.add(row.template_id as number)
-    }
+    collectTemplateId(row.template_id, templateIds)
   }
 
   const visibleTemplateRows = frontlineAccess
-    ? templateRows.filter(row => templateIds.has(row.id))
+    ? templateRows.filter(row => templateIds.has(Number(row.id)))
     : templateRows
 
   const allRecipientIds = Array.from(new Set(visibleDispatchRows.flatMap(row => row.recipient_ids || [])))
@@ -247,8 +247,8 @@ export default eventHandler(async (event) => {
 
   const objectIdsFromTemplates = Array.from(new Set(
     visibleTemplateRows
-      .map(row => row.object_id)
-      .filter((objectId): objectId is number => typeof objectId === 'number' && Number.isInteger(objectId) && objectId > 0)
+      .map(row => Number(row.object_id))
+      .filter((objectId): objectId is number => Number.isInteger(objectId) && objectId > 0)
   ))
 
   let objectNameById = new Map<number, string>()
@@ -296,8 +296,8 @@ export default eventHandler(async (event) => {
   const templateNameById = new Map(templates.map(template => [template.id, template.name]))
   const signedByDispatchId = new Set(
     visibleSignedRows
-      .map(row => row.dispatch_id)
-      .filter((dispatchId): dispatchId is number => typeof dispatchId === 'number' && Number.isInteger(dispatchId) && dispatchId > 0)
+      .map(row => Number(row.dispatch_id))
+      .filter((dispatchId): dispatchId is number => Number.isInteger(dispatchId) && dispatchId > 0)
   )
 
   const dispatches = visibleDispatchRows
@@ -309,7 +309,7 @@ export default eventHandler(async (event) => {
         .map(id => recipientMap.get(id))
         .filter(Boolean) as DispatchRecipient[],
       assignedToCurrentUser: frontlineAccess,
-      signedByCurrentUser: signedByDispatchId.has(dispatch.id)
+      signedByCurrentUser: signedByDispatchId.has(Number(dispatch.id))
     }))
 
   const signed = visibleSignedRows

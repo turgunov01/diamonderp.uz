@@ -74,6 +74,7 @@ export default eventHandler(async (event) => {
     taskId,
     itemId,
     employeeId: access.customer.id,
+    allowedObjectIds: access.objectIds,
     done,
     photoFiles
   })

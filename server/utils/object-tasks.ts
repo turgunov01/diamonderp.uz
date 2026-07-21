@@ -173,6 +173,9 @@ interface UpdateObjectTaskItemCompletionInput {
   taskId: number
   itemId: number
   employeeId: number
+  // Object ids the caller has access to. Task completion is object-scoped:
+  // any employee assigned to the task's object may complete its items.
+  allowedObjectIds?: number[]
   done: boolean
   photoFiles?: {
     filename?: string
@@ -1531,9 +1534,11 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     })
   }
 
-  // employee_id is a bigint → arrives as a string from node-postgres, so
-  // compare numerically (otherwise "40" !== 40 always denied access).
-  if (Number(taskList.employee_id) !== employeeId) {
+  // Tasks are shared per object: any employee with access to the task's object
+  // may complete its items (the mobile task list is object-scoped as well), not
+  // only the originally-assigned employee.
+  const taskObjectId = Number(taskList.object_id)
+  if (input.allowedObjectIds && !input.allowedObjectIds.includes(taskObjectId)) {
     throw createError({
       statusCode: 403,
       message: 'Task item access denied.'

@@ -7,7 +7,12 @@ export default eventHandler(async (event) => {
   const query = getQuery(event)
 
   const status = parseOptionalObjectTaskStatus(query.status)
-  const items = await listScopedObjectTasks(access.objectIds, status)
+  const allItems = await listScopedObjectTasks(access.objectIds, status)
+
+  // Managers only verify finished work: hide any task that is not 100% complete.
+  const items = access.role === 'manager'
+    ? allItems.filter(task => task.progressPercent >= 100)
+    : allItems
 
   return {
     role: access.role,

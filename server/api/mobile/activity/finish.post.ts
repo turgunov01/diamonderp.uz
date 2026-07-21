@@ -1,7 +1,7 @@
 import { finishEmployeeWork } from '../../../utils/employee-activity'
 import { recordAuthLocationEvent } from '../../../utils/auth-locations'
 import { recordEmployeeLocationPoints } from '../../../utils/employee-locations'
-import { isFrontlineMobileAccess, requireMobileAccess } from '../../../utils/mobile-access'
+import { isMobileEmployeeTaskAccess, requireMobileAccess } from '../../../utils/mobile-access'
 import { readBody } from 'h3'
 
 interface FinishEmployeeWorkBody {
@@ -12,7 +12,7 @@ interface FinishEmployeeWorkBody {
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
 
-  if (!isFrontlineMobileAccess(access)) {
+  if (!isMobileEmployeeTaskAccess(access)) {
     throw createError({
       statusCode: 403,
       message: 'Only employee accounts can record work completion.'

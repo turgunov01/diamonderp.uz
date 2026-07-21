@@ -1,6 +1,6 @@
 import { recordEmployeeActivity } from '../../../utils/employee-activity'
 import { recordEmployeeLocationPoints, type EmployeeLocationPointInput } from '../../../utils/employee-locations'
-import { isFrontlineMobileAccess, requireMobileAccess } from '../../../utils/mobile-access'
+import { isMobileEmployeeTaskAccess, requireMobileAccess } from '../../../utils/mobile-access'
 
 interface LocationPointBody {
   location?: unknown
@@ -80,7 +80,7 @@ function normalizeLocationBody(body: unknown) {
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
 
-  if (!isFrontlineMobileAccess(access)) {
+  if (!isMobileEmployeeTaskAccess(access)) {
     throw createError({
       statusCode: 403,
       message: 'Only employee accounts can record location points.'

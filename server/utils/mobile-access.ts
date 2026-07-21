@@ -127,14 +127,14 @@ export function isFrontlineMobileAccess(
   return Boolean(context.customer) && isFrontlineMobileRole(context.role)
 }
 
-const NON_EMPLOYEE_TASK_ROLES = new Set(['admin', 'hr', 'procurement', 'manager'])
+const EMPLOYEE_TASK_ROLES = new Set(['cleaner', 'manager'])
 
 export function isMobileEmployeeTaskRole(role: unknown) {
   const normalizedRole = typeof role === 'string' && role.trim()
     ? role.trim().toLowerCase()
     : 'customer'
 
-  return !NON_EMPLOYEE_TASK_ROLES.has(normalizedRole)
+  return EMPLOYEE_TASK_ROLES.has(normalizedRole)
 }
 
 export function isMobileEmployeeTaskAccess(

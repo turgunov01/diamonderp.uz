@@ -35,6 +35,14 @@ export default eventHandler(async (event) => {
     })
   }
 
+  // A manager may only verify a task once the employee has completed it fully (100%).
+  if (task.progressPercent < 100) {
+    throw createError({
+      statusCode: 403,
+      message: 'Task can only be reviewed once the employee completes it 100%.'
+    })
+  }
+
   const contentType = getHeader(event, 'content-type') || ''
   let decision: ReviewTaskBody['decision']
   let comment: string | null | undefined

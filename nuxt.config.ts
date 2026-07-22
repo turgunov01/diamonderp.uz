@@ -56,10 +56,7 @@ export default defineNuxtConfig({
       storagePassportBucket:
         process.env.NUXT_PUBLIC_STORAGE_PASSPORT_BUCKET
         || process.env.STORAGE_PASSPORT_BUCKET
-        || 'customer-passports',
-      googleMapsApiKey:
-        process.env.NUXT_PUBLIC_GOOGLE_MAPS_API_KEY
-        || 'AIzaSyBVVNaOxiZB_dyNZSws57T-PPmgaJNI7P4'
+        || 'customer-passports'
     }
   },
 

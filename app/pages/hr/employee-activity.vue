@@ -401,126 +401,6 @@ function buildRouteMapUrl(points: EmployeeLocationPointRecord[]) {
 
 const routeMapUrl = computed(() => buildRouteMapUrl(routePoints.value))
 
-// --- Google Maps route rendering ---------------------------------------------
-const googleMaps = useGoogleMaps()
-const mapEl = ref<HTMLElement | null>(null)
-const mapError = ref<string | null>(null)
-
-// Held as plain (non-reactive) references for the lifetime of the modal.
-let mapInstance: any = null
-let routePolylineOverlay: any = null
-let startMarker: any = null
-let endMarker: any = null
-
-function clearRouteOverlays() {
-  routePolylineOverlay?.setMap(null)
-  startMarker?.setMap(null)
-  endMarker?.setMap(null)
-  routePolylineOverlay = null
-  startMarker = null
-  endMarker = null
-}
-
-function disposeRouteMap() {
-  clearRouteOverlays()
-  mapInstance = null
-  mapError.value = null
-}
-
-async function renderRouteMap() {
-  // Wait until points are loaded and the container is visible (v-show is driven by
-  // the same conditions) so the map does not initialize with a zero-size element.
-  if (import.meta.server || !routeOpen.value || routeLoading.value || !routePoints.value.length) {
-    return
-  }
-
-  try {
-    const google = await googleMaps.load()
-
-    await nextTick()
-    // The modal (and its map container) may have closed while the API was loading.
-    if (!routeOpen.value || !mapEl.value) {
-      return
-    }
-
-    mapError.value = null
-    const path = routePoints.value.map(point => ({ lat: point.latitude, lng: point.longitude }))
-
-    if (!mapInstance) {
-      mapInstance = new google.maps.Map(mapEl.value, {
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: true,
-        zoomControl: true,
-        clickableIcons: false
-      })
-    }
-
-    clearRouteOverlays()
-
-    routePolylineOverlay = new google.maps.Polyline({
-      path,
-      geodesic: true,
-      strokeColor: '#2563eb',
-      strokeOpacity: 0.9,
-      strokeWeight: 4,
-      map: mapInstance
-    })
-
-    const bounds = new google.maps.LatLngBounds()
-    path.forEach(point => bounds.extend(point))
-
-    if (path.length === 1) {
-      mapInstance.setCenter(path[0])
-      mapInstance.setZoom(16)
-    } else {
-      mapInstance.fitBounds(bounds, 48)
-    }
-
-    startMarker = new google.maps.Marker({
-      position: path[0],
-      map: mapInstance,
-      title: 'Начало',
-      label: 'A'
-    })
-    endMarker = new google.maps.Marker({
-      position: path[path.length - 1],
-      map: mapInstance,
-      title: 'Конец',
-      label: 'B'
-    })
-
-    // The modal animates open, so the map is often initialized before its
-    // container reaches full size (Google renders a grey map). Nudge it to
-    // re-measure and re-fit once the dialog has settled.
-    setTimeout(() => {
-      if (!mapInstance) {
-        return
-      }
-      google.maps.event.trigger(mapInstance, 'resize')
-      if (path.length === 1) {
-        mapInstance.setCenter(path[0])
-        mapInstance.setZoom(16)
-      } else {
-        mapInstance.fitBounds(bounds, 48)
-      }
-    }, 300)
-  } catch (error) {
-    disposeRouteMap()
-    mapError.value = getErrorMessage(error) || 'Не удалось загрузить карту.'
-  }
-}
-
-watch([routeOpen, routePoints, routeLoading], async ([open]) => {
-  if (!open) {
-    disposeRouteMap()
-    return
-  }
-
-  await nextTick()
-  await renderRouteMap()
-})
-
 const columns: TableColumn<EmployeeActivityRecord>[] = [
   {
     accessorKey: 'employeeName',
@@ -798,25 +678,8 @@ const columns: TableColumn<EmployeeActivityRecord>[] = [
               </div>
             </div>
 
-            <div class="relative h-72 overflow-hidden rounded-lg border border-default bg-elevated/30">
-              <div
-                v-show="!routeLoading && !mapError && routePoints.length"
-                ref="mapEl"
-                class="h-full w-full"
-              />
-
-              <div v-if="routeLoading" class="flex h-full items-center justify-center text-sm text-muted">
-                Загрузка маршрута...
-              </div>
-
-              <div v-else-if="mapError" class="flex h-full flex-col items-center justify-center gap-1 px-6 text-center text-sm text-muted">
-                <UIcon name="i-lucide-map-pin-off" class="size-5" />
-                <span>{{ mapError }}</span>
-              </div>
-
-              <div v-else-if="!routePoints.length" class="flex h-full items-center justify-center px-6 text-center text-sm text-muted">
-                Точки маршрута для этой записи пока не найдены.
-              </div>
+            <div v-if="routeLoading" class="rounded-lg border border-default bg-elevated/30 px-4 py-3 text-center text-sm text-muted">
+              Загрузка точек маршрута...
             </div>
 
             <div class="max-h-72 overflow-auto rounded-lg border border-default">

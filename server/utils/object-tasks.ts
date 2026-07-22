@@ -1545,11 +1545,14 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     })
   }
 
+  // Only an approved task is final/locked. A task still pending review may keep
+  // receiving item edits (re-uploaded photos, idempotent re-submits) — locking it
+  // there wrongly rejected the employee's follow-up updates with a 409.
   const reviewStatus = normalizeReviewStatus(taskList.review_status)
-  if (reviewStatus === 'pending' || reviewStatus === 'approved') {
+  if (reviewStatus === 'approved') {
     throw createError({
       statusCode: 409,
-      message: 'Task is locked for review.'
+      message: 'Task is already approved and locked.'
     })
   }
 
@@ -1654,6 +1657,11 @@ export async function updateObjectTaskItemCompletion(input: UpdateObjectTaskItem
     taskListPatch.review_requested_at = now
     taskListPatch.reviewed_at = null
     taskListPatch.review_comment = null
+  } else if (nextStatus !== 'completed' && reviewStatus === 'pending') {
+    // Task dropped back below 100% while awaiting review — clear the stale pending
+    // flag so it leaves the manager's review queue until it is completed again.
+    taskListPatch.review_status = 'none'
+    taskListPatch.review_requested_at = null
   }
 
   const [updatedTaskList] = await $fetch<ObjectTaskListDbRow[]>(`${url}/rest/v1/object_task_lists`, {

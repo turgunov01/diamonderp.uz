@@ -28,7 +28,7 @@ type RatesResponse = {
 const allowedCurrencies = ['UZS', 'USD', 'EUR', 'RUB'] as const
 type CurrencyCode = (typeof allowedCurrencies)[number]
 
-const currency = useState<CurrencyCode>('dashboard-currency', () => 'UZS')
+const currency = useDashboardCurrency()
 const activeObject = useState<{ id: number, name: string } | null>('active-object')
 const activeObjectIdCookie = useCookie<number | null>('active-object-id', { default: () => null })
 const activeObjectId = computed(() => activeObject.value?.id ?? activeObjectIdCookie.value ?? undefined)

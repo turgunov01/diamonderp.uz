@@ -1,5 +1,7 @@
 export type TaskStatus = 'open' | 'in_progress' | 'completed'
 
+export type TaskReviewStatus = 'none' | 'pending' | 'approved' | 'rejected'
+
 export type ObjectTaskEmployee = {
   id: number
   name: string
@@ -42,6 +44,12 @@ export type ObjectTask = {
   totalItems: number
   completedItems: number
   progressPercent: number
+  reviewStatus?: TaskReviewStatus
+  reviewComment?: string | null
+  reviewedAt?: string | null
+  reviewRequestedAt?: string | null
+  reviewPhotoUrl?: string | null
+  reviewPhotoUrls?: string[]
   items: ObjectTaskItem[]
 }
 

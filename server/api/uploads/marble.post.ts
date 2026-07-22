@@ -37,7 +37,9 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Файлы не переданы.' })
   }
 
-  const files = form.filter(f => f.type === 'file' && f.filename && f.data)
+  // A multipart part's `type` is its MIME type (e.g. "image/jpeg"), never the
+  // literal "file" — file parts are identified by having a filename + data.
+  const files = form.filter(f => f.filename && f.data)
   if (!files.length) {
     throw createError({ statusCode: 400, message: 'Файлы не переданы.' })
   }

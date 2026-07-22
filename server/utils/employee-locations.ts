@@ -59,17 +59,23 @@ export interface ListEmployeeLocationPointsOptions {
   limit?: number
 }
 
-function assertEmployeeId(employeeId: number) {
-  if (!Number.isInteger(employeeId) || employeeId <= 0) {
+function assertEmployeeId(employeeId: unknown): number {
+  // Database bigint ids arrive as strings, so coerce before validating (matches parsePositiveInteger).
+  const parsed = typeof employeeId === 'number' ? employeeId : Number(employeeId)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
     throw createError({
       statusCode: 400,
       message: 'employeeId must be a positive integer.'
     })
   }
+
+  return parsed
 }
 
-function normalizePositiveInteger(value?: number | null) {
-  return Number.isInteger(value) && (value ?? 0) > 0 ? value as number : null
+function normalizePositiveInteger(value?: number | string | null) {
+  // Database bigint ids arrive as strings, so coerce before validating.
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
 export function parseLocationRecordedAt(value?: string | Date | null) {
@@ -155,11 +161,17 @@ async function fetchCustomersByIds(employeeIds: number[]) {
     headers: getDataApiServerHeaders(serviceRoleKey)
   })
 
-  return new Map(rows.map(row => [row.id, row]))
+  // Key by a coerced number so lookups by the (string) point employee_id match.
+  return new Map(rows.map(row => [Number(row.id), row]))
 }
 
 function normalizeEmployeeIds(rows: EmployeeLocationPointDbRow[]) {
-  return [...new Set(rows.map(row => row.employee_id).filter(employeeId => Number.isInteger(employeeId) && employeeId > 0))]
+  // The data API returns bigint ids as strings, so coerce before validating.
+  return [...new Set(
+    rows
+      .map(row => typeof row.employee_id === 'number' ? row.employee_id : Number(row.employee_id))
+      .filter((employeeId): employeeId is number => Number.isInteger(employeeId) && employeeId > 0)
+  )]
 }
 
 function isMissingEmployeeLocationPointsTable(error: unknown) {
@@ -211,7 +223,7 @@ function mapEmployeeLocationPointDbRowToRecord(
 
 export async function recordEmployeeLocationPoints(input: { points: EmployeeLocationPointInput[] }) {
   const rowsToInsert = input.points.map((point) => {
-    assertEmployeeId(point.employeeId)
+    const employeeId = assertEmployeeId(point.employeeId)
 
     const recordedAt = parseLocationRecordedAt(point.recordedAt)
     const location = serializeAuthLocation(point.location)
@@ -224,7 +236,7 @@ export async function recordEmployeeLocationPoints(input: { points: EmployeeLoca
     }
 
     return {
-      employee_id: point.employeeId,
+      employee_id: employeeId,
       activity_id: normalizePositiveInteger(point.activityId),
       building_id: normalizePositiveInteger(point.buildingId),
       recorded_at: recordedAt.toISOString(),
@@ -301,5 +313,5 @@ export async function listEmployeeLocationPoints(options: ListEmployeeLocationPo
 
   const customersById = await fetchCustomersByIds(normalizeEmployeeIds(rows))
 
-  return rows.map(row => mapEmployeeLocationPointDbRowToRecord(row, customersById.get(row.employee_id)))
+  return rows.map(row => mapEmployeeLocationPointDbRowToRecord(row, customersById.get(Number(row.employee_id))))
 }

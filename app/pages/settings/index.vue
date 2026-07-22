@@ -4,10 +4,7 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 
 const fileRef = ref<HTMLInputElement>()
 
-const allowedCurrencies = ['UZS', 'USD', 'EUR', 'RUB'] as const
-type CurrencyCode = (typeof allowedCurrencies)[number]
-
-const currency = useState<CurrencyCode>('dashboard-currency', () => 'UZS')
+const currency = useDashboardCurrency()
 
 const currencyOptions = [
   { label: 'Сумы (UZS)', value: 'UZS' },

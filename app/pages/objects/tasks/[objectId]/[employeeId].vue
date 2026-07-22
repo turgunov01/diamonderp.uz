@@ -159,6 +159,37 @@ function getItemPhotos(item: { proofPhotoUrls?: string[], proofPhotoUrl?: string
   return []
 }
 
+function getReviewPhotos(task: { reviewPhotoUrls?: string[], reviewPhotoUrl?: string | null }) {
+  if (Array.isArray(task.reviewPhotoUrls) && task.reviewPhotoUrls.length) {
+    return task.reviewPhotoUrls.filter(Boolean)
+  }
+
+  if (typeof task.reviewPhotoUrl === 'string' && task.reviewPhotoUrl.trim()) {
+    return [task.reviewPhotoUrl.trim()]
+  }
+
+  return []
+}
+
+function reviewStatusLabel(status?: string | null) {
+  if (status === 'approved') return 'Проверено'
+  if (status === 'rejected') return 'Отклонено'
+  if (status === 'pending') return 'Ожидает проверки'
+  return 'Без проверки'
+}
+
+function reviewStatusColor(status?: string | null) {
+  if (status === 'approved') return 'success'
+  if (status === 'rejected') return 'error'
+  if (status === 'pending') return 'warning'
+  return 'neutral'
+}
+
+// Show a verification badge only once the employee has finished the task.
+function hasReviewState(task: { reviewStatus?: string | null }) {
+  return task.reviewStatus === 'pending' || task.reviewStatus === 'approved' || task.reviewStatus === 'rejected'
+}
+
 function getTaskPhotos(task: { items?: { isDone?: boolean, proofPhotoUrls?: string[], proofPhotoUrl?: string | null }[] }) {
   const photos: string[] = []
   const items = Array.isArray(task.items) ? task.items : []
@@ -335,6 +366,13 @@ function getTaskPhotos(task: { items?: { isDone?: boolean, proofPhotoUrls?: stri
                           color="error"
                           variant="soft"
                         />
+                        <UBadge
+                          v-if="hasReviewState(task)"
+                          :label="reviewStatusLabel(task.reviewStatus)"
+                          :color="reviewStatusColor(task.reviewStatus)"
+                          variant="soft"
+                          icon="i-lucide-shield-check"
+                        />
                       </div>
 
                       <p class="text-xs text-muted">
@@ -409,6 +447,47 @@ function getTaskPhotos(task: { items?: { isDone?: boolean, proofPhotoUrls?: stri
             <p v-if="selectedTask.note" class="text-sm text-toned">
               {{ selectedTask.note }}
             </p>
+
+            <div
+              v-if="hasReviewState(selectedTask)"
+              class="rounded-lg border border-default/70 bg-elevated/40 p-3 space-y-2"
+            >
+              <div class="flex flex-wrap items-center gap-2">
+                <UIcon name="i-lucide-shield-check" class="size-4 text-muted" />
+                <p class="text-sm font-semibold text-highlighted">
+                  Проверка менеджера
+                </p>
+                <UBadge
+                  :label="reviewStatusLabel(selectedTask.reviewStatus)"
+                  :color="reviewStatusColor(selectedTask.reviewStatus)"
+                  variant="soft"
+                />
+                <UBadge
+                  v-if="selectedTask.reviewedAt"
+                  :label="formatDateTime(selectedTask.reviewedAt)"
+                  color="neutral"
+                  variant="subtle"
+                />
+              </div>
+
+              <p v-if="selectedTask.reviewComment" class="text-sm text-toned">
+                Комментарий: {{ selectedTask.reviewComment }}
+              </p>
+
+              <div v-if="getReviewPhotos(selectedTask).length" class="flex flex-wrap gap-2">
+                <a
+                  v-for="(photo, idx) in getReviewPhotos(selectedTask)"
+                  :key="`review-${selectedTask.id}-${idx}`"
+                  :href="photo"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="block h-20 w-20 overflow-hidden rounded-md border border-default"
+                  @click.stop
+                >
+                  <img :src="photo" alt="Фото проверки" class="h-full w-full object-cover">
+                </a>
+              </div>
+            </div>
 
             <div>
               <div class="flex items-center justify-between text-xs text-muted">

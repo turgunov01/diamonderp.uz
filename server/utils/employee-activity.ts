@@ -111,10 +111,12 @@ function isMissingEmployeeActivityLocationColumns(error: unknown) {
 }
 
 function normalizeEmployeeIds(rows: EmployeeActivityDbRow[]) {
+  // The data API returns bigint ids as strings, so coerce before validating —
+  // otherwise no customers are resolved and the building filter drops every row.
   return [...new Set(
     rows
-      .map(row => row.employee_id)
-      .filter((employeeId): employeeId is number => typeof employeeId === 'number' && Number.isInteger(employeeId) && employeeId > 0)
+      .map(row => typeof row.employee_id === 'number' ? row.employee_id : Number(row.employee_id))
+      .filter((employeeId): employeeId is number => Number.isInteger(employeeId) && employeeId > 0)
   )]
 }
 
@@ -154,7 +156,8 @@ async function fetchCustomersByIds(employeeIds: number[]) {
     headers: getDataApiServerHeaders(serviceRoleKey)
   })
 
-  return new Map(rows.map(row => [row.id, row]))
+  // Key by a coerced number so lookups by the (string) activity employee_id match.
+  return new Map(rows.map(row => [Number(row.id), row]))
 }
 
 function mapEmployeeActivityDbRowToRecord(
@@ -180,13 +183,17 @@ function mapEmployeeActivityDbRowToRecord(
   }
 }
 
-function assertEmployeeId(employeeId: number) {
-  if (!Number.isInteger(employeeId) || employeeId <= 0) {
+function assertEmployeeId(employeeId: unknown): number {
+  // Database bigint ids arrive as strings, so coerce before validating (matches parsePositiveInteger).
+  const parsed = typeof employeeId === 'number' ? employeeId : Number(employeeId)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
     throw createError({
       statusCode: 400,
       message: 'employeeId must be a positive integer.'
     })
   }
+
+  return parsed
 }
 
 function parseRecordedAt(value?: string | Date | null) {
@@ -626,11 +633,12 @@ export async function listEmployeeActivities(options: ListEmployeeActivitiesOpti
         return false
       }
 
-      return customersById.get(row.employee_id)?.building_id === options.buildingId
+      // building_id comes back as a string from the data API — coerce to compare.
+      return Number(customersById.get(Number(row.employee_id))?.building_id) === options.buildingId
     })
     .map(row => mapEmployeeActivityDbRowToRecord(
       row,
-      row.employee_id ? customersById.get(row.employee_id) : undefined
+      row.employee_id ? customersById.get(Number(row.employee_id)) : undefined
     ))
 }
 
@@ -639,14 +647,14 @@ export async function recordEmployeeActivity(input: {
   recordedAt?: string | Date | null
   location?: unknown
 }): Promise<RecordEmployeeActivityResult> {
-  assertEmployeeId(input.employeeId)
+  const employeeId = assertEmployeeId(input.employeeId)
 
   const recordedAt = parseRecordedAt(input.recordedAt)
-  const customer = await fetchActivityCustomer(input.employeeId)
+  const customer = await fetchActivityCustomer(employeeId)
   const scheduleType = await resolveWorkScheduleTypeForCustomer(customer)
   const initialStatus = buildInitialActivityStatus(recordedAt, scheduleType, customer.work_shift, customer.salary_type)
   const activityDate = initialStatus.activityDate
-  const existingActivity = await fetchExistingActivity(input.employeeId, activityDate)
+  const existingActivity = await fetchExistingActivity(employeeId, activityDate)
   const startedLocation = serializeAuthLocation(input.location)
 
   if (existingActivity) {
@@ -697,7 +705,7 @@ export async function recordEmployeeActivity(input: {
 
   try {
     createdActivity = await createActivity(
-      input.employeeId,
+      employeeId,
       customer.username,
       activityDate,
       recordedAt.toISOString(),
@@ -705,7 +713,7 @@ export async function recordEmployeeActivity(input: {
       initialStatus
     )
   } catch (error) {
-    const duplicateActivity = await fetchExistingActivity(input.employeeId, activityDate)
+    const duplicateActivity = await fetchExistingActivity(employeeId, activityDate)
 
     if (duplicateActivity) {
       return {
@@ -739,7 +747,7 @@ export async function finishEmployeeWork(input: {
   objectPinned?: string | null
   location?: unknown
 }): Promise<FinishEmployeeWorkResult> {
-  assertEmployeeId(input.employeeId)
+  const employeeId = assertEmployeeId(input.employeeId)
 
   const finishedAt = parseRecordedAt(input.finishedAt)
 
@@ -756,10 +764,10 @@ export async function finishEmployeeWork(input: {
   }
 
   const customer = employeeName === undefined || objectPinned === undefined || input.workShift === undefined
-    ? await fetchActivityCustomer(input.employeeId)
+    ? await fetchActivityCustomer(employeeId)
     : undefined
 
-  const effectiveEmployeeName = employeeName ?? customer?.username ?? `Employee #${input.employeeId}`
+  const effectiveEmployeeName = employeeName ?? customer?.username ?? `Employee #${employeeId}`
   const effectiveScheduleType = input.scheduleType
     ? normalizeScheduleType(input.scheduleType, input.workShift, customer?.salary_type)
     : (customer
@@ -785,10 +793,10 @@ export async function finishEmployeeWork(input: {
   const primaryDate = prefersToday ? today : yesterday
   const fallbackDate = prefersToday ? yesterday : today
 
-  let activity = await fetchExistingActivity(input.employeeId, primaryDate)
+  let activity = await fetchExistingActivity(employeeId, primaryDate)
 
   if (!activity && fallbackDate !== primaryDate) {
-    activity = await fetchExistingActivity(input.employeeId, fallbackDate)
+    activity = await fetchExistingActivity(employeeId, fallbackDate)
   }
 
   if (!activity) {
@@ -859,7 +867,7 @@ export async function finishEmployeeWork(input: {
   return {
     finishedAt: finishedAtIso,
     activity: mapEmployeeActivityDbRowToRecord(updatedActivity, {
-      id: input.employeeId,
+      id: employeeId,
       username: effectiveEmployeeName
     })
   }

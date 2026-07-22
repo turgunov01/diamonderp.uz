@@ -9,6 +9,10 @@ defineProps<{
 
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
+// Persisted alongside app.config defaults so the picked colors survive a reload
+// (re-applied on load by the ui-theme plugin).
+const primaryCookie = useCookie<string | null>('ui-primary', { maxAge: 60 * 60 * 24 * 365 })
+const neutralCookie = useCookie<string | null>('ui-neutral', { maxAge: 60 * 60 * 24 * 365 })
 const { session, logout } = useAuth()
 const { role } = useRoleAccess()
 
@@ -148,6 +152,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
             e.preventDefault()
 
             appConfig.ui.colors.primary = color
+            primaryCookie.value = color
           }
         }))
       }, {
@@ -168,6 +173,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
             e.preventDefault()
 
             appConfig.ui.colors.neutral = color
+            neutralCookie.value = color
           }
         }))
       }]

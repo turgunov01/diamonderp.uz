@@ -7,8 +7,8 @@
   type DocumentDispatchDbRow,
   type SignedDocumentDbRow
 } from '../../documents/documents'
-import { normalizePhone } from '../../../utils/auth'
-import { isFrontlineMobileAccess, requireMobileAccess } from '../../../utils/mobile-access'
+import { requireMobileAccess } from '../../../utils/mobile-access'
+import { isDispatchRecipient } from '../../documents/dispatch-visibility'
 import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
 import { getHeader, readBody, readMultipartFormData } from 'h3'
 import type { H3Event } from 'h3'
@@ -176,12 +176,16 @@ function toBuffer(data: string | Buffer, contentTypeHint?: string) {
 
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
-  if (!isFrontlineMobileAccess(access) || !access.user.phone) {
+  // Подписывать документ может ЛЮБОЙ сотрудник с телефоном — менеджер, уборщик,
+  // супервайзер и любые другие роли. Блокируем только ERP-аккаунты (admin/hr):
+  // у них нет customer-профиля, они отправители, а не подписанты.
+  if (!access.customer || !access.user.phone) {
     throw createError({
       statusCode: 403,
       message: 'Only employee accounts can sign mobile documents.'
     })
   }
+  const customer = access.customer
 
   const payload = await parsePayload(event)
   const { url, serviceRoleKey, documentSignatureBucket } = getDataApiServerConfig()
@@ -229,9 +233,12 @@ export default eventHandler(async (event) => {
     })
   }
 
-  const currentPhone = normalizePhone(access.user.phone)
-  const assignedToCurrentUser = (dispatch.recipient_ids || []).includes(access.customer.id)
-    || (dispatch.recipient_phones || []).some(phone => normalizePhone(phone) === currentPhone)
+  const assignedToCurrentUser = isDispatchRecipient(
+    dispatch.recipient_ids,
+    dispatch.recipient_phones,
+    Number(customer.id),
+    access.user.phone
+  )
 
   if (!dispatch.object_id) {
     throw createError({

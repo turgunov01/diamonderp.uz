@@ -9,6 +9,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck",
+    "test": "node --test \"test/**/*.test.ts\"",
     "db:schema:apply": "node scripts/apply-schema.mjs",
     "set:webhook": "node scripts/set-telegram-webhook.js"
   },

@@ -365,29 +365,23 @@ async function sendDocument() {
     return
   }
 
-  if (!selectedRecipientIds.value.length) {
-    toast.add({
-      title: 'Выберите сотрудников',
-      color: 'warning'
-    })
-    return
-  }
-
   sending.value = true
 
   try {
-    await $fetch('/api/documents/send', {
+    const dispatch = await $fetch<{ recipientCount: number }>('/api/documents/send', {
       method: 'POST',
       body: {
         objectId: objectId.value,
         templateId: selectedTemplateId.value,
+        // Пусто = документ получат все сотрудники объекта. Явный выбор лишь
+        // дополняет этот список и никого не исключает.
         recipientIds: selectedRecipientIds.value
       }
     })
 
     toast.add({
       title: 'Документ отправлен',
-      description: `Сотрудников в отправке: ${selectedRecipientIds.value.length}`,
+      description: `Сотрудников в отправке: ${dispatch.recipientCount}`,
       color: 'success'
     })
 
@@ -1049,7 +1043,7 @@ watch(miniOpen, (open) => {
       <UModal
         v-model:open="sendModalOpen"
         title="Отправка документа"
-        description="Выберите шаблон и сотрудников, которые подпишут документ в мобильном приложении"
+        description="Выберите шаблон — документ получат все сотрудники объекта в мобильном приложении"
       >
         <template #body>
           <div class="space-y-4">
@@ -1063,7 +1057,7 @@ watch(miniOpen, (open) => {
               />
             </UFormField>
 
-            <UFormField label="Сотрудники">
+            <UFormField label="Сотрудники (необязательно)">
               <USelectMenu
                 v-model="selectedRecipientIds"
                 :items="customerSelectItems"
@@ -1072,12 +1066,12 @@ watch(miniOpen, (open) => {
                 multiple
                 searchable
                 class="w-full"
-                placeholder="Выберите сотрудников"
+                placeholder="Все сотрудники объекта"
               />
             </UFormField>
 
-            <p v-if="!customerSelectItems.length" class="text-xs text-muted">
-              Для текущего объекта нет сотрудников с привязкой по "Позиции объекта" или "Закрепленному объекту".
+            <p class="text-xs text-muted">
+              Если никого не выбрать, документ получат <b>все сотрудники объекта</b> в мобильном приложении (включая уборщиков). Выбор сотрудников лишь добавляет их к этому списку.
             </p>
 
             <div class="flex items-center justify-end gap-2">

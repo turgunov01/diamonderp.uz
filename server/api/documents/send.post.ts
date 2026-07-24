@@ -1,12 +1,12 @@
-﻿import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
+import { getDataApiServerConfig, getDataApiServerHeaders } from '../../utils/data-api'
 import {
   getDataApiErrorData,
   mapDispatchDbRowToRecord,
   parseObjectIdInput,
   type DocumentDispatchDbRow,
-  type DocumentStatus,
   type DocumentTemplateDbRow
 } from './documents'
+import { resolveDispatchRecipients, type CustomerRecipientRow } from './recipients'
 
 interface SendDocumentBody {
   objectId: number
@@ -15,14 +15,7 @@ interface SendDocumentBody {
   title?: string
 }
 
-interface CustomerLiteRow {
-  id: number
-  username: string
-  phone_number: string
-  building_id?: number | null
-  object_pinned?: string | null
-  object_positions?: string[] | null
-}
+type CustomerLiteRow = CustomerRecipientRow
 
 interface ObjectLiteRow {
   id: number
@@ -42,17 +35,14 @@ function parseSendBody(body: unknown): SendDocumentBody {
     throw createError({ statusCode: 400, message: 'Поле templateId должно быть положительным целым числом.' })
   }
 
-  if (!Array.isArray(input.recipientIds) || !input.recipientIds.length) {
-    throw createError({ statusCode: 400, message: 'Поле recipientIds должно содержать хотя бы один id пользователя.' })
-  }
-
-  const recipientIds = input.recipientIds
-    .map(id => Number(id))
-    .filter(id => Number.isInteger(id) && id > 0)
-
-  if (!recipientIds.length) {
-    throw createError({ statusCode: 400, message: 'Поле recipientIds должно содержать корректные положительные целые числа.' })
-  }
+  // `recipientIds` теперь необязательное: если его не передать, документ
+  // получают все сотрудники объекта. Если передать — это лишь дополнение,
+  // которое объединяется с сотрудниками объекта (никто не выпадает).
+  const recipientIds = Array.isArray(input.recipientIds)
+    ? input.recipientIds
+        .map(id => Number(id))
+        .filter(id => Number.isInteger(id) && id > 0)
+    : []
 
   return {
     objectId: parseObjectIdInput(input.objectId),
@@ -114,11 +104,13 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Объект не найден.' })
   }
 
-  const customers = await $fetch<CustomerLiteRow[]>(`${url}/rest/v1/customers`, {
+  // Берём всех сотрудников здания (плюс legacy-записи без building_id), а затем
+  // в JS отбираем закреплённых за объектом. Явно выбранные получатели
+  // добавляются поверх и никогда не отбрасываются.
+  const buildingCustomers = await $fetch<CustomerLiteRow[]>(`${url}/rest/v1/customers`, {
     headers,
     query: {
       select: 'id,username,phone_number,building_id,object_pinned,object_positions',
-      id: `in.${encodePostgrestIn(payload.recipientIds)}`,
       ...(currentObject.building_id
         ? { or: `(building_id.eq.${currentObject.building_id},building_id.is.null)` }
         : {}),
@@ -126,19 +118,30 @@ export default eventHandler(async (event) => {
     }
   })
 
-  const selectedCustomers = customers
-
-  if (!selectedCustomers.length) {
-    throw createError({ statusCode: 404, message: 'Получатели для этого объекта не найдены.' })
+  // Если ERP явно выбрал сотрудника не из этого здания — подгружаем его отдельно,
+  // чтобы отправка не падала и не теряла получателей.
+  const knownIds = new Set(buildingCustomers.map(customer => Number(customer.id)))
+  const missingExplicitIds = payload.recipientIds.filter(id => !knownIds.has(id))
+  let extraCustomers: CustomerLiteRow[] = []
+  if (missingExplicitIds.length) {
+    extraCustomers = await $fetch<CustomerLiteRow[]>(`${url}/rest/v1/customers`, {
+      headers,
+      query: {
+        select: 'id,username,phone_number,building_id,object_pinned,object_positions',
+        id: `in.${encodePostgrestIn(missingExplicitIds)}`,
+        order: 'id.asc'
+      }
+    })
   }
 
-  const foundIds = new Set(selectedCustomers.map(customer => Number(customer.id)))
-  const missingIds = payload.recipientIds.filter(id => !foundIds.has(id))
-  if (missingIds.length) {
-    throw createError({
-      statusCode: 404,
-      message: `Не удалось найти всех получателей: ${missingIds.join(', ')}.`
-    })
+  const selectedCustomers = resolveDispatchRecipients(
+    [...buildingCustomers, ...extraCustomers],
+    currentObject.name,
+    payload.recipientIds
+  )
+
+  if (!selectedCustomers.length) {
+    throw createError({ statusCode: 404, message: 'Для этого объекта не найдено ни одного сотрудника.' })
   }
 
   const recipientIds = selectedCustomers.map(customer => Number(customer.id))

@@ -7,6 +7,7 @@ import {
 } from '../../../utils/mobile-access'
 import { buildEqOrInFilter, encodeIn } from '../../../utils/postgrest'
 import { getDataApiServerConfig, getDataApiServerHeaders } from '../../../utils/data-api'
+import { isDispatchRecipient } from '../../documents/dispatch-visibility'
 import type { AuthRole } from '~~/shared/types/auth'
 import { getRoleLabel } from '~~/shared/utils/access'
 import {
@@ -58,12 +59,17 @@ async function fetchRowsOrEmpty<T>(request: () => Promise<T[]>) {
 export default eventHandler(async (event) => {
   const access = await requireMobileAccess(event)
   const frontlineAccess = isFrontlineMobileAccess(access)
+  // Менеджеры/супервайзеры — тоже customer, но не frontline. Им, как и рядовым
+  // сотрудникам, документ может прийти лично (они в recipient_ids), поэтому для
+  // всех customer-ролей матчим и по объекту, и по получателю. ERP-роли
+  // (admin/hr) остаются на чистой фильтрации по объекту.
+  const isCustomerAccess = Boolean(access.customer)
   const requestedObjectId = parseRequestedObjectId(getQuery(event).objectId)
   const objectIds = frontlineAccess
     ? access.objectIds
     : resolveScopedObjectIds(access, requestedObjectId)
 
-  if (!objectIds.length && !frontlineAccess) {
+  if (!objectIds.length && !isCustomerAccess) {
     return {
       role: access.role,
       frontend: access.frontend,
@@ -97,7 +103,7 @@ export default eventHandler(async (event) => {
     order: 'id.desc'
   }
 
-  if (frontlineAccess) {
+  if (isCustomerAccess) {
     const orFilters: string[] = []
     if (objectFilterForOr) {
       orFilters.push(objectFilterForOr)
@@ -125,7 +131,7 @@ export default eventHandler(async (event) => {
     order: 'signed_at.desc'
   }
 
-  if (frontlineAccess) {
+  if (isCustomerAccess) {
     const orFilters: string[] = []
     if (objectFilterForOr) {
       orFilters.push(objectFilterForOr)
@@ -175,7 +181,7 @@ export default eventHandler(async (event) => {
     order: 'id.desc'
   }
 
-  if (frontlineAccess) {
+  if (isCustomerAccess) {
     const orFilters: string[] = []
     if (objectFilterForOr) {
       orFilters.push(objectFilterForOr)
@@ -203,12 +209,7 @@ export default eventHandler(async (event) => {
   }
 
   const visibleDispatchRows = frontlineAccess
-    ? dispatchRows.filter((row) => {
-        const recipientIds = (Array.isArray(row.recipient_ids) ? row.recipient_ids : []).map(Number)
-        const recipientPhones = Array.isArray(row.recipient_phones) ? row.recipient_phones : []
-        return (Number.isInteger(customerId) && recipientIds.includes(customerId))
-          || recipientPhones.some(phone => normalizePhone(phone) === currentPhone)
-      })
+    ? dispatchRows.filter(row => isDispatchRecipient(row.recipient_ids, row.recipient_phones, customerId, rawPhone))
     : dispatchRows
 
   const visibleSignedRows = frontlineAccess
@@ -252,7 +253,7 @@ export default eventHandler(async (event) => {
   ))
 
   let objectNameById = new Map<number, string>()
-  if (frontlineAccess && objectIdsFromTemplates.length) {
+  if (isCustomerAccess && objectIdsFromTemplates.length) {
     const objects = await $fetch<ObjectLiteRow[]>(`${url}/rest/v1/objects`, {
       headers,
       query: {
@@ -264,7 +265,7 @@ export default eventHandler(async (event) => {
     objectNameById = new Map(objects.map(object => [object.id, object.name]))
   }
 
-  const baseTemplateVariables = frontlineAccess
+  const baseTemplateVariables = isCustomerAccess
     ? {
         employee_name: access.user.name,
         phone: access.user.phone || '',
@@ -277,7 +278,7 @@ export default eventHandler(async (event) => {
   const templates = visibleTemplateRows.map((row) => {
     const record = mapTemplateDbRowToRecord(row)
 
-    if (!frontlineAccess || !baseTemplateVariables) {
+    if (!isCustomerAccess || !baseTemplateVariables) {
       return record
     }
 
@@ -294,23 +295,38 @@ export default eventHandler(async (event) => {
     }
   })
   const templateNameById = new Map(templates.map(template => [template.id, template.name]))
-  const signedByDispatchId = new Set(
+  // «Подписано мной» — только записи с моим телефоном. Для менеджера
+  // visibleSignedRows включает и чужие подписи по объекту, поэтому фильтруем.
+  const ownSignedDispatchIds = new Set(
     visibleSignedRows
+      .filter(row => normalizePhone(row.phone_number) === currentPhone)
       .map(row => Number(row.dispatch_id))
       .filter((dispatchId): dispatchId is number => Number.isInteger(dispatchId) && dispatchId > 0)
   )
 
   const dispatches = visibleDispatchRows
     .map(mapDispatchDbRowToRecord)
-    .map(dispatch => ({
-      ...dispatch,
-      templateName: dispatch.templateId ? templateNameById.get(dispatch.templateId) : undefined,
-      recipients: dispatch.recipientIds
-        .map(id => recipientMap.get(id))
-        .filter(Boolean) as DispatchRecipient[],
-      assignedToCurrentUser: frontlineAccess,
-      signedByCurrentUser: signedByDispatchId.has(Number(dispatch.id))
-    }))
+    .map((dispatch) => {
+      // Я получатель, если мой id есть в recipient_ids или мой телефон — в
+      // recipient_phones. Для frontline это всегда true (список уже сужен),
+      // для менеджера — только по документам, адресованным лично ему.
+      const isRecipient = isDispatchRecipient(
+        dispatch.recipientIds,
+        dispatch.recipientPhones,
+        customerId,
+        rawPhone
+      )
+
+      return {
+        ...dispatch,
+        templateName: dispatch.templateId ? templateNameById.get(dispatch.templateId) : undefined,
+        recipients: dispatch.recipientIds
+          .map(id => recipientMap.get(id))
+          .filter(Boolean) as DispatchRecipient[],
+        assignedToCurrentUser: isCustomerAccess ? isRecipient : false,
+        signedByCurrentUser: ownSignedDispatchIds.has(Number(dispatch.id))
+      }
+    })
 
   const signed = visibleSignedRows
     .map(mapSignedDbRowToRecord)
@@ -330,18 +346,6 @@ export default eventHandler(async (event) => {
     employeeName: item.employeeName,
     phoneNumber: item.phoneNumber
   }))
-
-  if (frontlineAccess) {
-    return {
-      role: access.role,
-      frontend: access.frontend,
-      objectIds,
-      templates,
-      dispatches,
-      signed,
-      documents
-    }
-  }
 
   return {
     role: access.role,
